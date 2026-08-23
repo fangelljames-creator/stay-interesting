@@ -129,7 +129,6 @@ export default function Home() {
   }, []);
 
   const fetchSavedActivities = async (userId: string) => {
-    // 1. Get saved IDs
     const { data: savedData, error: savedError } = await supabase
       .from("saved_activities")
       .select("activity_id")
@@ -140,7 +139,6 @@ export default function Home() {
       setSavedActivityIds(ids);
 
       if (ids.length > 0) {
-        // 2. Fetch full activity details for those IDs
         const { data: activityData, error: activityError } = await supabase
           .from("activities")
           .select("*")
@@ -203,7 +201,7 @@ export default function Home() {
 
       if (!error) {
         setSavedActivityIds([...savedActivityIds, activityId]);
-        fetchSavedActivities(user.id); // Refresh list
+        fetchSavedActivities(user.id);
       }
     }
   };
@@ -223,7 +221,7 @@ export default function Home() {
       const flattenedTags = newHistory.flat();
       const pathwayTag = path === "bored" ? "quick-fix" : "long-term";
       const finalTags = [...flattenedTags, pathwayTag];
-      await findPrecisionMatches(finalTags, pathwayTag);
+      await findPrecisionMatchesWithRotation(finalTags, pathwayTag);
     }
   };
 
@@ -237,7 +235,7 @@ export default function Home() {
     }
   };
 
-  const findPrecisionMatches = async (collectedTags: string[], pathwayTag: string) => {
+  const findPrecisionMatchesWithRotation = async (collectedTags: string[], pathwayTag: string) => {
     const { data: activities, error } = await supabase.from("activities").select("*");
 
     if (error || !activities) {
@@ -259,6 +257,16 @@ export default function Home() {
       validActivities = validActivities.filter(a => a.tags.includes(userLocationRequirement));
     }
 
+    // Retrieve recently shown activity IDs from browser session storage to rotate variety
+    const recentKey = `recent_shown_${path}`;
+    let recentShownIds: number[] = [];
+    try {
+      const stored = sessionStorage.getItem(recentKey);
+      if (stored) recentShownIds = JSON.parse(stored);
+    } catch (e) {
+      // fallback
+    }
+
     const scoredActivities = validActivities.map((activity) => {
       let score = 0;
       
@@ -278,6 +286,12 @@ export default function Home() {
       if (collectedTags.includes("active") && activity.tags.includes("active")) score *= 1.6;
       if (collectedTags.includes("tangible-output") && activity.tags.includes("tangible-output")) score *= 1.4;
 
+      // ROTATION PENALTY: If this exact activity was shown in the immediate previous run, 
+      // gently reduce its score so alternate high-scoring matches bubble to the top!
+      if (recentShownIds.includes(activity.id)) {
+        score *= 0.65;
+      }
+
       return { ...activity, score: Math.round(score * 10) / 10 };
     });
 
@@ -287,6 +301,13 @@ export default function Home() {
 
     const topMatches = sortedMatches.slice(0, 3);
     const topMatchIds = topMatches.map(m => m.id);
+
+    // Save these new IDs to session storage so next repeat quiz run rotates them
+    try {
+      sessionStorage.setItem(recentKey, JSON.stringify(topMatchIds));
+    } catch (e) {
+      // fallback
+    }
 
     const wildcardCandidates = activities.filter(
       a => a.tags.includes(pathwayTag) && !topMatchIds.includes(a.id)
@@ -490,7 +511,7 @@ export default function Home() {
             {isLoading ? (
               <div className="flex flex-col items-center justify-center py-12 space-y-4">
                 <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin" />
-                <p className="text-slate-500 font-medium">Curating precise matches...</p>
+                <p className="text-slate-500 font-medium">Curating rotating matches...</p>
               </div>
             ) : (
               <div className="space-y-5">
@@ -514,7 +535,6 @@ export default function Home() {
                               {getMedalText(index, activity.isWildcard)}
                             </span>
                             
-                            {/* Bookmark Heart Button */}
                             <button
                               onClick={() => toggleSaveActivity(activity.id)}
                               title={isSaved ? "Saved!" : "Save to list"}
