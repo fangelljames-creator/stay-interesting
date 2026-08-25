@@ -118,7 +118,41 @@ and `authenticated` with no write policy at all, so the anon key that ships in t
 cannot modify it; `saved_activities` is restricted to `(select auth.uid()) = user_id` for
 select/insert/delete. Queries 7a and 7b in that file re-check this at any time.
 
-## Two recommendation engines currently coexist
+## One funnel (merged 2026-08-25, roadmap steps 3 + 4)
+
+Every visit walks the same path, in `app/page.tsx`:
+
+```
+personality quiz -> Bored/Hobby chooser -> feasibility questions -> ranked results
+```
+
+`FunnelStage` drives it: `"loading" | "quiz" | "chooser" | "questions" | "results"`.
+
+**`"loading"` is load-bearing, not decoration.** The page is statically prerendered, so
+`sessionStorage` does not exist during that render and the opening stage cannot be known until
+after mount. It resolves in a `useEffect`; painting a spinner until then is what prevents a
+hydration mismatch. `eslint`'s `react-hooks/set-state-in-effect` objects — that is the correct
+trade, and there is a comment at the effect saying so. Do not "fix" it by reading storage during
+render.
+
+**The session contract** (`lib/quizSession.ts`, key `si_quiz_v1`): `sessionStorage` only. No
+table, no `localStorage`. The result survives navigation and refresh inside a tab and dies with
+it, so a new tab always retakes the quiz. Stores **raw per-axis sums plus the question count**,
+never a pre-divided vector, so `userVectorFromQuizTotals` stays the single place division — and
+therefore the no-rounding rule — lives. `readQuizSession` returns `null` on every failure path
+(server render, storage blocked, absent, malformed, wrong shape); the caller's answer to `null`
+is "send them to the quiz", which is fine for all of them.
+
+⚠️ **`writeQuizSession` fails silently when storage is blocked**, so the results stage really can
+be reached with no vector. The tag-score ordering is kept as the fallback for exactly that case.
+It is not dead code — don't delete it when retiring tag scoring.
+
+Two distinct ways out of a finished run: **"Try a different path"** keeps the vector and returns
+to the chooser; **"Retake the personality quiz"** clears the session and starts over. Retake links
+sit on both the chooser and the results.
+
+`/quiz` still works standalone. Its CTA stores the session and routes to `/`, so home picks the
+funnel up at the chooser rather than asking again.
 
 ### 1. Tag engine — `app/page.tsx` (home, client component)
 
@@ -167,15 +201,24 @@ never suggest something the user ruled out on social, location, or budget. It re
 `validActivities` rather than `sortedMatches`, so a zero-scoring but perfectly feasible activity is
 still eligible.
 
-### 2. Vector quiz — `app/quiz/page.tsx` → `components/PersonalityQuiz.tsx`
+### 2. Vector quiz — `components/PersonalityQuiz.tsx`
 
 - Axis order is a fixed invariant everywhere:
   `[Social, Energy, Creative, Analytical, Outdoors, Novelty, Stimulation]`, each scored 1–10.
 - 8 scenario questions in `data/personalityQuiz.ts`. The dominant axis picks 1 of 7 profile types —
   see **Personality quiz scoring** below for how that axis is chosen, which is easy to break.
-- Navigation mirrors the home-page quiz: a Back button (`handleBack` drops the last vector from
-  `selectedVectors`) and a progress bar across the top of the card.
-- The "Find My Perfect Activities →" button is still a placeholder: no `onClick` yet.
+- Back button and progress bar as before. The results card shows the **personality type only** —
+  the seven vector tiles were removed, and with them the last rounding in the codebase.
+- **Skip is a real answer, not a missing one.** `handleSkip` picks a random option and goes
+  through `handleSelectOption` exactly as a click would, so every path yields a full-length
+  vector and `handleBack` needs no special case for a skipped question. Skips are tracked as a
+  `boolean[]` parallel to `selectedVectors` — **not a counter**, because going back over a skip
+  has to un-count it. The count is stored in the session and displayed on the *results*, next to
+  the match percentages it qualifies.
+- `pickRandomOption` sits at module scope because `Math.random()` in a component body trips
+  `react-hooks/purity`.
+- The CTA takes an optional `onContinue`; without one it routes to `/`. That keeps
+  `app/quiz/page.tsx` a server component.
 
 ## Personality quiz scoring
 
@@ -195,13 +238,20 @@ Two consequences to keep in mind:
 - The `traits` array order is still a real tiebreaker for the remaining 10%. Reordering it changes
   results without touching a vector.
 
-**The rounding rule now has a second consumer.** As of step 2 the raw sums also feed
-`rankActivities`, via `userVectorFromQuizTotals(totals, questionCount)` in `lib/matchActivities.ts`
-— it divides the sums by the question count to reach the activities' own 1–10 scale and
-**deliberately does not round**. So "rounding is display-only" is no longer just about the profile
-label; precision lost upstream would now also flatten genuinely different users onto the same match
-ordering. Both consumers take the raw sums; only the results-card vector tiles take the rounded
-averages.
+**There is now no rounding anywhere in this path — keep it that way.** The rule used to be
+"rounding is display-only"; as of 2026-08-25 the display that needed it is gone. The vector tiles
+on the profile card were the only consumer of the rounded averages, and removing them deleted
+`finalVector` and its `Math.round` outright.
+
+The raw sums now feed two things, neither of which rounds:
+
+1. `determinePersonalityType(totals)` — the profile label, judged on raw sums (the tie-break fix).
+2. `userVectorFromQuizTotals(totals, questionCount)` in `lib/matchActivities.ts` — divides by the
+   question count to reach the activities' 1–10 scale and **deliberately does not round**.
+
+Precision lost upstream would inflate the profile tie rate *and* flatten genuinely different users
+onto the same match ordering. The rule is no longer "keep rounding out of the argmax" but the
+simpler "there is no rounding here; don't reintroduce any".
 
 `scripts/analyze-quiz-balance.mjs` measures this — it walks every possible answer combination and
 reports the tie rate and profile distribution. Run it after any change to the vectors in
@@ -239,12 +289,57 @@ Verified by `scripts/verify-activity-matching.mjs`, which imports the real funct
 quiz data rather than mirroring them (Node strips the TypeScript on the fly), so it cannot drift out
 of sync the way `analyze-quiz-balance.mjs` can.
 
-## Agreed integration plan
+## Integration plan — done
 
-Tags answer *what's feasible right now* (time, budget, location, social) → hard filters.
-The 7-axis vector answers *what fits who you are* → ranking. Merged pipeline: tag-filter first,
-then rank the survivors by similarity between the user's vector and each activity's vector.
-Every activity therefore needs both `tags` and a `vector`.
+Tags answer *what's feasible right now* → hard filters. The 7-axis vector answers *what fits who
+you are* → ranking. **Implemented 2026-08-25:** hard-filter on pathway/social/location/budget,
+then `rankActivities` orders the survivors by distance from the session vector, and every card
+shows its `matchPercent`.
+
+Two consequences of that switch worth knowing:
+
+- **The `score > 0` gate is gone.** It only ever dropped activities sharing no scoring tags with
+  the answers. Every survivor is feasible by definition and the vector supplies the ordering, so
+  activities that previously could not surface now can.
+- **The rotation penalty is a distance multiplier now** (`ROTATION_DISTANCE_PENALTY`, 1.35), since
+  lower distance is better. It is applied to a **sort key only** — the `matchPercent` on the card
+  stays the true one. Never let the penalty reach the displayed number; it would make the card
+  lie about the fit in order to make rotation work.
+
+## Retiring tag scoring — analysed, NOT approved
+
+Every user now completes the personality quiz (answered or shuffled), so a vector always exists
+and `rankActivities` does all the ordering. The `+2`/`+6` tag scoring and the ×1.6/×1.4
+multipliers no longer affect what anyone sees. Removing them is roadmap step 5 and **needs Owen's
+explicit approval first.**
+
+What each question is left with once scoring goes, traced from the tag constants in
+`app/page.tsx` rather than from memory:
+
+| Question | Survives as a hard filter | Verdict |
+|---|---|---|
+| Bored — time | nothing | ⚠️ **fully inert** |
+| Bored — energy | nothing | **fully inert** |
+| Bored — location | `inside`/`outside` | fine |
+| Bored — social | `solo`/`couple`/`social` | fine |
+| Bored — budget | `free`/`low-budget` | fine |
+| Hobby — psychological itch | nothing | **fully inert** |
+| Hobby — environment | `inside`/`outside` only | 8 of 10 tags stop mattering |
+| Hobby — learning curve | nothing | **fully inert** |
+| Hobby — commitment | budget tags only | the time half stops mattering |
+| Hobby — social | `solo`/`couple`/`social` | fine |
+
+**Four of ten questions become decorative**, and two more lose most of their content. The user
+would still answer them and nothing would change.
+
+⚠️ **Time is the one that should worry us.** Time tags carry the heaviest weight in scoring (`+6`)
+but were never a hard filter, so retiring scoring means someone with 10 minutes could be offered a
+half-day activity. **Recommendation: promote time to a hard filter the way budget was**, rather
+than let the most practical constraint in the app evaporate.
+
+Energy is subtler. The vector has an Energy axis, but that measures a *trait* — how energetic
+someone generally is — not how energetic they feel right now. Treating one as the other would be
+a silent downgrade, so either promote it too or drop the question honestly.
 
 ## Known issues
 
@@ -266,6 +361,15 @@ Every activity therefore needs both `tags` and a `vector`.
   vectors were authored by Claude, so this is seed data to correct, not a user decision to preserve.
 
 ## Recently completed
+
+**Funnel integration, 2026-08-25** (roadmap steps 3 + 4, branch `funnel-integration`):
+
+- `lib/quizSession.ts` — the per-tab quiz result. Raw sums + question count, versioned key,
+  null on every failure path.
+- Skip button on every personality question; the profile card trimmed to the type alone.
+- `FunnelStage` replaces the old `path === null` gating; retake links on chooser and results.
+- Results ranked by `rankActivities` with `matchPercent` on every card — the first time
+  `lib/matchActivities.ts` has been called by anything since it was written.
 
 **Cleanup sweep, 2026-08-25** (before the merged-engine build):
 
@@ -326,9 +430,11 @@ Every activity therefore needs both `tags` and a `vector`.
    with vectors. Verified: `vector` really is `integer[]`, `missing_vector` is 0.
 2. ~~Vector matching function: rank tag-filtered activities by similarity to the user's vector.~~
    **DONE 2026-08-25** — `lib/matchActivities.ts`, verified by
-   `scripts/verify-activity-matching.mjs`. Not yet wired to any UI; that is step 3.
-3. Wire the quiz results button to real recommendations.
-4. Merge both engines into one clean flow.
+   `scripts/verify-activity-matching.mjs`.
+3. ~~Wire the quiz results button to real recommendations.~~ **DONE 2026-08-25.**
+4. ~~Merge both engines into one clean flow.~~ **DONE 2026-08-25** — see **One funnel** above.
+5. **Retire the tag-scoring ranking** (`+2`/`+6` and the multipliers). Analysed and awaiting
+   Owen's approval — see **Retiring tag scoring** below. Do not start this without it.
 
 Not blocking the above, pick up when convenient: the two budget-tag issues, the missing animation
 plugin, and the quiz vector rebalance.
