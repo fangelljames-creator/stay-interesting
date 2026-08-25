@@ -2,24 +2,26 @@
 -- Stay Interesting / Boredom Buster — legacy schema cleanup
 --
 -- A one-off tidy-up of leftovers from the original hand-written schema, run
--- AFTER step1-schema-rls-seed.sql. Two jobs:
+-- AFTER step1-schema-rls-seed.sql. Four jobs:
 --
 --   1. Drop the unused `personality_scores` column.
 --   2. Drop the duplicate RLS policies left behind under their old names.
+--   3. Drop the unused `budget_level` and `time_required` columns.
+--   4. Make `vector` NOT NULL, now that every row has one.
 --
 -- HOW TO RUN
 --   Supabase dashboard -> SQL Editor -> New query -> paste this whole file -> Run.
 --
--- Safe to run more than once. Both steps are guarded and become no-ops once
--- they have been applied.
+-- Safe to run more than once. Every step is guarded and becomes a no-op once
+-- it has been applied.
 --
 -- ⚠️ WHAT THIS DELIBERATELY DOES NOT DO
 --   The original schema script began with:
 --       drop table if exists saved_activities cascade;
 --       drop table if exists activities cascade;
 --   Those are NOT reproduced here and must not be run. They would destroy all
---   33 seeded activities and every user's saved list. This file alters one
---   column and some policies; it drops no tables and no rows.
+--   37 seeded activities and every user's saved list. This file drops columns
+--   and policies only; it drops no tables and deletes no rows.
 -- ============================================================================
 
 
@@ -28,7 +30,7 @@
 --
 -- Background: it was declared `vector(7)` — a pgvector column — as the original
 -- home for the 7 axes. The project instead stores them in `vector integer[]`,
--- which is populated on all 33 rows, so this one is dead weight.
+-- which is populated on every row, so this one is dead weight.
 --
 -- Dropping a column is irreversible, so this refuses to act if any row has
 -- data in it. If the raise below fires, nothing is dropped and you should tell
@@ -97,8 +99,8 @@ drop policy if exists "Users can delete their own saved activities" on public.sa
 -- STEP 3 — Verification (read-only)
 -- ----------------------------------------------------------------------------
 
--- 3a. Columns on activities. personality_scores should be absent, leaving 8:
---     id, title, description, budget_level, time_required, created_at, tags, vector
+-- 3a. Columns at this point in the file: personality_scores absent, leaving 8.
+--     Steps 4 and 5 below then remove two more - see 6a for the final shape.
 select column_name, data_type, is_nullable
 from information_schema.columns
 where table_schema = 'public' and table_name = 'activities'
@@ -121,7 +123,7 @@ select relname as table_name, relrowsecurity as rls_enabled
 from pg_class
 where oid in ('public.activities'::regclass, 'public.saved_activities'::regclass);
 
--- 3d. The seed data is untouched: 33 rows, none missing a vector.
+-- 3d. The seed data is untouched: 37 rows, none missing a vector.
 select count(*) as total_activities,
        count(*) filter (where vector is null) as missing_vector
 from public.activities;
@@ -131,14 +133,89 @@ select extname, extversion from pg_extension where extname = 'vector';
 
 
 -- ----------------------------------------------------------------------------
--- STILL OPEN — not touched here, decide before acting
+-- STEP 4 — Drop `budget_level` and `time_required`  (Owen's decision, 2026-08-25)
 --
--- `budget_level` and `time_required` are also unused text columns, overlapping
--- what `tags` already encodes ('low-budget'/'free', '10-mins'/'1-hour'). They
--- are left in place deliberately: unlike personality_scores they were not
--- raised for removal, and they may yet be the intended design with `tags` as
--- the newer overlay. To drop them once decided:
+-- Two unused text columns from the original schema, overlapping what `tags`
+-- already encodes ('low-budget'/'free', '10-mins'/'1-hour'). Nothing reads
+-- them, and budget and time are both now driven entirely by tags — budget
+-- became a hard filter alongside social and location.
 --
---   alter table public.activities drop column if exists budget_level;
---   alter table public.activities drop column if exists time_required;
+-- Guarded the same way as personality_scores above: each column is checked for
+-- data first and the whole block aborts rather than destroying anything.
 -- ----------------------------------------------------------------------------
+
+do $$
+declare
+  populated integer;
+  col       text;
+begin
+  foreach col in array array['budget_level', 'time_required'] loop
+    if not exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public'
+        and table_name   = 'activities'
+        and column_name  = col
+    ) then
+      raise notice '% is already gone — nothing to do.', col;
+      continue;
+    end if;
+
+    execute format('select count(*) from public.activities where %I is not null', col)
+      into populated;
+
+    if populated > 0 then
+      raise exception 'ABORTED: % row(s) have data in %. Nothing dropped.', populated, col;
+    end if;
+
+    execute format('alter table public.activities drop column %I', col);
+    raise notice 'Dropped %.', col;
+  end loop;
+end
+$$;
+
+
+-- ----------------------------------------------------------------------------
+-- STEP 5 — Make `vector` mandatory
+--
+-- This was STEP 8 in step1-schema-rls-seed.sql, left commented until every row
+-- had a vector. All 37 seeded rows do, so it is applied here: a future activity
+-- can no longer be added without one, which would otherwise make it silently
+-- unrankable by lib/matchActivities.ts.
+--
+-- Aborts rather than failing halfway if any row is still missing a vector.
+-- Re-running once the column is already NOT NULL is a harmless no-op.
+-- ----------------------------------------------------------------------------
+
+do $$
+declare
+  missing integer;
+begin
+  select count(*) into missing from public.activities where vector is null;
+
+  if missing > 0 then
+    raise exception
+      'ABORTED: % activity row(s) still have no vector. Seed them first.', missing;
+  end if;
+
+  alter table public.activities alter column vector set not null;
+  raise notice 'vector is now NOT NULL.';
+end
+$$;
+
+
+-- ----------------------------------------------------------------------------
+-- STEP 6 — Verification for steps 4 and 5 (read-only)
+-- ----------------------------------------------------------------------------
+
+-- 6a. Columns on activities. budget_level and time_required should be absent,
+--     leaving 6: id, title, description, created_at, tags, vector.
+--     vector should now read is_nullable = NO.
+select column_name, data_type, is_nullable
+from information_schema.columns
+where table_schema = 'public' and table_name = 'activities'
+order by ordinal_position;
+
+-- 6b. Seed data untouched: expect 37 rows, 0 missing a vector.
+select count(*) as total_activities,
+       count(*) filter (where vector is null) as missing_vector
+from public.activities;

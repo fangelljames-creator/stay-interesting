@@ -501,10 +501,13 @@ where table_schema = 'public'
 -- STEP 8 (OPTIONAL) — run these later, only once the checks above are clean
 -- ----------------------------------------------------------------------------
 
--- Once 7e returns no rows, make the vector mandatory so a future activity
--- cannot be added without one:
+-- APPLIED 2026-08-25 as STEP 5 of cleanup-legacy-schema.sql, once 7e came back
+-- empty. Kept here for the record: the statement that makes vector mandatory,
+-- so a future activity cannot be added without one, is
 --
 --   alter table public.activities alter column vector set not null;
+--
+-- Do not run it from here as well - it is guarded in the cleanup file.
 
 -- If step 1b had to ADD title or description (7g shows them as nullable), they
 -- should be mandatory too. Check for empty ones first — this must return zero
