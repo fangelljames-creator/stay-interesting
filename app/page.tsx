@@ -244,17 +244,27 @@ export default function Home() {
       return;
     }
 
-    const userSocialRequirement = collectedTags.find(tag => SOCIAL_TAGS.includes(tag));
-    const userLocationRequirement = collectedTags.find(tag => LOCATION_TAGS.includes(tag));
+    // Collect every matching tag, not just the first. "With someone else or a group"
+    // emits ["social", "couple"], and matching on "social" alone excluded couple-only
+    // activities from exactly the users asking for them. An activity qualifies if it
+    // matches ANY of the user's tags on that axis.
+    const userSocialRequirements = collectedTags.filter(tag => SOCIAL_TAGS.includes(tag));
+    // No answer currently emits two location tags, so this behaves identically today --
+    // it's shaped the same way so adding one can't reintroduce the bug above.
+    const userLocationRequirements = collectedTags.filter(tag => LOCATION_TAGS.includes(tag));
 
     let validActivities = activities.filter(a => a.tags.includes(pathwayTag));
-    
-    if (userSocialRequirement) {
-      validActivities = validActivities.filter(a => a.tags.includes(userSocialRequirement));
+
+    if (userSocialRequirements.length > 0) {
+      validActivities = validActivities.filter(a =>
+        userSocialRequirements.some(tag => a.tags.includes(tag))
+      );
     }
 
-    if (userLocationRequirement) {
-      validActivities = validActivities.filter(a => a.tags.includes(userLocationRequirement));
+    if (userLocationRequirements.length > 0) {
+      validActivities = validActivities.filter(a =>
+        userLocationRequirements.some(tag => a.tags.includes(tag))
+      );
     }
 
     // Retrieve recently shown activity IDs from browser session storage to rotate variety
