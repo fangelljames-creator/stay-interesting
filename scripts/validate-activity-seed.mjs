@@ -25,9 +25,12 @@ import {
   TIME_LADDER,
 } from "../lib/activityTags.ts";
 import { parseSeedActivities } from "./lib/parse-seed.mjs";
+import { QUICK_QUESTIONS, HOBBY_QUESTIONS, MIN_RESULTS } from "../lib/feasibilityQuestions.ts";
+import { satisfiesFilter } from "../lib/activityTags.ts";
 
 const rows = parseSeedActivities();
 const failures = [];
+const SEPARATOR = "-".repeat(72);
 
 console.log(`Parsed ${rows.length} seed activities from supabase/step1-schema-rls-seed.sql`);
 console.log(`Vocabulary: ${ACTIVITY_TAGS.length} legal tags\n`);
@@ -95,6 +98,66 @@ if (unused.length) {
   console.log(`\nLegal but unused tags: ${unused.join(", ")}`);
   console.log("  (not a failure, but a tag nothing carries filters everything out)");
 }
+
+// --- Coverage report (DIAGNOSTIC, never fatal) -----------------------------
+//
+// Walks every combination of answers a user can give and counts how many
+// activities survive the hard filters BEFORE any relaxation. Imports the real
+// questions from lib/feasibilityQuestions.ts rather than restating them, so it
+// cannot drift from what the app actually asks.
+//
+// A high starvation rate is not automatically a fault: it means the filters are
+// strict relative to the catalogue, and relaxation exists to absorb exactly
+// that. It IS a fault when a combination sits at zero, because then that set of
+// answers can never be satisfied honestly and always bends.
+console.log(SEPARATOR);
+console.log("COVERAGE (diagnostic - relaxation absorbs these at runtime)");
+console.log("");
+
+for (const [questions, pathway, label] of [
+  [QUICK_QUESTIONS, "quick-fix", "quick"],
+  [HOBBY_QUESTIONS, "long-term", "hobby"],
+]) {
+  const pool = rows.filter((row) => row.tags.includes(pathway));
+  const sizes = questions.map((q) => q.options.length);
+  const total = sizes.reduce((a, b) => a * b, 1);
+
+  const blame = new Map();
+  let starved = 0;
+  let zero = 0;
+
+  for (let n = 0; n < total; n++) {
+    let rem = n;
+    const choice = sizes.map((size) => {
+      const pick = rem % size;
+      rem = Math.floor(rem / size);
+      return pick;
+    });
+    const actions = questions.map((q, i) => q.options[choice[i]].action);
+    const survivors = pool.filter((a) => actions.every((act) => satisfiesFilter(a.tags, act)));
+
+    if (survivors.length >= MIN_RESULTS) continue;
+    starved++;
+    if (survivors.length === 0) zero++;
+    choice.forEach((pick, i) => {
+      const text = questions[i].options[pick].text;
+      blame.set(text, (blame.get(text) ?? 0) + 1);
+    });
+  }
+
+  const pct = ((starved / total) * 100).toFixed(0);
+  console.log(
+    "  " + label.padEnd(7) + starved + " of " + total + " combinations start below " +
+    MIN_RESULTS + " (" + pct + "%), " + zero + " at zero"
+  );
+  for (const [text, count] of [...blame.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4)) {
+    console.log("      " + String(count).padStart(3) + "x  " + text);
+  }
+  console.log("");
+}
+console.log("  Answers above appear most often in starved combinations - they are");
+console.log("  where new activities would do the most good.");
+console.log("");
 
 if (failures.length) {
   console.log(`\n${failures.length} FAILURE(S):\n - ${failures.join("\n - ")}`);
