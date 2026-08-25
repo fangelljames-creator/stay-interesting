@@ -24,6 +24,8 @@ up, log in, take a 7-axis personality quiz, and save activities to custom lists.
 - `lib/` — Supabase client, imported as `@/lib/supabaseClient` (the `@/*` → `./*` alias is in
   `tsconfig.json`) (verified)
 - `scripts/` — dev-only analysis tools, not part of the build
+- `supabase/` — SQL to paste into the Supabase SQL editor. Not run by any CLI or migration
+  tool; these are hand-run scripts, written to be idempotent so re-running is safe.
 
 Note that `@AGENTS.md` above warns this Next.js version diverges from what you may have learned:
 check `node_modules/next/dist/docs/` before relying on remembered App Router conventions.
@@ -43,16 +45,32 @@ check `node_modules/next/dist/docs/` before relying on remembered App Router con
    live in `.env.local` and are never committed.
 6. Test/seed activity data must include: playing pool, rugby drills, biro sketching, Spanish
    language practice, and EV market analysis.
+7. Owen hand-edits files in VS Code. If the working tree differs from `HEAD`, treat the
+   difference as his intent — ask before reverting anything, and never assume an editor buffer
+   is stale. Corollary: if he says he edited a file and the diff is empty, the edits are most
+   likely unsaved in his editor rather than absent. Say so and ask him to save; do not conclude
+   he was mistaken, and do not proceed as though the on-disk text were final.
 
 ## Database (Supabase)
 
 - Standard email/password auth.
-- `activities`: `id`, `title`, `description`, `tags` (text array). **Planned:** a 7-axis `vector`
-  column — storage format undecided (`int[]` vs `jsonb`); decide with Owen before adding it.
-- `saved_activities`: `user_id`, `activity_id`.
-- ⚠️ RLS status unverified. Before other DB work, confirm/enable Row Level Security:
-  `saved_activities` restricted to `auth.uid() = user_id` (select/insert/delete);
-  `activities` publicly readable.
+- `activities`: `id`, `title`, `description`, `tags` (text array), `vector` (`integer[]`).
+- `saved_activities`: `user_id`, `activity_id`, unique on the pair.
+- All of the above is defined in `supabase/step1-schema-rls-seed.sql`, which Owen runs by hand in
+  the Supabase SQL editor. Treat that file as the source of truth for the schema and edit it
+  alongside any DB change, rather than making one-off changes in the dashboard.
+
+**Vector storage — decided 2026-08-25:** `integer[]`, not `jsonb` and not pgvector. Chosen because
+Supabase hands a Postgres array to JavaScript as a real array with no parsing, which keeps the
+step-2 similarity ranking as ordinary JS next to the existing tag scoring. A `CHECK` constraint
+enforces 7 elements, each 1–10. Revisit only if the activity table grows into the thousands, where
+pgvector's indexed search would start to matter.
+
+**RLS is enabled** (in the same file): `activities` is readable by `anon` and `authenticated` with
+no write policy at all, so the anon key that ships in the browser bundle cannot modify it;
+`saved_activities` is restricted to `(select auth.uid()) = user_id` for select/insert/delete.
+Confirm it is actually applied on the live project with the verification queries at the end of
+that file — the SQL existing in the repo is not proof it was run.
 
 ## Two recommendation engines currently coexist
 
@@ -109,12 +127,10 @@ Every activity therefore needs both `tags` and a `vector`.
 
 ## Known issues
 
-- **Social filter bug** in `findPrecisionMatchesWithRotation` (`app/page.tsx:247`) — **verified,
-  still open.** `.find()` returns only the first matching social tag. "With someone else or a
-  group" emits `["social", "couple"]`, so couple-only activities get wrongly excluded for exactly
-  the users who want them. Fix: collect all of the user's social tags and keep an activity if any
-  of them match. `userLocationRequirement` on the next line has the same shape — check whether any
-  answer emits two location tags before assuming it's fine.
+- **Budget is not a hard filter.** "Strictly Free" only adds `free` as a scoring tag, so a
+  `low-budget` activity (playing pool, say) still surfaces for a user who said free only. Either
+  hard-filter it the way social and location are filtered, or reword the answer. Note this
+  interacts with the hobby-budget issue below.
 - **`animate-in fade-in zoom-in` classes do nothing** — **verified, still open.** The results card
   uses them but nothing provides them: `tailwindcss-animate` is not in `package.json` and not
   installed. This is Tailwind v4, so the v3 plugin-array approach doesn't apply — it'd need
@@ -122,7 +138,10 @@ Every activity therefore needs both `tags` and a `vector`.
   silently, so the card simply appears with no animation.
 - The hobby-path budget question adds `low-budget` + `free` to every answer, so it differentiates
   almost nothing (may be intentional — free activities shouldn't be hidden from big spenders).
-  Not yet verified.
+  **Verified against the seed data:** because every user receives both tags, an activity that
+  honestly carries `investment-required` instead is uniformly 4 points behind one tagged
+  `low-budget`/`free`, regardless of what the user answered. That systematically down-ranks the
+  gear-heavy hobbies rather than differentiating anything.
 - The wildcard bypasses social/location hard filters. Probably an intentional "stretch pick" —
   confirm with Owen before changing it.
 - **Quiz vector balance is skewed.** With the tie-break fixed, the underlying vector imbalance is
@@ -139,14 +158,24 @@ Every activity therefore needs both `tags` and a `vector`.
   hardcoded to "3" against 8 actual questions, so it was visibly wrong in the UI.
 - Tie-break fix: dominant axis now judged on raw sums, not rounded averages (58.3% → 10.0% ties).
 - `scripts/analyze-quiz-balance.mjs` added.
+- Social filter bug fixed — `findPrecisionMatchesWithRotation` now collects every matching social
+  tag rather than the first (`app/page.tsx:251`). `userLocationRequirements` was reshaped the same
+  way so the bug can't return if an answer ever emits two location tags.
+- **Roadmap step 1** — `supabase/step1-schema-rls-seed.sql`: RLS policies, the `vector integer[]`
+  column with a shape CHECK, a unique constraint on `saved_activities (user_id, activity_id)`, and
+  33 seeded activities (17 quick-fix, 16 long-term) each carrying both tags and a vector.
+- `scripts/validate-activity-seed.mjs` added — checks the seed against the hard filters. It caught
+  four filter combinations that only had 3 surviving activities, which would have pinned those
+  users to the same three results forever with no room for the rotation penalty to work.
 
 ## Roadmap (agreed order)
 
-1. Supabase groundwork: RLS policies, the `vector` column, and seeding activities (the five
-   listed above, plus more) with both tags and 7-axis vectors.
+1. ~~Supabase groundwork: RLS policies, the `vector` column, and seeding activities with both tags
+   and 7-axis vectors.~~ **SQL written** (`supabase/step1-schema-rls-seed.sql`) — still needs Owen
+   to run it in the Supabase SQL editor and confirm the verification queries come back clean.
 2. Vector matching function: rank tag-filtered activities by similarity to the user's vector.
 3. Wire the quiz results button to real recommendations.
 4. Merge both engines into one clean flow.
 
-Not blocking the above, pick up when convenient: the social filter bug, the missing animation
+Not blocking the above, pick up when convenient: the two budget-tag issues, the missing animation
 plugin, and the quiz vector rebalance.
