@@ -28,6 +28,7 @@ export const AXES = [
 export const PATHWAY_TAGS = ["quick-fix", "long-term"];
 export const SOCIAL_TAGS = ["solo", "couple", "social"];
 export const LOCATION_TAGS = ["inside", "outside"];
+export const BUDGET_TAGS = ["free", "low-budget", "investment-required"];
 
 export const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const seedSqlPath = join(repoRoot, "supabase", "step1-schema-rls-seed.sql");

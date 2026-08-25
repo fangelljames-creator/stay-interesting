@@ -20,15 +20,30 @@ import {
   PATHWAY_TAGS,
   SOCIAL_TAGS,
   LOCATION_TAGS,
+  BUDGET_TAGS,
   parseSeedActivities,
 } from "./lib/parse-seed.mjs";
 
 // The tag sets a user can actually produce on each hard-filter axis, taken from
 // BORED_QUIZ and HOBBY_QUIZ. Note the hobby quiz's "structured facility" answer
 // emits no location tag at all, which means no location filter is applied.
+//
+// Budgets: the bored quiz offers strictly-free vs open. The hobby quiz's three
+// answers reduce to two distinct budget sets, because "Deep immersion" and
+// "Weekend expeditions" both list all three tags and so match everything.
 const FILTER_COMBINATIONS = [
-  { pathway: "quick-fix", socials: [["solo"], ["social", "couple"]], locations: [["inside"], ["outside"]] },
-  { pathway: "long-term", socials: [["solo"], ["couple"], ["social"]], locations: [["inside"], ["outside"], []] },
+  {
+    pathway: "quick-fix",
+    socials: [["solo"], ["social", "couple"]],
+    locations: [["inside"], ["outside"]],
+    budgets: [["free"], ["low-budget", "free"]],
+  },
+  {
+    pathway: "long-term",
+    socials: [["solo"], ["couple"], ["social"]],
+    locations: [["inside"], ["outside"], []],
+    budgets: [["low-budget", "free"], ["investment-required", "low-budget", "free"]],
+  },
 ];
 
 // Top 3 plus a wildcard means 4 is the bare minimum; below 5 there is nothing
@@ -51,6 +66,9 @@ for (const row of rows) {
   if (!LOCATION_TAGS.some((tag) => row.tags.includes(tag))) {
     problems.push(`"${row.title}": no location tag — can never be recommended`);
   }
+  if (!BUDGET_TAGS.some((tag) => row.tags.includes(tag))) {
+    problems.push(`"${row.title}": no budget tag — can never be recommended`);
+  }
   if (row.vector.length !== AXES.length) {
     problems.push(`"${row.title}": vector has ${row.vector.length} values, needs ${AXES.length}`);
   }
@@ -68,19 +86,27 @@ if (new Set(titles).size !== titles.length) {
 }
 
 console.log(`Survivors per hard-filter combination (need >= ${MIN_SURVIVORS}):\n`);
-for (const { pathway, socials, locations } of FILTER_COMBINATIONS) {
+const matches = (row, group) =>
+  group.length === 0 || group.some((tag) => row.tags.includes(tag));
+
+for (const { pathway, socials, locations, budgets } of FILTER_COMBINATIONS) {
   for (const social of socials) {
     for (const location of locations) {
-      const survivors = rows.filter(
-        (row) =>
-          row.tags.includes(pathway) &&
-          social.some((tag) => row.tags.includes(tag)) &&
-          (location.length === 0 || location.some((tag) => row.tags.includes(tag)))
-      );
-      const label = `${pathway} | social=${social.join("+")} | location=${location.join("+") || "(unfiltered)"}`;
-      console.log(`  ${String(survivors.length).padStart(2)}  ${label}`);
-      if (survivors.length < MIN_SURVIVORS) {
-        problems.push(`Only ${survivors.length} activities survive: ${label}`);
+      for (const budget of budgets) {
+        const survivors = rows.filter(
+          (row) =>
+            row.tags.includes(pathway) &&
+            matches(row, social) &&
+            matches(row, location) &&
+            matches(row, budget)
+        );
+        const label =
+          `${pathway} | social=${social.join("+")} | ` +
+          `location=${location.join("+") || "(unfiltered)"} | budget=${budget.join("+")}`;
+        console.log(`  ${String(survivors.length).padStart(2)}  ${label}`);
+        if (survivors.length < MIN_SURVIVORS) {
+          problems.push(`Only ${survivors.length} activities survive: ${label}`);
+        }
       }
     }
   }

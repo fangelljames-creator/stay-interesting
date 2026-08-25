@@ -200,7 +200,7 @@ create policy "Users can remove their own saved activities"
 -- ----------------------------------------------------------------------------
 -- STEP 6 — Seed activities
 --
--- 33 activities: 17 on the "quick-fix" (I'm Bored) pathway and 16 on the
+-- 37 activities: 19 on the "quick-fix" (I'm Bored) pathway and 18 on the
 -- "long-term" (Find a Hobby) pathway. Includes the five required test entries:
 -- playing pool, rugby drills, biro sketching, Spanish language practice, and
 -- EV market analysis.
@@ -315,6 +315,16 @@ with seed (title, description, tags, vector) as (
    array['quick-fix','1-hour','half-day','high-energy','active-movement','outside','facility','couple','social','free','active','physical-challenge'],
    array[7,8,1,3,7,3,7]),
 
+  ('Learn a two-player card game neither of you knows',
+   'One deck, one set of rules nobody has read before, and the specific fun of both being terrible at something at the same time. Cribbage, piquet, durak — pick one and stumble through.',
+   array['quick-fix','10-mins','1-hour','low-energy','sedentary','inside','couple','social','free','learning','mental-challenge'],
+   array[8,2,3,6,1,9,5]),
+
+  ('Blind taste test whatever is in the cupboard',
+   'Three of anything — teas, crisps, jams, supermarket colas — decanted by one person and guessed by the other with their eyes shut. You learn something genuinely surprising about what you actually taste.',
+   array['quick-fix','10-mins','low-energy','sedentary','inside','couple','social','free','hands-on'],
+   array[8,2,4,6,1,8,9]),
+
   -- === LONG-TERM PATHWAY (Find a Hobby) ===================================
 
   ('Rugby drills',
@@ -395,7 +405,17 @@ with seed (title, description, tags, vector) as (
   ('Club road cycling',
    'Club runs give you a route, a pace group, and people who will not let you sit up on the last hill. Sixty miles is a different sport from commuting, and far more achievable in company.',
    array['long-term','weekend-short','5-hours-week','high-energy','active-movement','outside','nature','solo','couple','social','active','physical-challenge','process-oriented','goal-oriented','investment-required'],
-   array[7,9,1,4,9,4,8])
+   array[7,9,1,4,9,4,8]),
+
+  ('Geocaching',
+   'Millions of small containers hidden in plain sight worldwide, findable with the phone already in your pocket. It turns any walk into a search, and takes you to corners of your own area you would never otherwise stand in.',
+   array['long-term','weekend-short','1-2-hours-week','high-energy','active-movement','outside','nature','solo','couple','social','free','low-budget','learning','mental-challenge'],
+   array[5,6,3,7,8,10,6]),
+
+  ('Skateboarding at a public park',
+   'A board, a free concrete park, and one trick you cannot do yet. Progress is measured in weeks and comes with bruises, but almost nothing else gives that much of a hit for landing something small.',
+   array['long-term','1-2-hours-week','5-hours-week','high-energy','active-movement','outside','facility','solo','couple','social','low-budget','active','physical-challenge','process-oriented'],
+   array[5,8,5,3,7,6,10])
 
 )
 insert into public.activities (title, description, tags, vector)
@@ -424,7 +444,7 @@ where schemaname = 'public'
   and tablename in ('activities', 'saved_activities')
 order by tablename, cmd;
 
--- 7c. Activity counts by pathway. Expect quick-fix 17, long-term 16
+-- 7c. Activity counts by pathway. Expect quick-fix 19, long-term 18
 --     (higher if you already had rows of your own).
 select
   case

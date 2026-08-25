@@ -117,11 +117,38 @@ select/insert/delete. Queries 7a and 7b in that file re-check this at any time.
 Also owns auth (`getSession` + `onAuthStateChange`) and the saved-activities list (fetch/toggle).
 
 - Two flows: "Bored" → pathway tag `quick-fix`; "Hobby" → pathway tag `long-term`.
-- Pipeline: fetch all activities → hard-filter (pathway tag, social tag, location tag) → score
-  tag matches (+6 for time tags, +2 for others) → multipliers (×1.6 analytical/creative/culture/
-  active, ×1.4 tangible-output) → ×0.65 penalty for IDs stored in
-  `sessionStorage["recent_shown_${path}"]` → top 3 + 1 random wildcard (the wildcard only
-  requires the pathway tag).
+- Pipeline: fetch all activities → hard-filter (pathway tag, then social, location, and budget) →
+  score tag matches (+6 for time tags, +2 for others) → multipliers (×1.6 analytical/creative/
+  culture/active, ×1.4 tangible-output) → ×0.65 penalty for IDs stored in
+  `sessionStorage["recent_shown_${path}"]` → top 3 + 1 random wildcard.
+
+**Three hard filters, all shaped identically** (`SOCIAL_TAGS`, `LOCATION_TAGS`, `BUDGET_TAGS`):
+collect every one of the user's tags on that axis, keep an activity if it matches ANY of them. An
+activity carrying no tag at all on one of these axes is invisible to everyone —
+`scripts/validate-activity-seed.mjs` fails the build on that.
+
+**Budget became a hard filter 2026-08-25 (Owen's decision).** It had been scoring-only, so
+"Strictly Free" still surfaced paid activities. Filtering it makes the multi-tag budget answers
+semantically correct rather than redundant, which is why the hobby quiz's blanket `low-budget` +
+`free` tags are **deliberately kept**:
+
+| Answer | Emits | Now means |
+|---|---|---|
+| Bored → Strictly Free | `free` | free only |
+| Bored → Open budget | `low-budget`, `free` | free or cheap |
+| Hobby → Light commitment | `low-budget`, `free` | excludes gear-only hobbies |
+| Hobby → Deep immersion | + `investment-required` | matches everything |
+| Hobby → Weekend expeditions | + `investment-required` | matches everything |
+
+Listing all three tags is how an answer says "no budget limit". Under the old scoring-only
+behaviour those tags differentiated nothing; under filtering they are the mechanism. Don't "tidy"
+them away.
+
+**Wildcard rule, confirmed 2026-08-25: it may stretch taste, never feasibility.** It is drawn from
+the hard-filtered survivors minus the picks already shown, so it can surprise on theme but can
+never suggest something the user ruled out on social, location, or budget. It reads from
+`validActivities` rather than `sortedMatches`, so a zero-scoring but perfectly feasible activity is
+still eligible.
 
 ### 2. Vector quiz — `app/quiz/page.tsx` → `components/PersonalityQuiz.tsx`
 
@@ -210,39 +237,27 @@ Every activity therefore needs both `tags` and a `vector`.
   JavaScript compares strings happily, so `.includes()` and `.filter()` behave, and `tsc` stays
   green because Supabase rows come back as `any[]` so nothing ever checks. But the types are
   false, and the first arithmetic or `parseInt` on an id yields `NaN`. Change them to `string`.
-- **Budget is not a hard filter.** "Strictly Free" only adds `free` as a scoring tag, so a
-  `low-budget` activity (playing pool, say) still surfaces for a user who said free only. Either
-  hard-filter it the way social and location are filtered, or reword the answer. Note this
-  interacts with the hobby-budget issue below.
 - **`animate-in fade-in zoom-in` classes do nothing** — **verified, still open.** The results card
   uses them but nothing provides them: `tailwindcss-animate` is not in `package.json` and not
   installed. This is Tailwind v4, so the v3 plugin-array approach doesn't apply — it'd need
   `tw-animate-css` (or equivalent) loaded via `@plugin` in `app/globals.css`. The classes fail
   silently, so the card simply appears with no animation.
-- The hobby-path budget question adds `low-budget` + `free` to every answer, so it differentiates
-  almost nothing (may be intentional — free activities shouldn't be hidden from big spenders).
-  **Verified against the seed data:** because every user receives both tags, an activity that
-  honestly carries `investment-required` instead is uniformly 4 points behind one tagged
-  `low-budget`/`free`, regardless of what the user answered. That systematically down-ranks the
-  gear-heavy hobbies rather than differentiating anything.
-- The wildcard bypasses social/location hard filters. Probably an intentional "stretch pick" —
-  confirm with Owen before changing it.
 - **Quiz vector balance is skewed.** With the tie-break fixed, the underlying vector imbalance is
   now visible and unmasked: Stimulation wins 36.7% of all 65,536 answer paths while Creative wins
   3.6%, against an even split of 14.3%. Stimulation has both the highest option-pool average (5.03)
   and the highest floor (2.9), so it starts every path ahead. Rebalancing means editing vectors in
   `data/personalityQuiz.ts` and re-running `scripts/analyze-quiz-balance.mjs`.
-- **The seed pool leans the opposite way to the quiz, on the same two axes.** Dominant axis across
-  the 33 seeded activities: Creative 8, Social 7, Energy 6, Outdoors 6, Analytical 5, **Novelty 1,
-  Stimulation 0**. So the two axes that win most quiz paths (Stimulation 36.7%, Novelty 17.6% —
-  together 54% of users) are the two the catalogue barely has. `verify-activity-matching.mjs`
-  surfaces this as its Stimulation-purist warning.
-  This is not a matcher bug and the matches it returns are sensible — a Stimulation purist gets
-  court knockabout and bouldering, which genuinely are stimulating — but no activity in the pool
-  has Stimulation as its *strongest* axis, so the profile label can never point at something the
-  catalogue agrees is that. Fix from either end: rebalance the quiz vectors down, or seed a few
-  genuinely Stimulation- and Novelty-dominant activities. The vectors were authored by Claude in
-  step 1, so this is seed data to correct, not a user decision to preserve.
+- **The seed pool still leans the opposite way to the quiz, on the same two axes.** Dominant axis
+  across the 37 seeded activities: Creative 8, Social 7, Energy 6, Outdoors 6, Analytical 5,
+  **Novelty 3, Stimulation 2**. The two axes that win most quiz paths (Stimulation 36.7%,
+  Novelty 17.6% — together 54% of users) are still the two the catalogue has least of.
+  Improved 2026-08-25 from Novelty 1 / Stimulation 0 by the four activities added for the budget
+  filter, but `verify-activity-matching.mjs` **still flags the Stimulation purist**: skateboarding
+  lands at d=4.90, a hair behind darts, so it misses the top 3 by a rounding error rather than by
+  a mile. Not a matcher bug — the matches returned are sensible — but the profile label still
+  cannot point at something the catalogue agrees is Stimulation-dominant. Fix from either end:
+  rebalance the quiz vectors down, or seed more genuinely Stimulation-dominant activities. These
+  vectors were authored by Claude, so this is seed data to correct, not a user decision to preserve.
 
 ## Recently completed
 
@@ -263,6 +278,12 @@ Every activity therefore needs both `tags` and a `vector`.
 - `scripts/validate-activity-seed.mjs` added — checks the seed against the hard filters. It caught
   four filter combinations that only had 3 surviving activities, which would have pinned those
   users to the same three results forever with no room for the rotation penalty to work.
+- **Budget promoted to the third hard filter, 2026-08-25 (Owen's decision).** Resolved both budget
+  Known-issues entries and confirmed the wildcard rule. Seed grew 33 → 37 to keep every
+  pathway × social × location × budget combination at ≥5 survivors: the four failing combinations
+  were fixed by adding activities, not by re-tagging, because pool hire, film developing, and a
+  road bike are all genuinely not free and re-tagging them would have gutted the semantics.
+  **The live database needs `step1-schema-rls-seed.sql` re-run to pick up the 4 new rows.**
 - **Roadmap step 2** — `lib/matchActivities.ts`: pure Euclidean-distance ranking, plus
   `userVectorFromQuizTotals`, `euclideanDistance`, `matchPercentFor`, and `isValidVector`.
   `scripts/verify-activity-matching.mjs` checks it (self-match, purist-path diagnostic, bad-data

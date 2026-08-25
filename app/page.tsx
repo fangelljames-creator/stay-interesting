@@ -89,6 +89,7 @@ const HOBBY_QUIZ = [
 
 const SOCIAL_TAGS = ["solo", "couple", "social"];
 const LOCATION_TAGS = ["inside", "outside"];
+const BUDGET_TAGS = ["free", "low-budget", "investment-required"];
 const TIME_TAGS = ["10-mins", "30-mins", "1-hour", "half-day", "whole-day", "weekend-short", "1-2-hours-week", "5-hours-week"];
 
 export default function Home() {
@@ -244,14 +245,21 @@ export default function Home() {
       return;
     }
 
-    // Collect every matching tag, not just the first. "With someone else or a group"
-    // emits ["social", "couple"], and matching on "social" alone excluded couple-only
-    // activities from exactly the users asking for them. An activity qualifies if it
-    // matches ANY of the user's tags on that axis.
+    // Three hard filters: social, location, budget. Each collects EVERY matching tag,
+    // not just the first. "With someone else or a group" emits ["social", "couple"],
+    // and matching on "social" alone excluded couple-only activities from exactly the
+    // users asking for them. An activity qualifies if it matches ANY of the user's
+    // tags on that axis.
     const userSocialRequirements = collectedTags.filter(tag => SOCIAL_TAGS.includes(tag));
     // No answer currently emits two location tags, so this behaves identically today --
     // it's shaped the same way so adding one can't reintroduce the bug above.
     const userLocationRequirements = collectedTags.filter(tag => LOCATION_TAGS.includes(tag));
+    // Budget was scoring-only until now, so "Strictly Free" still surfaced paid
+    // activities. Filtering it the same way makes the multi-tag budget answers mean
+    // what they say: an open budget lists all three tags and so matches everything,
+    // while a low-cost answer omits "investment-required" and so excludes the
+    // gear-only hobbies.
+    const userBudgetRequirements = collectedTags.filter(tag => BUDGET_TAGS.includes(tag));
 
     let validActivities = activities.filter(a => a.tags.includes(pathwayTag));
 
@@ -264,6 +272,12 @@ export default function Home() {
     if (userLocationRequirements.length > 0) {
       validActivities = validActivities.filter(a =>
         userLocationRequirements.some(tag => a.tags.includes(tag))
+      );
+    }
+
+    if (userBudgetRequirements.length > 0) {
+      validActivities = validActivities.filter(a =>
+        userBudgetRequirements.some(tag => a.tags.includes(tag))
       );
     }
 
@@ -319,9 +333,12 @@ export default function Home() {
       // fallback
     }
 
-    const wildcardCandidates = activities.filter(
-      a => a.tags.includes(pathwayTag) && !topMatchIds.includes(a.id)
-    );
+    // The wildcard may stretch TASTE, never FEASIBILITY: it is drawn from the
+    // hard-filtered survivors minus the picks already shown, so it can surprise
+    // on theme but can never suggest something the user ruled out on social,
+    // location, or budget. It comes from validActivities rather than sortedMatches
+    // so a zero-scoring but perfectly feasible activity is still eligible.
+    const wildcardCandidates = validActivities.filter(a => !topMatchIds.includes(a.id));
 
     let finalResults = [...topMatches];
     if (wildcardCandidates.length > 0) {
