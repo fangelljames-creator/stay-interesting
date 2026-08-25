@@ -37,7 +37,8 @@ check `node_modules/next/dist/docs/` before relying on remembered App Router con
 4. Check your own work: run the dev server and `npx tsc --noEmit` after changes. When something
    breaks, diagnose step by step and explain the cause, not just the fix.
    (Heads-up: `next dev` rewrites the agent-rules block into `AGENTS.md`, so running it can leave
-   an uncommitted change in the tree. See `@AGENTS.md` — commit it alongside your work.)
+   an uncommitted change in the tree. See `@AGENTS.md` — glance at the diff first, only the
+   managed `nextjs-agent-rules` block should ever change, then commit it alongside your work.)
 5. Flag every step that needs the Supabase dashboard (API keys, SQL editor, env vars). Secrets
    live in `.env.local` and are never committed.
 6. Test/seed activity data must include: playing pool, rugby drills, biro sketching, Spanish
