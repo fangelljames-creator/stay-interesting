@@ -194,53 +194,59 @@ sit on both the chooser and the results.
 `/quiz` still works standalone. Its CTA stores the session and routes to `/`, so home picks the
 funnel up at the chooser rather than asking again.
 
-### 1. Tag engine — `app/page.tsx` (home, client component)
+### 1. Feasibility engine — `app/page.tsx` + `lib/feasibilityQuestions.ts`
 
-Also owns auth (`getSession` + `onAuthStateChange`) and the saved-activities list (fetch/toggle).
+Rebuilt 2026-08-25. **There is no tag scoring.** No `+2`/`+6` weights, no multipliers, no
+`score > 0` gate. Tags decide what is FEASIBLE; `rankActivities` decides what FITS.
 
-- Two flows: "Bored" → pathway tag `quick-fix`; "Hobby" → pathway tag `long-term`.
-- Pipeline: fetch all activities → hard-filter (pathway tag, then social, location, and budget) →
-  score tag matches (+6 for time tags, +2 for others) → multipliers (×1.6 analytical/creative/
-  culture/active, ×1.4 tangible-output) → ×0.65 penalty for IDs stored in
-  `sessionStorage["recent_shown_${path}"]` → top 3 + 1 random wildcard.
+```
+pathway filter -> per-question filter actions -> rank by vector -> top 3 + wildcard
+```
 
-**Three hard filters, all shaped identically** (`SOCIAL_TAGS`, `LOCATION_TAGS`, `BUDGET_TAGS`):
-collect every one of the user's tags on that axis, keep an activity if it matches ANY of them. An
-activity carrying no tag at all on one of these axes is invisible to everyone —
-`scripts/validate-activity-seed.mjs` fails the build on that.
+**Nine questions**, five on the quick path and four on the hobby path, in
+`lib/feasibilityQuestions.ts`. They live there rather than in the page component so scripts can
+import the real definitions — mirroring them by hand is how `analyze-quiz-balance.mjs` became
+something that goes stale in lockstep with the code it checks.
 
-**Budget became a hard filter 2026-08-25 (Owen's decision).** It had been scoring-only, so
-"Strictly Free" still surfaced paid activities. Filtering it makes the multi-tag budget answers
-semantically correct rather than redundant, which is why the hobby quiz's blanket `low-budget` +
-`free` tags are **deliberately kept**:
+Every option carries an explicit `FilterAction`:
 
-| Answer | Emits | Now means |
+| Question | Constraint | Actions |
 |---|---|---|
-| Bored → Strictly Free | `free` | free only |
-| Bored → Open budget | `low-budget`, `free` | free or cheap |
-| Hobby → Light commitment | `low-budget`, `free` | excludes gear-only hobbies |
-| Hobby → Deep immersion | + `investment-required` | matches everything |
-| Hobby → Weekend expeditions | + `investment-required` | matches everything |
+| How long have you actually got? | `time` | `allow {10-mins}` / `{1-hour}` / `{half-day}` / `none` |
+| What's your body in the mood for? | `energy` | `exclude exertion` / `require exertion` / `none` |
+| In or out? | `place` | `require inside` / `require outside` / `none` |
+| Who's around? | `company` | `require solo` / `couple` / `social` |
+| Spending money? | `cost` | ceiling: `{free}` / `{free,low-budget}` / `none` |
 
-Listing all three tags is how an answer says "no budget limit". Under the old scoring-only
-behaviour those tags differentiated nothing; under filtering they are the mechanism. Don't "tidy"
-them away.
+The hobby path mirrors it with `setting` (`at-home` / `facility` / `in-nature`) in place of
+`place`, **no energy question**, and a "don't mind" option on company.
 
-**Budget tagging is a judgment call, and the calls are deliberate.** `investment-required` means
-the activity is gear-gated: pool hire, film stock and developing, a road bike. Skateboarding is
-tagged `low-budget` — **confirmed with Owen 2026-08-25** — because a starter board is a one-off
-~£60–80 and skateparks are free, putting it nearer pool hire than a road bike. That call carries
-weight: it is one of two activities holding `long-term | outside | low-cost` at 6 survivors for
-each social value. Retagging it to `investment-required` drops all three to exactly 5, which still
-passes the validator's floor but leaves no headroom for the rotation penalty. Check
-`scripts/validate-activity-seed.mjs` before changing any budget tag.
+**Graceful relaxation.** When fewer than `MIN_RESULTS` (3) survive, one constraint is bent at a
+time, in order: **place/setting → energy → time (widened one slot up the ladder)**. The results
+page states exactly what was bent — relaxation is never silent.
 
-**Wildcard rule, confirmed 2026-08-25: it may stretch taste, never feasibility.** It is drawn from
-the hard-filtered survivors minus the picks already shown, so it can surprise on theme but can
-never suggest something the user ruled out on social, location, or budget. It reads from
-`validActivities` rather than `sortedMatches`, so a zero-scoring but perfectly feasible activity is
-still eligible.
+⚠️ **`RELAXATION_STEPS` must never contain `cost` or `company`.** Someone who said "keep it free"
+cannot act on a paid suggestion, and someone on their own cannot act on one needing three people.
+Those are facts about their situation, not preferences to nudge. Bending either produces a
+recommendation the user physically cannot take.
 
+**The wildcard may stretch taste, never feasibility** — drawn from the same filtered survivors
+minus the picks already shown, so it can surprise on theme but never suggests something ruled out.
+
+**Rotation** pushes recently-shown activities down by multiplying their distance
+(`ROTATION_DISTANCE_PENALTY`, 1.35). It touches a **sort key only** — the `matchPercent` on the
+card stays the true distance. Never let the penalty reach the displayed number.
+
+⚠️ **No-vector fallback.** `writeQuizSession` fails silently when storage is blocked, so the
+results really can be reached with no vector. Nothing can rank then, so the survivors are shown
+unordered with no `matchPercent` and the page says why. Do not "tidy" this into an empty state.
+
+**Coverage today:** the quick path starts below 3 survivors on 44% of its 324 answer combinations,
+the hobby path on 43% of 192. That is a thin-catalogue measurement, not a tagging fault — five
+simultaneous hard filters over a 20-activity pool cannot do much better, and relaxation absorbs
+it (no combination ends up empty at runtime). `scripts/validate-activity-seed.mjs` reports it.
+**Not being padded with hand-written activities**: the catalogue is heading for thousands, at
+which point starvation largely evaporates on its own.
 ### 2. Vector quiz — `components/PersonalityQuiz.tsx`
 
 - Axis order is a fixed invariant everywhere:
@@ -346,40 +352,58 @@ Two consequences of that switch worth knowing:
   stays the true one. Never let the penalty reach the displayed number; it would make the card
   lie about the fit in order to make rotation work.
 
-## Retiring tag scoring — analysed, NOT approved
+## Tag scoring — retired 2026-08-25
 
-Every user now completes the personality quiz (answered or shuffled), so a vector always exists
-and `rankActivities` does all the ordering. The `+2`/`+6` tag scoring and the ×1.6/×1.4
-multipliers no longer affect what anyone sees. Removing them is roadmap step 5 and **needs Owen's
-explicit approval first.**
+Done, as part of the feasibility redesign. The `+2`/`+6` weights and the ×1.6/×1.4 multipliers
+are gone; nothing scores tags any more.
 
-What each question is left with once scoring goes, traced from the tag constants in
-`app/page.tsx` rather than from memory:
+The analysis that justified it: with every user completing the personality quiz, `rankActivities`
+did all the ordering, and tracing the tags showed **four of ten questions had become fully
+decorative** — users answered them and nothing changed. Time was the dangerous one, carrying the
+heaviest scoring weight while never being a hard filter, so someone with ten minutes could be
+handed a half-day activity.
 
-| Question | Survives as a hard filter | Verdict |
-|---|---|---|
-| Bored — time | nothing | ⚠️ **fully inert** |
-| Bored — energy | nothing | **fully inert** |
-| Bored — location | `inside`/`outside` | fine |
-| Bored — social | `solo`/`couple`/`social` | fine |
-| Bored — budget | `free`/`low-budget` | fine |
-| Hobby — psychological itch | nothing | **fully inert** |
-| Hobby — environment | `inside`/`outside` only | 8 of 10 tags stop mattering |
-| Hobby — learning curve | nothing | **fully inert** |
-| Hobby — commitment | budget tags only | the time half stops mattering |
-| Hobby — social | `solo`/`couple`/`social` | fine |
+Rather than delete the scoring and leave half-dead questions behind, the whole feasibility layer
+was rebuilt: time and energy are now real filters, and the taste questions ("psychological itch",
+"learning curve") are gone entirely, since the vector already measures what they asked about.
+## ⚠️ Scaling to a catalogue in the thousands
 
-**Four of ten questions become decorative**, and two more lose most of their content. The user
-would still answer them and nothing would change.
+Owen's stated direction (2026-08-25). Several current decisions were made explicitly for a
+37-row table and **should be revisited before the catalogue grows**, not after.
 
-⚠️ **Time is the one that should worry us.** Time tags carry the heaviest weight in scoring (`+6`)
-but were never a hard filter, so retiring scoring means someone with 10 minutes could be offered a
-half-day activity. **Recommendation: promote time to a hard filter the way budget was**, rather
-than let the most practical constraint in the app evaporate.
+**1. The engine fetches the entire table on every results view.**
+`findMatches` runs `supabase.from("activities").select("*")` and then filters in JavaScript. At 37
+rows that is trivial. At a few thousand it is a multi-megabyte download on every single run, paid
+by the user on their connection, to then throw nearly all of it away. This is the first thing that
+will hurt, and it will hurt as slowness rather than as an error.
 
-Energy is subtler. The vector has an Energy axis, but that measures a *trait* — how energetic
-someone generally is — not how energetic they feel right now. Treating one as the other would be
-a silent downgrade, so either promote it too or drop the question honestly.
+Direction: push the hard filters into SQL. Postgres array operators map onto them directly —
+`tags @> array['quick-fix','solo']` for the require/allow cases, `not (tags && array['exertion'])`
+for exclude — with a **GIN index on `tags`**. Fetch only survivors.
+
+**2. That changes the `integer[]` vs pgvector decision.**
+`integer[]` was chosen so Supabase hands JavaScript a real array and ranking stays ordinary JS.
+That reasoning was explicitly conditional: *"revisit at the point the table grows or step 2 wants
+to filter and rank in one query."* Both conditions now apply. **pgvector is already installed** —
+the dropped `personality_scores` column was `vector(7)` — so switching is a column add plus a
+backfill, not a reinstall, and `<=>` cosine distance with an index would do filtering and ranking
+in one query. Note the metric would change from Euclidean to cosine, which the
+**Vector matching** section explains was deliberately rejected on meaning, not performance. That
+trade needs a real decision, not a default.
+
+**3. Relaxation becomes a query strategy, not a re-filter.**
+It currently re-filters an in-memory array up to three times. Against SQL it becomes up to four
+round trips, so it should either widen the WHERE clause in one query or be pushed into a Postgres
+function.
+
+**4. Coverage starvation mostly solves itself.**
+The 44% / 43% starvation rates are a function of a 20-activity pool, not of the tag design. They
+should fall away as the catalogue grows — which is exactly why the seed was not padded with
+hand-written filler. Keep running the coverage report; at scale it is the only way to see the
+sparse corners at all.
+
+**5. RLS and the anon key still hold.** Nothing above changes the security model: `activities`
+stays publicly readable with no write policy.
 
 ## Known issues
 
@@ -401,6 +425,17 @@ a silent downgrade, so either promote it too or drop the question honestly.
   vectors were authored by Claude, so this is seed data to correct, not a user decision to preserve.
 
 ## Recently completed
+
+**Feasibility redesign, 2026-08-25** (branch `funnel-integration`):
+
+- `lib/activityTags.ts` — the closed 20-tag vocabulary and the `FilterAction` type.
+- `lib/feasibilityQuestions.ts` — nine questions, each option an explicit filter action, plus the
+  relaxation ladder. Kept out of the page component so scripts import the real definitions.
+- All 37 activities retagged: 40 distinct tags down to 20, exactly one cost tier each, four
+  carrying both pathways. `supabase/retag-activities.sql` migrates the live table by title.
+- Tag scoring retired entirely; graceful relaxation added, with disclosure on the results page.
+- Validator v2: unknown tags, cost-tier count and per-pathway completeness are hard failures, plus
+  a non-fatal coverage report over all 516 answer combinations.
 
 **Funnel integration, 2026-08-25** (roadmap steps 3 + 4, branch `funnel-integration`):
 
@@ -473,8 +508,10 @@ a silent downgrade, so either promote it too or drop the question honestly.
    `scripts/verify-activity-matching.mjs`.
 3. ~~Wire the quiz results button to real recommendations.~~ **DONE 2026-08-25.**
 4. ~~Merge both engines into one clean flow.~~ **DONE 2026-08-25** — see **One funnel** above.
-5. **Retire the tag-scoring ranking** (`+2`/`+6` and the multipliers). Analysed and awaiting
-   Owen's approval — see **Retiring tag scoring** below. Do not start this without it.
+5. ~~Retire the tag-scoring ranking.~~ **DONE 2026-08-25**, subsumed into a wholesale
+   feasibility redesign — see **Tag doctrine** and **Feasibility engine** above.
+6. **Scale to a catalogue in the thousands.** Owen's stated direction. See the warning below
+   before building anything that assumes the current size.
 
 Not blocking the above, pick up when convenient: the two budget-tag issues, the missing animation
 plugin, and the quiz vector rebalance.
