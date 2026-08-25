@@ -6,8 +6,12 @@
  *
  * Scoring here mirrors calculateFinalProfile / determinePersonalityType in
  * components/PersonalityQuiz.tsx exactly -- sum each axis across the answered
- * questions, divide by the question count, Math.round, then take the first
- * index holding the max. Change the scoring there and this goes stale.
+ * questions, then take the first index holding the max of those raw sums.
+ * Rounding to an average happens only for display. Change the scoring there
+ * and this goes stale.
+ *
+ * The walk also reports the superseded rounded-first scheme for comparison,
+ * since the tie rate is the whole reason the app stopped using it.
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -119,6 +123,9 @@ if (totalPaths > 5_000_000) {
   const wins = new Array(7).fill(0);
   const tiedWins = new Array(7).fill(0);
   let tiedPaths = 0;
+  // Superseded scheme, kept for the before/after comparison only.
+  const roundedWins = new Array(7).fill(0);
+  let roundedTiedPaths = 0;
   const choice = new Array(nQ).fill(0);
 
   for (let path = 0; path < totalPaths; path++) {
@@ -134,16 +141,20 @@ if (totalPaths > 5_000_000) {
       const v = questions[qi].vectors[choice[qi]];
       for (let i = 0; i < 7; i++) totals[i] += v[i];
     }
-    const avg = totals.map((t) => Math.round(t / nQ));
-
-    const top = Math.max(...avg);
-    const winner = avg.indexOf(top); // first index wins ties, same as the app
+    // Current app behaviour: judge on the raw sums.
+    const top = Math.max(...totals);
+    const winner = totals.indexOf(top); // first index wins ties, same as the app
     wins[winner]++;
-
-    if (avg.filter((x) => x === top).length > 1) {
+    if (totals.filter((x) => x === top).length > 1) {
       tiedPaths++;
       tiedWins[winner]++;
     }
+
+    // Superseded: round to an average first, then judge.
+    const avg = totals.map((t) => Math.round(t / nQ));
+    const roundedTop = Math.max(...avg);
+    roundedWins[avg.indexOf(roundedTop)]++;
+    if (avg.filter((x) => x === roundedTop).length > 1) roundedTiedPaths++;
   }
 
   console.log(`  ${pad("Axis", 12)} ${num("paths", 8)} ${num("share", 8)}   won on a tie`);
@@ -164,6 +175,13 @@ if (totalPaths > 5_000_000) {
       `(${((tiedPaths / totalPaths) * 100).toFixed(1)}%) -- these are resolved by ` +
       `indexOf, so they always go to whichever tied axis sits earliest in the traits array.`
   );
+  console.log(
+    `  For comparison, the superseded round-then-judge scheme tied on ` +
+      `${roundedTiedPaths.toLocaleString()} paths ` +
+      `(${((roundedTiedPaths / totalPaths) * 100).toFixed(1)}%).`
+  );
+  const moved = roundedWins.reduce((n, w, i) => n + Math.abs(w - wins[i]), 0) / 2;
+  console.log(`  Switching schemes moves at least ${moved.toLocaleString()} paths to a different profile.`);
   if (unreachable.length) {
     console.log(
       `  UNREACHABLE: ${unreachable.map((r) => r.trait).join(", ")} ` +

@@ -30,6 +30,7 @@ export default function PersonalityQuiz() {
     }
   };
 
+  // Takes the raw per-axis sums, not the rounded averages -- see calculateFinalProfile.
   const determinePersonalityType = (vector: number[]) => {
     const traits = ["Social", "Energy", "Creative", "Analytical", "Outdoors", "Novelty", "Stimulation"];
     const maxScore = Math.max(...vector);
@@ -92,10 +93,15 @@ export default function PersonalityQuiz() {
       }
     });
 
+    // Rounding is for display only. Picking the dominant axis from the rounded
+    // averages collapsed distinct scores onto the same integer and left ~58% of
+    // answer paths tied at the top, and determinePersonalityType breaks ties with
+    // indexOf -- so those all went to whichever axis sat earliest in the traits
+    // array. Judging on the raw sums keeps the full precision of the answers.
     const averageVector = totals.map((total) => Math.round(total / numQuestions));
     setFinalVector(averageVector);
-    
-    const type = determinePersonalityType(averageVector);
+
+    const type = determinePersonalityType(totals);
     setProfileType(type);
     
     setIsFinished(true);
