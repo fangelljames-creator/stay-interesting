@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+/* Provides animate-in / animate-out and their modifiers (fade-in, zoom-in-95,
+   slide-in-from-bottom-4, and the duration-* / delay-* pairings). Without it
+   those classes are inert - Tailwind emits nothing for them and the cards just
+   appear.
+
+   Note this is @import, NOT @plugin. tw-animate-css ships plain CSS, so it is
+   imported like any stylesheet; @plugin is for JavaScript plugins such as
+   @tailwindcss/typography. The v3 predecessor tailwindcss-animate was a JS
+   plugin listed in tailwind.config.js, which does not apply here - this project
+   is Tailwind v4 and has no config file. */
+@import "tw-animate-css";
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
