@@ -11,21 +11,17 @@
  * catches it, along with malformed vectors and filter combinations that leave
  * too few activities for the top-3 list to have any variety.
  *
- * Like scripts/analyze-quiz-balance.mjs, this mirrors the app's logic by hand,
- * so it goes stale if findPrecisionMatchesWithRotation changes and must be
- * updated alongside it.
+ * Like scripts/analyze-quiz-balance.mjs, this mirrors the app's filtering by
+ * hand, so it goes stale if findPrecisionMatchesWithRotation changes and must
+ * be updated alongside it.
  */
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
-
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const sqlPath = join(repoRoot, "supabase", "step1-schema-rls-seed.sql");
-
-// Hard-filter tag groups, mirroring the constants at the top of app/page.tsx.
-const PATHWAY_TAGS = ["quick-fix", "long-term"];
-const SOCIAL_TAGS = ["solo", "couple", "social"];
-const LOCATION_TAGS = ["inside", "outside"];
+import {
+  AXES,
+  PATHWAY_TAGS,
+  SOCIAL_TAGS,
+  LOCATION_TAGS,
+  parseSeedActivities,
+} from "./lib/parse-seed.mjs";
 
 // The tag sets a user can actually produce on each hard-filter axis, taken from
 // BORED_QUIZ and HOBBY_QUIZ. Note the hobby quiz's "structured facility" answer
@@ -39,35 +35,10 @@ const FILTER_COMBINATIONS = [
 // for the rotation penalty to swap in and results never change between runs.
 const MIN_SURVIVORS = 5;
 
-const AXES = ["Social", "Energy", "Creative", "Analytical", "Outdoors", "Novelty", "Stimulation"];
-
-function parseSeedRows(sql) {
-  const start = sql.indexOf("with seed (title");
-  const end = sql.indexOf("insert into public.activities");
-  if (start === -1 || end === -1) {
-    throw new Error(`Could not find the seed block in ${sqlPath}`);
-  }
-
-  const rowPattern =
-    /\(\s*'((?:[^']|'')*)',\s*\n\s*'(?:[^']|'')*',\s*\n\s*array\[([^\]]*)\],\s*\n\s*array\[([^\]]*)\]\)/g;
-
-  const rows = [];
-  let match;
-  while ((match = rowPattern.exec(sql.slice(start, end))) !== null) {
-    rows.push({
-      title: match[1].replace(/''/g, "'"),
-      tags: match[2].split(",").map((tag) => tag.trim().replace(/^'|'$/g, "")),
-      vector: match[3].split(",").map((n) => Number(n.trim())),
-    });
-  }
-  return rows;
-}
-
-const rows = parseSeedRows(readFileSync(sqlPath, "utf8"));
+const rows = parseSeedActivities();
 const problems = [];
 
 console.log(`Parsed ${rows.length} seed activities from supabase/step1-schema-rls-seed.sql\n`);
-if (rows.length === 0) problems.push("No seed rows parsed — the SQL format may have changed.");
 
 for (const row of rows) {
   const pathways = PATHWAY_TAGS.filter((tag) => row.tags.includes(tag));

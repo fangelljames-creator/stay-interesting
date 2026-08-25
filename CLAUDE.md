@@ -151,10 +151,49 @@ Two consequences to keep in mind:
 - The `traits` array order is still a real tiebreaker for the remaining 10%. Reordering it changes
   results without touching a vector.
 
+**The rounding rule now has a second consumer.** As of step 2 the raw sums also feed
+`rankActivities`, via `userVectorFromQuizTotals(totals, questionCount)` in `lib/matchActivities.ts`
+— it divides the sums by the question count to reach the activities' own 1–10 scale and
+**deliberately does not round**. So "rounding is display-only" is no longer just about the profile
+label; precision lost upstream would now also flatten genuinely different users onto the same match
+ordering. Both consumers take the raw sums; only the results-card vector tiles take the rounded
+averages.
+
 `scripts/analyze-quiz-balance.mjs` measures this — it walks every possible answer combination and
 reports the tie rate and profile distribution. Run it after any change to the vectors in
 `data/personalityQuiz.ts` or to the scoring itself. It mirrors the scoring logic by hand, so it goes
 stale if the component changes and must be updated alongside it.
+
+## Vector matching — `lib/matchActivities.ts`
+
+`rankActivities(userVector, activities)` sorts activities by closeness to the user's 7-axis vector,
+nearest first, decorating each with `distance` and `matchPercent` (the same way `app/page.tsx`
+decorates with `score`).
+
+**Metric: Euclidean distance.** Straight-line distance across the 7 axes, so an activity matches
+when it sits near the user on every axis at once. `matchPercent = (1 - d / (9 * sqrt(7))) * 100`,
+clamped to 0–100 — `9 * sqrt(7)` ≈ 23.81 is the largest gap two valid vectors can have (every axis
+maximally opposed, 1 vs 10). Exact match = 100%.
+
+Two alternatives were considered and rejected, both because they throw away intensity:
+
+- **Dot product** rewards magnitude. An activity vectored all-10s would out-score every other
+  activity for *every* user, so one maximal row would win every quiz regardless of who took it.
+- **Cosine similarity** compares direction only. It calls a `[2,2,2,2,2,2,2]` user a perfect match
+  for a `[9,9,9,9,9,9,9]` activity because the vectors are parallel. That is exactly backwards
+  here: someone scoring low across the board wants something gentle, not the most intense thing in
+  the catalogue. Intensity is information in this model, not noise to normalise away.
+
+**Pure and composable, deliberately.** No fetching, no filtering, no React. Tag hard-filtering stays
+upstream, so the caller decides what is *feasible* and this decides what *fits* — which is what lets
+the same function serve the quiz flow now and the merged engine in roadmap step 4. Activities with a
+null or malformed vector are skipped rather than throwing, because rows arrive from Supabase untyped
+and one bad row must not take down the results page. An invalid `userVector` *does* throw: that is a
+caller bug, and returning an empty list would hide it.
+
+Verified by `scripts/verify-activity-matching.mjs`, which imports the real function and the real
+quiz data rather than mirroring them (Node strips the TypeScript on the fly), so it cannot drift out
+of sync the way `analyze-quiz-balance.mjs` can.
 
 ## Agreed integration plan
 
@@ -193,6 +232,17 @@ Every activity therefore needs both `tags` and a `vector`.
   3.6%, against an even split of 14.3%. Stimulation has both the highest option-pool average (5.03)
   and the highest floor (2.9), so it starts every path ahead. Rebalancing means editing vectors in
   `data/personalityQuiz.ts` and re-running `scripts/analyze-quiz-balance.mjs`.
+- **The seed pool leans the opposite way to the quiz, on the same two axes.** Dominant axis across
+  the 33 seeded activities: Creative 8, Social 7, Energy 6, Outdoors 6, Analytical 5, **Novelty 1,
+  Stimulation 0**. So the two axes that win most quiz paths (Stimulation 36.7%, Novelty 17.6% —
+  together 54% of users) are the two the catalogue barely has. `verify-activity-matching.mjs`
+  surfaces this as its Stimulation-purist warning.
+  This is not a matcher bug and the matches it returns are sensible — a Stimulation purist gets
+  court knockabout and bouldering, which genuinely are stimulating — but no activity in the pool
+  has Stimulation as its *strongest* axis, so the profile label can never point at something the
+  catalogue agrees is that. Fix from either end: rebalance the quiz vectors down, or seed a few
+  genuinely Stimulation- and Novelty-dominant activities. The vectors were authored by Claude in
+  step 1, so this is seed data to correct, not a user decision to preserve.
 
 ## Recently completed
 
@@ -213,6 +263,11 @@ Every activity therefore needs both `tags` and a `vector`.
 - `scripts/validate-activity-seed.mjs` added — checks the seed against the hard filters. It caught
   four filter combinations that only had 3 surviving activities, which would have pinned those
   users to the same three results forever with no room for the rotation penalty to work.
+- **Roadmap step 2** — `lib/matchActivities.ts`: pure Euclidean-distance ranking, plus
+  `userVectorFromQuizTotals`, `euclideanDistance`, `matchPercentFor`, and `isValidVector`.
+  `scripts/verify-activity-matching.mjs` checks it (self-match, purist-path diagnostic, bad-data
+  handling) by importing the real module and real quiz data. `scripts/lib/parse-seed.mjs` now holds
+  the shared seed parser both dev scripts use.
 - **Legacy schema cleanup, run 2026-08-25** (`supabase/cleanup-legacy-schema.sql`): dropped the
   unused `personality_scores` `vector(7)` column, and removed the 4 duplicate RLS policies left
   under their original names. The drop is guarded — it counts non-null values first and aborts
@@ -223,7 +278,9 @@ Every activity therefore needs both `tags` and a `vector`.
 1. ~~Supabase groundwork: RLS policies, the `vector` column, and seeding activities with both tags
    and 7-axis vectors.~~ **DONE 2026-08-25** — script run, RLS applied, 33 activities seeded, all
    with vectors. Verified: `vector` really is `integer[]`, `missing_vector` is 0.
-2. Vector matching function: rank tag-filtered activities by similarity to the user's vector.
+2. ~~Vector matching function: rank tag-filtered activities by similarity to the user's vector.~~
+   **DONE 2026-08-25** — `lib/matchActivities.ts`, verified by
+   `scripts/verify-activity-matching.mjs`. Not yet wired to any UI; that is step 3.
 3. Wire the quiz results button to real recommendations.
 4. Merge both engines into one clean flow.
 
