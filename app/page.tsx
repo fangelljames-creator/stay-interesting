@@ -3,7 +3,17 @@
 import { useState, useEffect, SubmitEvent } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import PersonalityQuiz from "@/components/PersonalityQuiz";
-import { readQuizSession, clearQuizSession, type QuizSession } from "@/lib/quizSession";
+import { readQuizSession, clearQuizSession, sessionUserVector, type QuizSession } from "@/lib/quizSession";
+import { rankActivities } from "@/lib/matchActivities";
+
+/**
+ * Rotation penalty, expressed as a distance multiplier. Ranking is now by
+ * Euclidean distance where LOWER is better, so pushing a recently-shown
+ * activity down means multiplying its distance rather than shrinking a score.
+ * Applied to a sort key only -- the matchPercent on the card stays the true
+ * one, so the number shown never lies about the fit.
+ */
+const ROTATION_DISTANCE_PENALTY = 1.35;
 
 /**
  * The funnel, in order. Every visit walks personality quiz -> Bored/Hobby
@@ -354,9 +364,27 @@ export default function Home() {
       return { ...activity, score: Math.round(score * 10) / 10 };
     });
 
-    const sortedMatches = scoredActivities
-      .filter(a => a.score > 0)
-      .sort((a, b) => b.score - a.score);
+    // Rank the survivors by how well they suit the personality vector. The
+    // hard filters above already decided what is FEASIBLE; this decides what
+    // FITS. Note there is no longer a "score > 0" gate: every survivor is
+    // feasible by definition, and an activity that happens to share no scoring
+    // tags is no less suitable, so it stays eligible.
+    const userVector = quizSession ? sessionUserVector(quizSession) : null;
+
+    let sortedMatches;
+    if (userVector) {
+      const ranked = rankActivities(userVector, scoredActivities);
+      const sortKey = (a: typeof ranked[number]) =>
+        recentShownIds.includes(a.id) ? a.distance * ROTATION_DISTANCE_PENALTY : a.distance;
+      sortedMatches = [...ranked].sort((a, b) => sortKey(a) - sortKey(b));
+    } else {
+      // No vector for this tab. Only reachable when sessionStorage is blocked,
+      // since writeQuizSession fails silently by design -- the user should
+      // still get results, just ordered the old way.
+      sortedMatches = scoredActivities
+        .filter(a => a.score > 0)
+        .sort((a, b) => b.score - a.score);
+    }
 
     const topMatches = sortedMatches.slice(0, 3);
     const topMatchIds = topMatches.map(m => m.id);
@@ -371,14 +399,14 @@ export default function Home() {
     // The wildcard may stretch TASTE, never FEASIBILITY: it is drawn from the
     // hard-filtered survivors minus the picks already shown, so it can surprise
     // on theme but can never suggest something the user ruled out on social,
-    // location, or budget. It comes from validActivities rather than sortedMatches
-    // so a zero-scoring but perfectly feasible activity is still eligible.
-    const wildcardCandidates = validActivities.filter(a => !topMatchIds.includes(a.id));
+    // location, or budget. Drawn from the ranked list rather than the raw
+    // survivors so it carries a real matchPercent of its own.
+    const wildcardCandidates = sortedMatches.filter(a => !topMatchIds.includes(a.id));
 
     let finalResults = [...topMatches];
     if (wildcardCandidates.length > 0) {
       const randomWildcard = wildcardCandidates[Math.floor(Math.random() * wildcardCandidates.length)];
-      finalResults.push({ ...randomWildcard, isWildcard: true, score: 0 });
+      finalResults.push({ ...randomWildcard, isWildcard: true });
     }
 
     setRecommendations(finalResults);
@@ -620,6 +648,20 @@ export default function Home() {
           <div className="space-y-6 text-left animate-in fade-in slide-in-from-bottom-4 duration-500">
             <h2 className="text-3xl font-bold text-slate-900 text-center">Your Curated Results</h2>
 
+            {quizSession && quizSession.skipped > 0 && (
+              <p className="text-center text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                {quizSession.skipped} of your {quizSession.questionCount} personality answers
+                {quizSession.skipped === 1 ? " was" : " were"} shuffled for you, so these matches
+                are a rougher fit.{" "}
+                <button
+                  onClick={retakePersonalityQuiz}
+                  className="font-semibold underline underline-offset-2 hover:text-amber-900"
+                >
+                  Answer them properly
+                </button>
+              </p>
+            )}
+
             {isLoading ? (
               <div className="flex flex-col items-center justify-center py-12 space-y-4">
                 <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin" />
@@ -643,6 +685,14 @@ export default function Home() {
                           </h3>
                           
                           <div className="flex items-center gap-2">
+                            {typeof activity.matchPercent === "number" && (
+                              <span
+                                title="How closely this matches your personality vector"
+                                className="border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap"
+                              >
+                                {Math.round(activity.matchPercent)}% match
+                              </span>
+                            )}
                             <span className={`border text-xs font-bold px-4 py-1.5 rounded-full whitespace-nowrap ${getMedalStyles(index, activity.isWildcard)}`}>
                               {getMedalText(index, activity.isWildcard)}
                             </span>
