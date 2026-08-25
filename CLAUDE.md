@@ -371,38 +371,43 @@ was rebuilt: time and energy are now real filters, and the taste questions ("psy
 Owen's stated direction (2026-08-25). Several current decisions were made explicitly for a
 37-row table and **should be revisited before the catalogue grows**, not after.
 
-**1. The engine fetches the entire table on every results view.**
-`findMatches` runs `supabase.from("activities").select("*")` and then filters in JavaScript. At 37
-rows that is trivial. At a few thousand it is a multi-megabyte download on every single run, paid
-by the user on their connection, to then throw nearly all of it away. This is the first thing that
-will hurt, and it will hurt as slowness rather than as an error.
+**The scaling ladder.** Three stages, in order. **The metric never changes at any stage** — it is
+Euclidean distance throughout, in JavaScript and later in Postgres. Do not let a stage change
+introduce a change of meaning.
 
-Direction: push the hard filters into SQL. Postgres array operators map onto them directly —
-`tags @> array['quick-fix','solo']` for the require/allow cases, `not (tags && array['exertion'])`
-for exclude — with a **GIN index on `tags`**. Fetch only survivors.
+**(A) Now — `select *` plus JavaScript filtering is correct.**
+`findMatches` fetches the table and filters in JS. At 37 rows that is the right answer: one round
+trip, no query complexity, and relaxation is a cheap in-memory re-filter. Do not optimise this
+before it hurts.
 
-**2. That changes the `integer[]` vs pgvector decision.**
-`integer[]` was chosen so Supabase hands JavaScript a real array and ranking stays ordinary JS.
-That reasoning was explicitly conditional: *"revisit at the point the table grows or step 2 wants
-to filter and rank in one query."* Both conditions now apply. **pgvector is already installed** —
-the dropped `personality_scores` column was `vector(7)` — so switching is a column add plus a
-backfill, not a reinstall, and `<=>` cosine distance with an index would do filtering and ranking
-in one query. Note the metric would change from Euclidean to cosine, which the
-**Vector matching** section explains was deliberately rejected on meaning, not performance. That
-trade needs a real decision, not a default.
+**(B) First pressure — move the hard filters into the query.**
+The symptom is a slow results view: the whole table crosses the wire on every run to be thrown
+away. Push the tag filters into SQL, where the array operators map straight onto the filter
+actions — `tags @> array['quick-fix','solo']` for require/allow, `not (tags && array['exertion'])`
+for exclude — and `select` only the columns the results page needs rather than `*`. **Ranking
+stays in JavaScript, on the same Euclidean distance.** A GIN index on `tags` when the row count
+justifies one. Relaxation currently re-filters an in-memory array up to three times; against SQL
+that becomes several round trips, so widen the WHERE clause in one query instead.
 
-**3. Relaxation becomes a query strategy, not a re-filter.**
-It currently re-filters an in-memory array up to three times. Against SQL it becomes up to four
-round trips, so it should either widen the WHERE clause in one query or be pushed into a Postgres
-function.
+**(C) Real scale — rank in the database too.**
+`vector integer[]` becomes a pgvector `vector(7)` column, and filtering and ordering happen in one
+query: `... where <tag filters> order by vector <-> $userVector limit 4`. **`<->` is pgvector's
+L2 operator — Euclidean, exactly what `euclideanDistance` computes today.** Cosine (`<=>`) is a
+different operator that we simply would not use; the **Vector matching** section explains why
+cosine is wrong for this model, and none of that changes here. Add an index only when row counts
+justify it — an exact scan is fine for a long time, and an approximate index trades recall for
+speed, which is a real decision of its own.
 
-**4. Coverage starvation mostly solves itself.**
+pgvector is already installed (the dropped `personality_scores` column was `vector(7)`), so stage
+C is a column add plus a backfill, not a reinstall.
+
+**Coverage starvation mostly solves itself.**
 The 44% / 43% starvation rates are a function of a 20-activity pool, not of the tag design. They
 should fall away as the catalogue grows — which is exactly why the seed was not padded with
 hand-written filler. Keep running the coverage report; at scale it is the only way to see the
 sparse corners at all.
 
-**5. RLS and the anon key still hold.** Nothing above changes the security model: `activities`
+**RLS and the anon key still hold.** Nothing above changes the security model: `activities`
 stays publicly readable with no write policy.
 
 ## Known issues
