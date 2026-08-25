@@ -1,36 +1,82 @@
 "use client";
 
 import { useState } from "react";
-import { personalityQuestions } from "../data/personalityQuiz";
+import { useRouter } from "next/navigation";
+import { personalityQuestions, type QuizOption } from "../data/personalityQuiz";
+import { writeQuizSession } from "../lib/quizSession";
 
-export default function PersonalityQuiz() {
+/**
+ * Module scope on purpose. Math.random() inside the component body trips the
+ * React Compiler's purity rule (react-hooks/purity), which cannot tell that
+ * this only ever runs from a click handler. Hoisting it out states that
+ * plainly instead of leaving a lint error to be ignored.
+ */
+function pickRandomOption(options: QuizOption[]): QuizOption {
+  return options[Math.floor(Math.random() * options.length)];
+}
+
+interface PersonalityQuizProps {
+  /**
+   * What the results-card CTA does. The funnel on app/page.tsx passes a
+   * function that advances its own stage; standalone /quiz passes nothing and
+   * gets the default, which navigates home into the funnel.
+   */
+  onContinue?: () => void;
+}
+
+export default function PersonalityQuiz({ onContinue }: PersonalityQuizProps) {
+  const router = useRouter();
+
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedVectors, setSelectedVectors] = useState<number[][]>([]);
+  // Parallel to selectedVectors: was each answer shuffled by Skip rather than
+  // chosen? An array, not a counter, because handleBack has to be able to
+  // un-count a skip when the user goes back over one.
+  const [skipFlags, setSkipFlags] = useState<boolean[]>([]);
   const [isFinished, setIsFinished] = useState(false);
-  const [finalVector, setFinalVector] = useState<number[] | null>(null);
-  
+
   const [profileType, setProfileType] = useState<{title: string, description: string} | null>(null);
 
   // Expecting exactly 7 numbers now
-  const handleSelectOption = (vector: [number, number, number, number, number, number, number]) => {
+  const handleSelectOption = (
+    vector: [number, number, number, number, number, number, number],
+    wasSkipped = false
+  ) => {
     const newVectors = [...selectedVectors, vector];
-    
+    const newSkips = [...skipFlags, wasSkipped];
+
+    // Both arrays are set on every path, including the last question. They
+    // previously were not, which left state missing the final answer.
+    setSelectedVectors(newVectors);
+    setSkipFlags(newSkips);
+
     if (currentStep < personalityQuestions.length - 1) {
-      setSelectedVectors(newVectors);
       setCurrentStep(currentStep + 1);
     } else {
-      calculateFinalProfile(newVectors);
+      calculateFinalProfile(newVectors, newSkips);
     }
+  };
+
+  /**
+   * Skipping is a real answer, not an absence of one: it picks a random option
+   * and goes through handleSelectOption exactly as a click would. That keeps
+   * every vector the same length as every other and means handleBack needs no
+   * special case for a skipped question.
+   */
+  const handleSkip = () => {
+    const shuffled = pickRandomOption(personalityQuestions[currentStep].options);
+    handleSelectOption(shuffled.vector, true);
   };
 
   const handleBack = () => {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
       setSelectedVectors(selectedVectors.slice(0, -1));
+      setSkipFlags(skipFlags.slice(0, -1));
     }
   };
 
-  // Takes the raw per-axis sums, not the rounded averages -- see calculateFinalProfile.
+  // Takes the raw per-axis sums, not averages -- see calculateFinalProfile.
   const determinePersonalityType = (vector: number[]) => {
     const traits = ["Social", "Energy", "Creative", "Analytical", "Outdoors", "Novelty", "Stimulation"];
     const maxScore = Math.max(...vector);
@@ -81,10 +127,9 @@ export default function PersonalityQuiz() {
     }
   };
 
-  const calculateFinalProfile = (allVectors: number[][]) => {
-    const numQuestions = allVectors.length;
+  const calculateFinalProfile = (allVectors: number[][], allSkips: boolean[]) => {
     // We now have 7 zeroes
-    const totals = [0, 0, 0, 0, 0, 0, 0]; 
+    const totals = [0, 0, 0, 0, 0, 0, 0];
 
     allVectors.forEach((vec) => {
       // Loop counts up to 7
@@ -93,21 +138,36 @@ export default function PersonalityQuiz() {
       }
     });
 
-    // Rounding is for display only. Picking the dominant axis from the rounded
-    // averages collapsed distinct scores onto the same integer and left ~58% of
-    // answer paths tied at the top, and determinePersonalityType breaks ties with
+    // The dominant axis is judged on the RAW sums. Judging on rounded averages
+    // collapsed distinct scores onto the same integer and left ~58% of answer
+    // paths tied at the top, and determinePersonalityType breaks ties with
     // indexOf -- so those all went to whichever axis sat earliest in the traits
-    // array. Judging on the raw sums keeps the full precision of the answers.
-    const averageVector = totals.map((total) => Math.round(total / numQuestions));
-    setFinalVector(averageVector);
+    // array. Nothing here rounds any more: the vector tiles that once displayed
+    // rounded averages are gone, so the sums reach both consumers intact.
+    setProfileType(determinePersonalityType(totals));
 
-    const type = determinePersonalityType(totals);
-    setProfileType(type);
-    
+    // Hand the raw sums to the tab so the funnel can rank activities against
+    // them. Division by questionCount happens once, in sessionUserVector.
+    writeQuizSession({
+      totals,
+      questionCount: allVectors.length,
+      skipped: allSkips.filter(Boolean).length,
+    });
+
     setIsFinished(true);
   };
 
-  if (isFinished && finalVector && profileType) {
+  const handleContinue = () => {
+    if (onContinue) {
+      onContinue();
+      return;
+    }
+    // Standalone /quiz: the result is already stored, so home picks up the
+    // funnel at the Bored/Hobby chooser rather than asking the quiz again.
+    router.push("/");
+  };
+
+  if (isFinished && profileType) {
     return (
       <div className="max-w-2xl mx-auto p-8 bg-white rounded-2xl shadow-xl border border-gray-100 text-center animate-in fade-in zoom-in duration-500">
         <div className="inline-block px-4 py-1.5 rounded-full bg-indigo-100 text-indigo-800 text-sm font-bold tracking-wider uppercase mb-6">
@@ -117,20 +177,11 @@ export default function PersonalityQuiz() {
         <p className="text-lg text-gray-600 mb-8 leading-relaxed">
           {profileType.description}
         </p>
-        
-        <div className="bg-gray-50 border border-gray-100 p-5 rounded-xl mb-8">
-          <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Your Unique Vector</p>
-          <div className="flex justify-center gap-2 flex-wrap">
-            {["Social", "Energy", "Creative", "Analytical", "Outdoors", "Novelty", "Stimulation"].map((trait, idx) => (
-              <div key={trait} className="flex flex-col items-center bg-white px-3 py-2 rounded-lg shadow-sm border border-gray-200 min-w-[80px]">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">{trait}</span>
-                <span className="text-xl font-black text-indigo-600">{finalVector[idx]}</span>
-              </div>
-            ))}
-          </div>
-        </div>
 
-        <button className="w-full sm:w-auto px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-indigo-200">
+        <button
+          onClick={handleContinue}
+          className="w-full sm:w-auto px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-indigo-200"
+        >
           Find My Perfect Activities →
         </button>
       </div>
@@ -154,14 +205,23 @@ export default function PersonalityQuiz() {
           <span className="text-xs font-bold tracking-wider text-indigo-600 uppercase">
             Question {currentStep + 1} of {personalityQuestions.length}
           </span>
-          {currentStep > 0 && (
+          <div className="flex items-center gap-4">
+            {currentStep > 0 && (
+              <button
+                onClick={handleBack}
+                className="text-sm font-semibold text-gray-400 hover:text-gray-900 transition-colors"
+              >
+                ← Back
+              </button>
+            )}
             <button
-              onClick={handleBack}
-              className="text-sm font-semibold text-gray-400 hover:text-gray-900 transition-colors"
+              onClick={handleSkip}
+              title="Picks one at random and moves on"
+              className="text-sm font-semibold text-gray-400 hover:text-indigo-600 transition-colors"
             >
-              ← Back
+              Skip →
             </button>
-          )}
+          </div>
         </div>
         <h2 className="text-2xl font-bold text-gray-900 mt-2 leading-snug">
           {question.scenario}
