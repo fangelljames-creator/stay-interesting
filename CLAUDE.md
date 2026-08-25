@@ -54,11 +54,37 @@ check `node_modules/next/dist/docs/` before relying on remembered App Router con
 ## Database (Supabase)
 
 - Standard email/password auth.
-- `activities`: `id`, `title`, `description`, `tags` (text array), `vector` (`integer[]`).
-- `saved_activities`: `user_id`, `activity_id`, unique on the pair.
-- All of the above is defined in `supabase/step1-schema-rls-seed.sql`, which Owen runs by hand in
-  the Supabase SQL editor. Treat that file as the source of truth for the schema and edit it
-  alongside any DB change, rather than making one-off changes in the dashboard.
+- `activities` — **9 columns, verified against the live table 2026-08-25:**
+
+  | column | type | notes |
+  |---|---|---|
+  | `id` | `uuid` **not** integer | default `gen_random_uuid()` |
+  | `title` | `text` | not null |
+  | `description` | `text` | nullable |
+  | `budget_level` | `text` | **unused** — nothing reads it; overlaps `tags` |
+  | `time_required` | `text` | **unused** — nothing reads it; overlaps `tags` |
+  | `personality_scores` | `USER-DEFINED` | **unused and unidentified** — see below |
+  | `created_at` | `timestamptz` | default `timezone('utc', now())` |
+  | `tags` | `text[]` | not null, default `'{}'` |
+  | `vector` | `integer[]` | 7 axes, CHECK-constrained to 7 values of 1–10 |
+
+- `saved_activities`: `id`, `user_id` (uuid), `activity_id` (uuid), `created_at`, unique on
+  (`user_id`, `activity_id`).
+- `supabase/step1-schema-rls-seed.sql` is the source of truth for the schema — edit it alongside
+  any DB change rather than making one-off changes in the dashboard. Owen runs it by hand in the
+  Supabase SQL editor. **Run 2026-08-25: 33 activities seeded, every one with tags and a vector.**
+
+⚠️ **`create table if not exists` is not a schema guard.** It does nothing when the table exists,
+even if the columns differ, which is how the seed came to fail against a table with no `tags`
+column. Use `alter table ... add column if not exists` (STEP 1b in that file) for anything that
+must actually reconcile. Query 7g in the same file reports the table's real shape.
+
+❓ **`personality_scores` is an open question.** `USER-DEFINED` means a custom type — an enum,
+composite, domain, or a pgvector `vector`. It is null on every row and no code reads it, so it
+blocks nothing, but identify it before designing anything else vector-shaped; if it turns out to
+be a pgvector column it predates and duplicates `vector integer[]`. Same for `budget_level` and
+`time_required`: decide whether they are the intended design and `tags` is the newer overlay, or
+whether they are dead columns to drop.
 
 **Vector storage — decided 2026-08-25:** `integer[]`, not `jsonb` and not pgvector. Chosen because
 Supabase hands a Postgres array to JavaScript as a real array with no parsing, which keeps the
@@ -66,11 +92,10 @@ step-2 similarity ranking as ordinary JS next to the existing tag scoring. A `CH
 enforces 7 elements, each 1–10. Revisit only if the activity table grows into the thousands, where
 pgvector's indexed search would start to matter.
 
-**RLS is enabled** (in the same file): `activities` is readable by `anon` and `authenticated` with
-no write policy at all, so the anon key that ships in the browser bundle cannot modify it;
-`saved_activities` is restricted to `(select auth.uid()) = user_id` for select/insert/delete.
-Confirm it is actually applied on the live project with the verification queries at the end of
-that file — the SQL existing in the repo is not proof it was run.
+**RLS is enabled and applied** (2026-08-25, via the same file): `activities` is readable by `anon`
+and `authenticated` with no write policy at all, so the anon key that ships in the browser bundle
+cannot modify it; `saved_activities` is restricted to `(select auth.uid()) = user_id` for
+select/insert/delete. Queries 7a and 7b in that file re-check this at any time.
 
 ## Two recommendation engines currently coexist
 
@@ -127,6 +152,12 @@ Every activity therefore needs both `tags` and a `vector`.
 
 ## Known issues
 
+- **Activity ids are typed as `number` but are `uuid` strings** — `app/page.tsx:108`
+  (`useState<number[]>` for `savedActivityIds`), `:177` (`toggleSaveActivity(activityId: number)`),
+  and `:272` (`recentShownIds: number[]`, the sessionStorage rotation store). Nothing crashes:
+  JavaScript compares strings happily, so `.includes()` and `.filter()` behave, and `tsc` stays
+  green because Supabase rows come back as `any[]` so nothing ever checks. But the types are
+  false, and the first arithmetic or `parseInt` on an id yields `NaN`. Change them to `string`.
 - **Budget is not a hard filter.** "Strictly Free" only adds `free` as a scoring tag, so a
   `low-budget` activity (playing pool, say) still surfaces for a user who said free only. Either
   hard-filter it the way social and location are filtered, or reword the answer. Note this
@@ -161,9 +192,11 @@ Every activity therefore needs both `tags` and a `vector`.
 - Social filter bug fixed — `findPrecisionMatchesWithRotation` now collects every matching social
   tag rather than the first (`app/page.tsx:251`). `userLocationRequirements` was reshaped the same
   way so the bug can't return if an answer ever emits two location tags.
-- **Roadmap step 1** — `supabase/step1-schema-rls-seed.sql`: RLS policies, the `vector integer[]`
-  column with a shape CHECK, a unique constraint on `saved_activities (user_id, activity_id)`, and
-  33 seeded activities (17 quick-fix, 16 long-term) each carrying both tags and a vector.
+- **Roadmap step 1, run against the live database 2026-08-25** —
+  `supabase/step1-schema-rls-seed.sql`: RLS policies, the `vector integer[]` column with a shape
+  CHECK, a unique constraint on `saved_activities (user_id, activity_id)`, and 33 seeded
+  activities (17 quick-fix, 16 long-term) each carrying both tags and a vector. The first run
+  failed on a table whose real columns didn't match the assumed ones; STEP 1b now reconciles that.
 - `scripts/validate-activity-seed.mjs` added — checks the seed against the hard filters. It caught
   four filter combinations that only had 3 surviving activities, which would have pinned those
   users to the same three results forever with no room for the rotation penalty to work.
@@ -171,8 +204,8 @@ Every activity therefore needs both `tags` and a `vector`.
 ## Roadmap (agreed order)
 
 1. ~~Supabase groundwork: RLS policies, the `vector` column, and seeding activities with both tags
-   and 7-axis vectors.~~ **SQL written** (`supabase/step1-schema-rls-seed.sql`) — still needs Owen
-   to run it in the Supabase SQL editor and confirm the verification queries come back clean.
+   and 7-axis vectors.~~ **DONE 2026-08-25** — script run, RLS applied, 33 activities seeded, all
+   with vectors. Verified: `vector` really is `integer[]`, `missing_vector` is 0.
 2. Vector matching function: rank tag-filtered activities by similarity to the user's vector.
 3. Wire the quiz results button to real recommendations.
 4. Merge both engines into one clean flow.

@@ -7,7 +7,13 @@
 --   Supabase dashboard -> SQL Editor -> New query -> paste this whole file -> Run.
 --
 -- This script is idempotent: running it twice is safe and will not duplicate
--- rows or error out. Nothing here deletes data.
+-- rows or error out. Nothing here deletes data. That also means it is safe to
+-- re-run after a partial failure — the steps that already succeeded become
+-- no-ops and it picks up where it stopped.
+--
+-- If a step fails with "column ... does not exist", run query 7g at the bottom
+-- on its own first. It reports the table's real shape, which is what step 1b
+-- exists to reconcile.
 --
 -- THE VECTOR
 --   Every activity carries a 7-number vector, always in this fixed order:
@@ -39,6 +45,28 @@ create table if not exists public.saved_activities (
   activity_id bigint      not null references public.activities (id) on delete cascade,
   created_at  timestamptz not null default now()
 );
+
+
+-- ----------------------------------------------------------------------------
+-- STEP 1b — Bring an already-existing `activities` table up to shape
+--
+-- IMPORTANT: "create table if not exists" above does nothing at all when the
+-- table already exists — it does NOT check that the columns match. The live
+-- table turned out to have no `tags` column, so that guard passed silently and
+-- the seed insert further down failed with:
+--
+--   ERROR: 42703: column "tags" of relation "activities" does not exist
+--
+-- These statements add each column only when it is missing, and are no-ops
+-- otherwise. `tags` is given a default so this is safe even if the table
+-- already holds rows. `title` and `description` are added nullable for the
+-- same reason — you cannot add a NOT NULL column to a table with existing
+-- rows unless you also give it a default. Step 8 tightens them afterwards.
+-- ----------------------------------------------------------------------------
+
+alter table public.activities add column if not exists title       text;
+alter table public.activities add column if not exists description text;
+alter table public.activities add column if not exists tags        text[] not null default '{}';
 
 
 -- ----------------------------------------------------------------------------
@@ -427,15 +455,46 @@ from public.saved_activities
 group by user_id, activity_id
 having count(*) > 1;
 
+-- 7g. The actual shape of the activities table. Run this FIRST if anything
+--     below fails with a "column ... does not exist" error — it tells you what
+--     is really there, rather than what this file assumes is there.
+--     Expect at least: id, title, description, tags (ARRAY), vector (ARRAY).
+select column_name, data_type, is_nullable, column_default
+from information_schema.columns
+where table_schema = 'public' and table_name = 'activities'
+order by ordinal_position;
+
+-- 7h. Any column on activities that is NOT NULL, has no default, and is not
+--     one of the four the seed inserts. Each one of these will block the seed
+--     insert, and step 1b cannot guess a value for it. Should be zero rows.
+select column_name, data_type
+from information_schema.columns
+where table_schema = 'public'
+  and table_name = 'activities'
+  and is_nullable = 'NO'
+  and column_default is null
+  and is_identity = 'NO'
+  and column_name not in ('title', 'description', 'tags', 'vector');
+
 
 -- ----------------------------------------------------------------------------
--- OPTIONAL — run these later, only once the checks above are clean
+-- STEP 8 (OPTIONAL) — run these later, only once the checks above are clean
 -- ----------------------------------------------------------------------------
 
 -- Once 7e returns no rows, make the vector mandatory so a future activity
 -- cannot be added without one:
 --
 --   alter table public.activities alter column vector set not null;
+
+-- If step 1b had to ADD title or description (7g shows them as nullable), they
+-- should be mandatory too. Check for empty ones first — this must return zero
+-- rows before the alters below will succeed:
+--
+--   select id, title, description from public.activities
+--   where title is null or description is null;
+--
+--   alter table public.activities alter column title       set not null;
+--   alter table public.activities alter column description set not null;
 
 -- If 7f found duplicates, this keeps the earliest of each and deletes the
 -- rest. Read the 7f output first so you know what is going. Then re-run
