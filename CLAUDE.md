@@ -16,7 +16,12 @@ up, log in, take a 7-axis personality quiz, and save activities to custom lists.
 
 - Next.js App Router + TypeScript. **No `src/` directory.** (verified)
 - Tailwind CSS v4, pulled in with a bare `@import "tailwindcss"` in `app/globals.css` — there is no
-  `tailwind.config.js` and no plugin array. v4 plugins load via `@plugin` in CSS. (verified)
+  `tailwind.config.js` and no plugin array. (verified)
+  **`@plugin` vs `@import` — get this right.** `@plugin` is only for *JavaScript* plugins
+  (`@plugin "@tailwindcss/typography"`). A package that ships plain CSS is loaded with `@import`
+  like any stylesheet. `tw-animate-css` is plain CSS, so it is `@import "tw-animate-css"`. An
+  earlier version of this file asserted `@plugin` for it and was wrong; check the package's own
+  docs before wiring one up.
 - Supabase (Postgres + auth). Hosted on Vercel.
 - `app/` — routes (`page.tsx` home, `quiz/page.tsx`, `login/page.tsx`)
 - `components/` — UI components (`PersonalityQuiz.tsx`)
@@ -61,8 +66,8 @@ check `node_modules/next/dist/docs/` before relying on remembered App Router con
   | `id` | `uuid` **not** integer | default `gen_random_uuid()` |
   | `title` | `text` | not null |
   | `description` | `text` | nullable |
-  | `budget_level` | `text` | **unused** — nothing reads it; overlaps `tags` |
-  | `time_required` | `text` | **unused** — nothing reads it; overlaps `tags` |
+  | `budget_level` | `text` | **being dropped** — see cleanup file STEP 4 |
+  | `time_required` | `text` | **being dropped** — see cleanup file STEP 4 |
   | `created_at` | `timestamptz` | default `timezone('utc', now())` |
   | `tags` | `text[]` | not null, default `'{}'` |
   | `vector` | `integer[]` | 7 axes, CHECK-constrained to 7 values of 1–10 |
@@ -73,7 +78,7 @@ check `node_modules/next/dist/docs/` before relying on remembered App Router con
   source of truth for the schema — edit them alongside any DB change rather than making one-off
   changes in the dashboard.
   - `supabase/step1-schema-rls-seed.sql` — schema, RLS, and the seed data.
-    **Run 2026-08-25: 33 activities seeded, every one with tags and a vector.**
+    **Run 2026-08-25: 37 activities seeded, every one with tags and a vector.**
   - `supabase/cleanup-legacy-schema.sql` — one-off tidy-up of the original hand-written schema.
     **Run 2026-08-25: dropped `personality_scores`, removed 4 duplicate policies.**
 
@@ -89,9 +94,12 @@ security hole (multiple PERMISSIVE policies are OR'd, and both expressed the sam
 redundant and slower. Cleaned up 2026-08-25. When renaming a policy, drop the OLD name explicitly;
 re-running a script with a new name will not replace the old one.
 
-Still open: `budget_level` and `time_required` are unused text columns overlapping what `tags`
-encodes. Decide whether they are the intended design with `tags` as a newer overlay, or dead
-columns to drop — the drop statements are at the bottom of `cleanup-legacy-schema.sql`.
+**Resolved 2026-08-25 (Owen's decision: drop).** `budget_level` and `time_required` were unused
+text columns duplicating what `tags` encodes, and since budget became a hard filter both
+dimensions are driven entirely by tags. STEP 4 of `cleanup-legacy-schema.sql` drops them and
+STEP 5 makes `vector` NOT NULL. Both are guarded — they check for data and abort rather than
+destroy anything. ⚠️ **Written but not yet run against the live database**; until Owen pastes that
+file, `activities` still has 8 columns and a nullable `vector`.
 
 **Vector storage — decided 2026-08-25:** `integer[]`, in a column literally named `vector`. Chosen
 because Supabase hands a Postgres array to JavaScript as a real array with no parsing, which keeps
@@ -101,7 +109,7 @@ enforces 7 elements, each 1–10.
 Note the decision was made believing pgvector was not installed. **It is** — the dropped
 `personality_scores` column was `vector(7)`, and the extension is deliberately left installed even
 though nothing uses it. So switching to pgvector is a column add, not a reinstall, and `<=>` cosine
-distance in SQL is available whenever ranking should move server-side. At 33 rows it wins nothing
+distance in SQL is available whenever ranking should move server-side. At 37 rows it wins nothing
 measurable, and pgvector returns to JS as a string needing parsing, so `integer[]` stands — but
 revisit at the point the table grows or step 2 wants to filter and rank in one query.
 
@@ -240,17 +248,6 @@ Every activity therefore needs both `tags` and a `vector`.
 
 ## Known issues
 
-- **Activity ids are typed as `number` but are `uuid` strings** — `app/page.tsx:108`
-  (`useState<number[]>` for `savedActivityIds`), `:177` (`toggleSaveActivity(activityId: number)`),
-  and `:272` (`recentShownIds: number[]`, the sessionStorage rotation store). Nothing crashes:
-  JavaScript compares strings happily, so `.includes()` and `.filter()` behave, and `tsc` stays
-  green because Supabase rows come back as `any[]` so nothing ever checks. But the types are
-  false, and the first arithmetic or `parseInt` on an id yields `NaN`. Change them to `string`.
-- **`animate-in fade-in zoom-in` classes do nothing** — **verified, still open.** The results card
-  uses them but nothing provides them: `tailwindcss-animate` is not in `package.json` and not
-  installed. This is Tailwind v4, so the v3 plugin-array approach doesn't apply — it'd need
-  `tw-animate-css` (or equivalent) loaded via `@plugin` in `app/globals.css`. The classes fail
-  silently, so the card simply appears with no animation.
 - **Quiz vector balance is skewed.** With the tie-break fixed, the underlying vector imbalance is
   now visible and unmasked: Stimulation wins 36.7% of all 65,536 answer paths while Creative wins
   3.6%, against an even split of 14.3%. Stimulation has both the highest option-pool average (5.03)
@@ -269,6 +266,25 @@ Every activity therefore needs both `tags` and a `vector`.
   vectors were authored by Claude, so this is seed data to correct, not a user decision to preserve.
 
 ## Recently completed
+
+**Cleanup sweep, 2026-08-25** (before the merged-engine build):
+
+- Activity ids typed as `string` — they are uuids. Checked the whole file; the remaining `number`
+  types are vectors and array indices, which really are numeric.
+- `.gitattributes` with `* text=auto eol=lf`, ending both the per-commit CRLF warnings and the
+  phantom ` M` on `data/personalityQuiz.ts`. `git add --renormalize .` staged nothing — the repo
+  already held every text file as LF — so the fix was the policy file plus converting the six
+  worktree copies that still physically held CRLF. **Watch out:** Python's `write_text` re-adds
+  CRLF on Windows unless you pass `newline="
+"`; it caught me once mid-sweep.
+- `tw-animate-css` installed and `@import`ed, so `animate-in fade-in zoom-in-95` and
+  `slide-in-from-bottom-4` finally emit real CSS. Verified against the built bundle, not by eye:
+  `.animate-in` now binds `@keyframes enter`, `.fade-in` sets `--tw-enter-opacity: 0`,
+  `.zoom-in-95` sets `--tw-enter-scale: .95`. None of those existed in the bundle before.
+- Temporary `/quiz` link on the home page under the two pathway cards, marked with the condition
+  for its removal (roadmap step 4, when the engines merge).
+- `budget_level` and `time_required` drops activated, plus `vector` NOT NULL — both guarded, both
+  still awaiting a run against the live database.
 
 - Back button on the personality quiz, mirroring the home-page `handleBack`.
 - Progress bar on the personality quiz card.
