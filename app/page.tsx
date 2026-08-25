@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, SubmitEvent } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 
 // --- QUIZ DEFINITIONS ---
@@ -498,6 +499,16 @@ export default function Home() {
                 <p className="text-slate-500 text-sm leading-relaxed">Discover a new ongoing passion tailored to your schedule, domain, and budget.</p>
               </button>
             </div>
+
+            {/* TEMPORARY: the personality quiz lives on its own route and is
+                otherwise unreachable from the UI. Remove this once the two
+                engines are merged into one flow (roadmap step 4). */}
+            <Link
+              href="/quiz"
+              className="inline-block text-sm font-semibold text-indigo-600 hover:text-indigo-800 underline underline-offset-4 transition-colors"
+            >
+              Or take the 7-axis personality quiz →
+            </Link>
           </div>
         )}
 
