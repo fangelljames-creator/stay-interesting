@@ -106,7 +106,11 @@ export default function Home() {
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   
-  const [savedActivityIds, setSavedActivityIds] = useState<number[]>([]);
+  // Activity ids are uuid strings (activities.id defaults to gen_random_uuid()),
+  // not integers. These were typed as number and happened to work only because
+  // JavaScript compares strings fine and Supabase rows arrive as any[], so tsc
+  // never checked. Any arithmetic or parseInt on one would have produced NaN.
+  const [savedActivityIds, setSavedActivityIds] = useState<string[]>([]);
   const [savedActivitiesDetails, setSavedActivitiesDetails] = useState<any[]>([]);
   const [showSavedModal, setShowSavedModal] = useState(false);
 
@@ -175,7 +179,7 @@ export default function Home() {
     setShowSavedModal(false);
   };
 
-  const toggleSaveActivity = async (activityId: number) => {
+  const toggleSaveActivity = async (activityId: string) => {
     if (!user) {
       alert("Please log in to save activities to your list!");
       return;
@@ -283,7 +287,7 @@ export default function Home() {
 
     // Retrieve recently shown activity IDs from browser session storage to rotate variety
     const recentKey = `recent_shown_${path}`;
-    let recentShownIds: number[] = [];
+    let recentShownIds: string[] = [];
     try {
       const stored = sessionStorage.getItem(recentKey);
       if (stored) recentShownIds = JSON.parse(stored);
