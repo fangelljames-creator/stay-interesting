@@ -54,7 +54,7 @@ check `node_modules/next/dist/docs/` before relying on remembered App Router con
 ## Database (Supabase)
 
 - Standard email/password auth.
-- `activities` — **9 columns, verified against the live table 2026-08-25:**
+- `activities` — **8 columns, verified against the live table 2026-08-25:**
 
   | column | type | notes |
   |---|---|---|
@@ -63,34 +63,47 @@ check `node_modules/next/dist/docs/` before relying on remembered App Router con
   | `description` | `text` | nullable |
   | `budget_level` | `text` | **unused** — nothing reads it; overlaps `tags` |
   | `time_required` | `text` | **unused** — nothing reads it; overlaps `tags` |
-  | `personality_scores` | `USER-DEFINED` | **unused and unidentified** — see below |
   | `created_at` | `timestamptz` | default `timezone('utc', now())` |
   | `tags` | `text[]` | not null, default `'{}'` |
   | `vector` | `integer[]` | 7 axes, CHECK-constrained to 7 values of 1–10 |
 
 - `saved_activities`: `id`, `user_id` (uuid), `activity_id` (uuid), `created_at`, unique on
   (`user_id`, `activity_id`).
-- `supabase/step1-schema-rls-seed.sql` is the source of truth for the schema — edit it alongside
-  any DB change rather than making one-off changes in the dashboard. Owen runs it by hand in the
-  Supabase SQL editor. **Run 2026-08-25: 33 activities seeded, every one with tags and a vector.**
+- Two SQL files, both run by hand in the Supabase SQL editor and both idempotent. They are the
+  source of truth for the schema — edit them alongside any DB change rather than making one-off
+  changes in the dashboard.
+  - `supabase/step1-schema-rls-seed.sql` — schema, RLS, and the seed data.
+    **Run 2026-08-25: 33 activities seeded, every one with tags and a vector.**
+  - `supabase/cleanup-legacy-schema.sql` — one-off tidy-up of the original hand-written schema.
+    **Run 2026-08-25: dropped `personality_scores`, removed 4 duplicate policies.**
 
 ⚠️ **`create table if not exists` is not a schema guard.** It does nothing when the table exists,
 even if the columns differ, which is how the seed came to fail against a table with no `tags`
 column. Use `alter table ... add column if not exists` (STEP 1b in that file) for anything that
 must actually reconcile. Query 7g in the same file reports the table's real shape.
 
-❓ **`personality_scores` is an open question.** `USER-DEFINED` means a custom type — an enum,
-composite, domain, or a pgvector `vector`. It is null on every row and no code reads it, so it
-blocks nothing, but identify it before designing anything else vector-shaped; if it turns out to
-be a pgvector column it predates and duplicates `vector integer[]`. Same for `budget_level` and
-`time_required`: decide whether they are the intended design and `tags` is the newer overlay, or
-whether they are dead columns to drop.
+⚠️ **`drop policy if exists` matches on the exact name only.** The original schema created its
+policies under different names from the ones in `step1-schema-rls-seed.sql`, so that file's drop
+guards never matched them and both sets survived — 8 policies where 4 were intended. Not a
+security hole (multiple PERMISSIVE policies are OR'd, and both expressed the same rule) but
+redundant and slower. Cleaned up 2026-08-25. When renaming a policy, drop the OLD name explicitly;
+re-running a script with a new name will not replace the old one.
 
-**Vector storage — decided 2026-08-25:** `integer[]`, not `jsonb` and not pgvector. Chosen because
-Supabase hands a Postgres array to JavaScript as a real array with no parsing, which keeps the
-step-2 similarity ranking as ordinary JS next to the existing tag scoring. A `CHECK` constraint
-enforces 7 elements, each 1–10. Revisit only if the activity table grows into the thousands, where
-pgvector's indexed search would start to matter.
+Still open: `budget_level` and `time_required` are unused text columns overlapping what `tags`
+encodes. Decide whether they are the intended design with `tags` as a newer overlay, or dead
+columns to drop — the drop statements are at the bottom of `cleanup-legacy-schema.sql`.
+
+**Vector storage — decided 2026-08-25:** `integer[]`, in a column literally named `vector`. Chosen
+because Supabase hands a Postgres array to JavaScript as a real array with no parsing, which keeps
+the step-2 similarity ranking as ordinary JS next to the existing tag scoring. A `CHECK` constraint
+enforces 7 elements, each 1–10.
+
+Note the decision was made believing pgvector was not installed. **It is** — the dropped
+`personality_scores` column was `vector(7)`, and the extension is deliberately left installed even
+though nothing uses it. So switching to pgvector is a column add, not a reinstall, and `<=>` cosine
+distance in SQL is available whenever ranking should move server-side. At 33 rows it wins nothing
+measurable, and pgvector returns to JS as a string needing parsing, so `integer[]` stands — but
+revisit at the point the table grows or step 2 wants to filter and rank in one query.
 
 **RLS is enabled and applied** (2026-08-25, via the same file): `activities` is readable by `anon`
 and `authenticated` with no write policy at all, so the anon key that ships in the browser bundle
@@ -200,6 +213,10 @@ Every activity therefore needs both `tags` and a `vector`.
 - `scripts/validate-activity-seed.mjs` added — checks the seed against the hard filters. It caught
   four filter combinations that only had 3 surviving activities, which would have pinned those
   users to the same three results forever with no room for the rotation penalty to work.
+- **Legacy schema cleanup, run 2026-08-25** (`supabase/cleanup-legacy-schema.sql`): dropped the
+  unused `personality_scores` `vector(7)` column, and removed the 4 duplicate RLS policies left
+  under their original names. The drop is guarded — it counts non-null values first and aborts
+  rather than destroying data. The pgvector extension was left installed on purpose.
 
 ## Roadmap (agreed order)
 
