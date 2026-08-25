@@ -29,20 +29,20 @@ export const personalityQuestions: QuizQuestion[] = [
         vector: [1, 1, 9, 2, 1, 4, 4],
       },
       {
-        label: "Untangle something",
-        description: "Finally sit down with a problem or system that's been nagging at you.",
+        label: "Coffee and a puzzle",
+        description: "Chess, sudoku, a spreadsheet that needs taming, researching a purchase to death — anything with a right answer at the end.",
         vector: [1, 2, 2, 9, 1, 3, 4],
       },
       {
-        label: "Move at your own pace",
-        description: "Head out alone for a long, steady walk or ride with nowhere to be.",
+        label: "Out the door, headphones in",
+        description: "A long walk or an easy ride, a podcast on, no destination in mind.",
         vector: [1, 7, 2, 2, 8, 2, 2],
       },
     ],
   },
   {
     id: 2,
-    scenario: "A friend cancels your evening plans at the last minute. How do you pivot?",
+    scenario: "Your evening plans just fell through, and the whole night is suddenly yours. What do you actually end up doing?",
     options: [
       {
         label: "Sink into a story",
@@ -50,18 +50,18 @@ export const personalityQuestions: QuizQuestion[] = [
         vector: [1, 1, 3, 6, 1, 5, 8],
       },
       {
-        label: "Start a contest",
-        description: "Rally whoever's around for a high-stakes game night.",
+        label: "Find something to win",
+        description: "A lobby with your mates, ranked games, cards, a pub quiz — anything with a scoreboard.",
         vector: [7, 3, 2, 5, 1, 4, 8],
       },
       {
-        label: "Get under the hood",
-        description: "Use the free time to fix, tinker with, or build something.",
+        label: "Make something with your hands",
+        description: "Cook something ambitious, mod or fix a gadget, pick the half-finished project back up.",
         vector: [2, 5, 7, 6, 3, 4, 5],
       },
       {
-        label: "Find a new crowd",
-        description: "Text around and find a completely different vibe for the night.",
+        label: "Make new plans on the spot",
+        description: "Text around, see who's free, end up somewhere you didn't expect.",
         vector: [10, 4, 2, 1, 3, 7, 7],
       },
     ],
