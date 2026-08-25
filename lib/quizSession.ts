@@ -17,7 +17,7 @@
 // Relative rather than the "@/" alias: this is a sibling in the same directory,
 // and the alias is for imports that cross out of a directory (app/ reaching into
 // lib/, as in "@/lib/supabaseClient").
-import { isValidVector, userVectorFromQuizTotals } from "./matchActivities";
+import { isValidVector, userVectorFromQuizTotals } from "./matchActivities.ts";
 
 /**
  * Versioned so a future shape change cannot poison a tab that still holds the

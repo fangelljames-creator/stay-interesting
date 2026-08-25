@@ -1,128 +1,103 @@
 #!/usr/bin/env node
 /**
  * Validates the seed activities in supabase/step1-schema-rls-seed.sql against
- * the hard filters in app/page.tsx. Run it after editing the seed:
+ * the closed tag vocabulary.
  *
  *   node scripts/validate-activity-seed.mjs
  *
- * Why this exists: the recommendation pipeline hard-filters on pathway, social,
- * and location tags. An activity missing any of those can never be recommended
- * to anyone, and nothing surfaces that — it just quietly never appears. This
- * catches it, along with malformed vectors and filter combinations that leave
- * too few activities for the top-3 list to have any variety.
+ * Imports lib/activityTags.ts directly (Node strips the types), so the
+ * vocabulary cannot drift between the app and this check — there is one
+ * definition and both read it.
  *
- * Like scripts/analyze-quiz-balance.mjs, this mirrors the app's filtering by
- * hand, so it goes stale if findPrecisionMatchesWithRotation changes and must
- * be updated alongside it.
+ * THE DOCTRINE: tags encode feasibility, the vector ranks, and a tag no hard
+ * filter reads must not exist. These are hard failures rather than warnings
+ * because every one of them makes an activity silently unreachable, and
+ * nothing in the running app would ever tell you.
  */
 import {
-  AXES,
+  ACTIVITY_TAGS,
+  isActivityTag,
   PATHWAY_TAGS,
-  SOCIAL_TAGS,
-  LOCATION_TAGS,
-  BUDGET_TAGS,
-  parseSeedActivities,
-} from "./lib/parse-seed.mjs";
-
-// The tag sets a user can actually produce on each hard-filter axis, taken from
-// BORED_QUIZ and HOBBY_QUIZ. Note the hobby quiz's "structured facility" answer
-// emits no location tag at all, which means no location filter is applied.
-//
-// Budgets: the bored quiz offers strictly-free vs open. The hobby quiz's three
-// answers reduce to two distinct budget sets, because "Deep immersion" and
-// "Weekend expeditions" both list all three tags and so match everything.
-const FILTER_COMBINATIONS = [
-  {
-    pathway: "quick-fix",
-    socials: [["solo"], ["social", "couple"]],
-    locations: [["inside"], ["outside"]],
-    budgets: [["free"], ["low-budget", "free"]],
-  },
-  {
-    pathway: "long-term",
-    socials: [["solo"], ["couple"], ["social"]],
-    locations: [["inside"], ["outside"], []],
-    budgets: [["low-budget", "free"], ["investment-required", "low-budget", "free"]],
-  },
-];
-
-// Top 3 plus a wildcard means 4 is the bare minimum; below 5 there is nothing
-// for the rotation penalty to swap in and results never change between runs.
-const MIN_SURVIVORS = 5;
+  COMPANY_TAGS,
+  PLACE_TAGS,
+  SETTING_TAGS,
+  COST_TAGS,
+  TIME_LADDER,
+} from "../lib/activityTags.ts";
+import { parseSeedActivities } from "./lib/parse-seed.mjs";
 
 const rows = parseSeedActivities();
-const problems = [];
+const failures = [];
 
-console.log(`Parsed ${rows.length} seed activities from supabase/step1-schema-rls-seed.sql\n`);
+console.log(`Parsed ${rows.length} seed activities from supabase/step1-schema-rls-seed.sql`);
+console.log(`Vocabulary: ${ACTIVITY_TAGS.length} legal tags\n`);
 
 for (const row of rows) {
-  const pathways = PATHWAY_TAGS.filter((tag) => row.tags.includes(tag));
-  if (pathways.length !== 1) {
-    problems.push(`"${row.title}": has ${pathways.length} pathway tags, needs exactly 1`);
-  }
-  if (!SOCIAL_TAGS.some((tag) => row.tags.includes(tag))) {
-    problems.push(`"${row.title}": no social tag — can never be recommended`);
-  }
-  if (!LOCATION_TAGS.some((tag) => row.tags.includes(tag))) {
-    problems.push(`"${row.title}": no location tag — can never be recommended`);
-  }
-  if (!BUDGET_TAGS.some((tag) => row.tags.includes(tag))) {
-    problems.push(`"${row.title}": no budget tag — can never be recommended`);
-  }
-  if (row.vector.length !== AXES.length) {
-    problems.push(`"${row.title}": vector has ${row.vector.length} values, needs ${AXES.length}`);
-  }
-  if (row.vector.some((n) => !Number.isInteger(n) || n < 1 || n > 10)) {
-    problems.push(`"${row.title}": vector values must be integers 1-10, got [${row.vector}]`);
-  }
-  if (new Set(row.tags).size !== row.tags.length) {
-    problems.push(`"${row.title}": duplicate tag`);
-  }
-}
+  const has = (tag) => row.tags.includes(tag);
 
-const titles = rows.map((row) => row.title);
-if (new Set(titles).size !== titles.length) {
-  problems.push("Duplicate titles in the seed — the insert de-duplicates by title.");
-}
+  // 1. Closed vocabulary. Anything else is a tag no filter reads.
+  const unknown = row.tags.filter((tag) => !isActivityTag(tag));
+  if (unknown.length) {
+    failures.push(`"${row.title}": tag(s) not in the vocabulary — ${unknown.join(", ")}`);
+  }
 
-console.log(`Survivors per hard-filter combination (need >= ${MIN_SURVIVORS}):\n`);
-const matches = (row, group) =>
-  group.length === 0 || group.some((tag) => row.tags.includes(tag));
+  // 2. Exactly one cost tier. Cost is applied as a ceiling, so one is enough
+  //    and more than one makes the tag meaningless.
+  const costs = row.tags.filter((tag) => COST_TAGS.includes(tag));
+  if (costs.length !== 1) {
+    failures.push(`"${row.title}": ${costs.length} cost tiers (${costs.join(", ") || "none"}), needs exactly 1`);
+  }
 
-for (const { pathway, socials, locations, budgets } of FILTER_COMBINATIONS) {
-  for (const social of socials) {
-    for (const location of locations) {
-      for (const budget of budgets) {
-        const survivors = rows.filter(
-          (row) =>
-            row.tags.includes(pathway) &&
-            matches(row, social) &&
-            matches(row, location) &&
-            matches(row, budget)
-        );
-        const label =
-          `${pathway} | social=${social.join("+")} | ` +
-          `location=${location.join("+") || "(unfiltered)"} | budget=${budget.join("+")}`;
-        console.log(`  ${String(survivors.length).padStart(2)}  ${label}`);
-        if (survivors.length < MIN_SURVIVORS) {
-          problems.push(`Only ${survivors.length} activities survive: ${label}`);
-        }
-      }
+  // 3. Completeness — each of these makes the row invisible to everyone.
+  if (!COMPANY_TAGS.some(has)) failures.push(`"${row.title}": no company tag`);
+  if (!PLACE_TAGS.some(has)) failures.push(`"${row.title}": no place tag`);
+
+  // 4. A pathway, and a time tag for EACH pathway carried. An activity on the
+  //    quick path with only weekly time tags can never answer "how long have
+  //    you got?", so it would never appear.
+  const pathways = PATHWAY_TAGS.filter(has);
+  if (!pathways.length) {
+    failures.push(`"${row.title}": no pathway tag`);
+  }
+  for (const pathway of pathways) {
+    if (!TIME_LADDER[pathway].some(has)) {
+      failures.push(`"${row.title}": carries ${pathway} but no ${pathway} time tag`);
     }
   }
+
+  if (new Set(row.tags).size !== row.tags.length) {
+    failures.push(`"${row.title}": duplicate tag`);
+  }
 }
 
-console.log("\nVector spread across the activity pool:");
-AXES.forEach((axis, index) => {
-  const values = rows.map((row) => row.vector[index]);
-  const mean = values.reduce((sum, n) => sum + n, 0) / values.length;
-  console.log(
-    `  ${axis.padEnd(12)} mean ${mean.toFixed(2)}  range ${Math.min(...values)}-${Math.max(...values)}`
-  );
-});
+// --- Inventory (informational) ---------------------------------------------
+const used = new Set(rows.flatMap((row) => row.tags));
+const unused = ACTIVITY_TAGS.filter((tag) => !used.has(tag));
 
-if (problems.length) {
-  console.log(`\n${problems.length} problem(s):\n - ${problems.join("\n - ")}`);
+const group = (name, tags) => {
+  const counts = tags.map((tag) => `${tag} ${rows.filter((r) => r.tags.includes(tag)).length}`);
+  console.log(`  ${name.padEnd(9)} ${counts.join("   ")}`);
+};
+console.log("Tag usage:");
+group("pathway", PATHWAY_TAGS);
+group("quick", TIME_LADDER["quick-fix"]);
+group("long", TIME_LADDER["long-term"]);
+group("place", PLACE_TAGS);
+group("setting", SETTING_TAGS);
+group("company", COMPANY_TAGS);
+group("cost", COST_TAGS);
+console.log(`  exertion  ${rows.filter((r) => r.tags.includes("exertion")).length}`);
+
+const dual = rows.filter((r) => PATHWAY_TAGS.every((p) => r.tags.includes(p)));
+console.log(`\nCarrying both pathways (${dual.length}): ${dual.map((r) => r.title).join(", ") || "none"}`);
+
+if (unused.length) {
+  console.log(`\nLegal but unused tags: ${unused.join(", ")}`);
+  console.log("  (not a failure, but a tag nothing carries filters everything out)");
+}
+
+if (failures.length) {
+  console.log(`\n${failures.length} FAILURE(S):\n - ${failures.join("\n - ")}`);
   process.exit(1);
 }
-console.log("\nAll checks passed.");
+console.log("\nAll structural checks passed.");

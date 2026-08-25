@@ -5,6 +5,11 @@ import { supabase } from "@/lib/supabaseClient";
 import PersonalityQuiz from "@/components/PersonalityQuiz";
 import { readQuizSession, clearQuizSession, sessionUserVector, type QuizSession } from "@/lib/quizSession";
 import { rankActivities } from "@/lib/matchActivities";
+import {
+  satisfiesFilter,
+  type FilterAction,
+  type PathwayTag,
+} from "@/lib/activityTags";
 
 /**
  * Rotation penalty, expressed as a distance multiplier. Ranking is now by
@@ -27,93 +32,14 @@ const ROTATION_DISTANCE_PENALTY = 1.35;
 type FunnelStage = "loading" | "quiz" | "chooser" | "questions" | "results";
 
 // --- QUIZ DEFINITIONS ---
-const BORED_QUIZ = [
-  {
-    question: "How much time do you have right now?",
-    answers: [
-      { text: "10-15 minutes", tags: ["10-mins"] },
-      { text: "Around an hour", tags: ["1-hour"] },
-      { text: "Half a day", tags: ["half-day"] },
-    ],
-  },
-  {
-    question: "What's your current physical energy?",
-    answers: [
-      { text: "Low Energy (Resting / Sedentary)", tags: ["low-energy", "sedentary"] },
-      { text: "High Energy (Moving around / Active)", tags: ["high-energy", "active-movement"] },
-    ],
-  },
-  {
-    question: "Where do you want to be?",
-    answers: [
-      { text: "Indoors / At home", tags: ["inside"] },
-      { text: "Outdoors / Leaving the house", tags: ["outside"] },
-    ],
-  },
-  {
-    question: "Social preference right now?",
-    answers: [
-      { text: "Solo (Just me)", tags: ["solo"] },
-      { text: "With someone else or a group", tags: ["social", "couple"] },
-    ],
-  },
-  {
-    question: "Budget filter?",
-    answers: [
-      { text: "Strictly Free", tags: ["free"] },
-      { text: "Open budget (Free or low cost)", tags: ["low-budget", "free"] },
-    ],
-  },
-];
-
-const HOBBY_QUIZ = [
-  {
-    question: "What primary psychological itch are you trying to scratch?",
-    answers: [
-      { text: "Analytical & Systems (Finance, coding, puzzles, strategy)", tags: ["analytical", "tech", "mental-challenge"] },
-      { text: "Tactile Creation & Making (Cooking, woodwork, crafting, gear)", tags: ["creative", "hands-on", "messy"] },
-      { text: "Culture, History & Mind (Literature, languages, history, design)", tags: ["culture", "learning", "vintage"] },
-      { text: "Physical Exertion & Outdoor Exploration (Fitness, hiking, sports)", tags: ["active", "physical-challenge", "nature"] },
-    ],
-  },
-  {
-    question: "What environment matches your ideal workflow?",
-    answers: [
-      { text: "A clean digital desk or screen space", tags: ["desk-bound", "inside", "digital"] },
-      { text: "A dedicated workshop, garage, or kitchen space", tags: ["workshop", "inside", "hands-on"] },
-      { text: "Out in the wild, trail, or open water", tags: ["wild-nature", "outside", "nature"] },
-      { text: "A structured facility (Gym, court, pool, studio)", tags: ["facility", "active"] },
-    ],
-  },
-  {
-    question: "How do you want to engage with the learning curve?",
-    answers: [
-      { text: "Deep Process-Oriented Mastery (Long-term skill building)", tags: ["process-oriented", "goal-oriented", "5-hours-week"] },
-      { text: "Tangible Output Focused (I want to build or finish a physical item)", tags: ["tangible-output", "hands-on", "1-2-hours-week"] },
-    ],
-  },
-  {
-    question: "What is your time and financial commitment?",
-    answers: [
-      { text: "Light commitment (1-2 hrs/wk, low cost)", tags: ["1-2-hours-week", "low-budget", "free"] },
-      { text: "Deep immersion (5+ hrs/wk, willing to invest in gear)", tags: ["5-hours-week", "investment-required", "low-budget", "free"] },
-      { text: "Weekend expeditions only", tags: ["weekend-short", "investment-required", "low-budget", "free"] },
-    ],
-  },
-  {
-    question: "Social dynamic preference?",
-    answers: [
-      { text: "Independent solo pursuit", tags: ["solo"] },
-      { text: "With a partner or close friend", tags: ["couple"] },
-      { text: "Community, club, or team setting", tags: ["social"] },
-    ],
-  },
-];
-
-const SOCIAL_TAGS = ["solo", "couple", "social"];
-const LOCATION_TAGS = ["inside", "outside"];
-const BUDGET_TAGS = ["free", "low-budget", "investment-required"];
-const TIME_TAGS = ["10-mins", "30-mins", "1-hour", "half-day", "whole-day", "weekend-short", "1-2-hours-week", "5-hours-week"];
+import {
+  QUICK_QUESTIONS,
+  HOBBY_QUESTIONS,
+  RELAXATION_STEPS,
+  MIN_RESULTS,
+  widenTime,
+  type FeasibilityQuestion,
+} from "@/lib/feasibilityQuestions";
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
@@ -127,7 +53,10 @@ export default function Home() {
 
   const [path, setPath] = useState<"bored" | "hobby" | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
-  const [tagHistory, setTagHistory] = useState<string[][]>([]); 
+  const [answerHistory, setAnswerHistory] = useState<FilterAction[]>([]);
+  // Which constraints, if any, had to be bent to find anything. Surfaced on
+  // the results so relaxation is never silent.
+  const [relaxedConstraints, setRelaxedConstraints] = useState<string[]>([]);
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -249,39 +178,46 @@ export default function Home() {
     }
   };
 
-  const activeQuiz = path === "bored" ? BORED_QUIZ : HOBBY_QUIZ;
+  const activeQuiz = path === "bored" ? QUICK_QUESTIONS : HOBBY_QUESTIONS;
   const progress = path ? Math.round((currentStep / activeQuiz.length) * 100) : 0;
 
-  const handleAnswer = async (selectedTags: string[]) => {
-    const newHistory = [...tagHistory, selectedTags];
-    setTagHistory(newHistory);
+  const handleAnswer = async (action: FilterAction) => {
+    const newHistory = [...answerHistory, action];
+    setAnswerHistory(newHistory);
 
     if (currentStep < activeQuiz.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
       setStage("results");
       setIsLoading(true);
-      const flattenedTags = newHistory.flat();
-      const pathwayTag = path === "bored" ? "quick-fix" : "long-term";
-      const finalTags = [...flattenedTags, pathwayTag];
-      await findPrecisionMatchesWithRotation(finalTags, pathwayTag);
+      const pathwayTag: PathwayTag = path === "bored" ? "quick-fix" : "long-term";
+      await findMatches(newHistory, activeQuiz, pathwayTag);
     }
   };
 
   const handleBack = () => {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
-      setTagHistory(tagHistory.slice(0, -1));
+      setAnswerHistory(answerHistory.slice(0, -1));
     } else {
       // Back from the first feasibility question returns to the chooser, not
       // to the quiz -- the vector is already earned and should not be lost.
       setPath(null);
-      setTagHistory([]);
+      setAnswerHistory([]);
       setStage("chooser");
     }
   };
 
-  const findPrecisionMatchesWithRotation = async (collectedTags: string[], pathwayTag: string) => {
+  /**
+   * Pathway filter -> per-question filter actions -> rank by personality
+   * vector. There is no tag scoring any more: tags decide what is FEASIBLE,
+   * the vector decides what FITS.
+   */
+  const findMatches = async (
+    answers: FilterAction[],
+    questions: FeasibilityQuestion[],
+    pathwayTag: PathwayTag
+  ) => {
     const { data: activities, error } = await supabase.from("activities").select("*");
 
     if (error || !activities) {
@@ -290,122 +226,98 @@ export default function Home() {
       return;
     }
 
-    // Three hard filters: social, location, budget. Each collects EVERY matching tag,
-    // not just the first. "With someone else or a group" emits ["social", "couple"],
-    // and matching on "social" alone excluded couple-only activities from exactly the
-    // users asking for them. An activity qualifies if it matches ANY of the user's
-    // tags on that axis.
-    const userSocialRequirements = collectedTags.filter(tag => SOCIAL_TAGS.includes(tag));
-    // No answer currently emits two location tags, so this behaves identically today --
-    // it's shaped the same way so adding one can't reintroduce the bug above.
-    const userLocationRequirements = collectedTags.filter(tag => LOCATION_TAGS.includes(tag));
-    // Budget was scoring-only until now, so "Strictly Free" still surfaced paid
-    // activities. Filtering it the same way makes the multi-tag budget answers mean
-    // what they say: an open budget lists all three tags and so matches everything,
-    // while a low-cost answer omits "investment-required" and so excludes the
-    // gear-only hobbies.
-    const userBudgetRequirements = collectedTags.filter(tag => BUDGET_TAGS.includes(tag));
+    const pool = activities.filter((a) => a.tags?.includes(pathwayTag));
 
-    let validActivities = activities.filter(a => a.tags.includes(pathwayTag));
+    // Pair every answer with the constraint its question governs, so
+    // relaxation knows what each one is.
+    let constraints = questions.map((question, index) => ({
+      kind: question.constraint,
+      action: answers[index] ?? ({ kind: "none" } as FilterAction),
+    }));
 
-    if (userSocialRequirements.length > 0) {
-      validActivities = validActivities.filter(a =>
-        userSocialRequirements.some(tag => a.tags.includes(tag))
+    const applyAll = (candidates: any[]) =>
+      candidates.filter((a) =>
+        constraints.every((c) => satisfiesFilter(a.tags ?? [], c.action))
       );
-    }
 
-    if (userLocationRequirements.length > 0) {
-      validActivities = validActivities.filter(a =>
-        userLocationRequirements.some(tag => a.tags.includes(tag))
-      );
-    }
+    let survivors = applyAll(pool);
 
-    if (userBudgetRequirements.length > 0) {
-      validActivities = validActivities.filter(a =>
-        userBudgetRequirements.some(tag => a.tags.includes(tag))
-      );
-    }
+    // GRACEFUL RELAXATION. Bend one thing at a time, in a fixed order, and
+    // only far enough to reach MIN_RESULTS. Cost and company are never in
+    // RELAXATION_STEPS, so they cannot be bent here however empty the pool is.
+    const bent: string[] = [];
+    for (const step of RELAXATION_STEPS) {
+      if (survivors.length >= MIN_RESULTS) break;
 
-    // Retrieve recently shown activity IDs from browser session storage to rotate variety
+      let changedSomething = false;
+      constraints = constraints.map((c) => {
+        // An answer that already filters nothing cannot be relaxed further,
+        // and must not be reported as though it had been.
+        if (!step.kinds.includes(c.kind) || c.action.kind === "none") return c;
+
+        if (c.kind === "time") {
+          const widened = widenTime(c.action, pathwayTag);
+          if (!widened) return c;
+          changedSomething = true;
+          return { ...c, action: widened };
+        }
+
+        changedSomething = true;
+        return { ...c, action: { kind: "none" } as FilterAction };
+      });
+
+      if (changedSomething) {
+        bent.push(step.label);
+        survivors = applyAll(pool);
+      }
+    }
+    setRelaxedConstraints(bent);
+
+    // Rotation: remember what was shown last time so it can be pushed down.
     const recentKey = `recent_shown_${path}`;
     let recentShownIds: string[] = [];
     try {
       const stored = sessionStorage.getItem(recentKey);
       if (stored) recentShownIds = JSON.parse(stored);
-    } catch (e) {
-      // fallback
+    } catch {
+      // Storage unavailable; no rotation this run.
     }
 
-    const scoredActivities = validActivities.map((activity) => {
-      let score = 0;
-      
-      collectedTags.forEach((userTag) => {
-        if (activity.tags.includes(userTag)) {
-          if (TIME_TAGS.includes(userTag)) {
-            score += 6;
-          } else {
-            score += 2;
-          }
-        }
-      });
-
-      if (collectedTags.includes("analytical") && activity.tags.includes("analytical")) score *= 1.6;
-      if (collectedTags.includes("creative") && activity.tags.includes("creative")) score *= 1.6;
-      if (collectedTags.includes("culture") && activity.tags.includes("culture")) score *= 1.6;
-      if (collectedTags.includes("active") && activity.tags.includes("active")) score *= 1.6;
-      if (collectedTags.includes("tangible-output") && activity.tags.includes("tangible-output")) score *= 1.4;
-
-      // ROTATION PENALTY: If this exact activity was shown in the immediate previous run, 
-      // gently reduce its score so alternate high-scoring matches bubble to the top!
-      if (recentShownIds.includes(activity.id)) {
-        score *= 0.65;
-      }
-
-      return { ...activity, score: Math.round(score * 10) / 10 };
-    });
-
-    // Rank the survivors by how well they suit the personality vector. The
-    // hard filters above already decided what is FEASIBLE; this decides what
-    // FITS. Note there is no longer a "score > 0" gate: every survivor is
-    // feasible by definition, and an activity that happens to share no scoring
-    // tags is no less suitable, so it stays eligible.
     const userVector = quizSession ? sessionUserVector(quizSession) : null;
 
-    let sortedMatches;
+    let ordered;
     if (userVector) {
-      const ranked = rankActivities(userVector, scoredActivities);
-      const sortKey = (a: typeof ranked[number]) =>
+      const ranked = rankActivities(userVector, survivors);
+      // The penalty moves the SORT KEY only. matchPercent on the card stays
+      // the true distance, so the number never lies to make rotation work.
+      const sortKey = (a: (typeof ranked)[number]) =>
         recentShownIds.includes(a.id) ? a.distance * ROTATION_DISTANCE_PENALTY : a.distance;
-      sortedMatches = [...ranked].sort((a, b) => sortKey(a) - sortKey(b));
+      ordered = [...ranked].sort((a, b) => sortKey(a) - sortKey(b));
     } else {
-      // No vector for this tab. Only reachable when sessionStorage is blocked,
-      // since writeQuizSession fails silently by design -- the user should
-      // still get results, just ordered the old way.
-      sortedMatches = scoredActivities
-        .filter(a => a.score > 0)
-        .sort((a, b) => b.score - a.score);
+      // No vector: sessionStorage is blocked, so writeQuizSession failed
+      // silently. Nothing can rank, so show the feasible set unranked and let
+      // the results page say so rather than implying an order that isn't real.
+      ordered = survivors;
     }
 
-    const topMatches = sortedMatches.slice(0, 3);
-    const topMatchIds = topMatches.map(m => m.id);
+    const topMatches = ordered.slice(0, MIN_RESULTS);
+    const topMatchIds = topMatches.map((m) => m.id);
 
-    // Save these new IDs to session storage so next repeat quiz run rotates them
     try {
       sessionStorage.setItem(recentKey, JSON.stringify(topMatchIds));
-    } catch (e) {
-      // fallback
+    } catch {
+      // Nothing to do; rotation just won't apply next run.
     }
 
-    // The wildcard may stretch TASTE, never FEASIBILITY: it is drawn from the
-    // hard-filtered survivors minus the picks already shown, so it can surprise
-    // on theme but can never suggest something the user ruled out on social,
-    // location, or budget. Drawn from the ranked list rather than the raw
-    // survivors so it carries a real matchPercent of its own.
-    const wildcardCandidates = sortedMatches.filter(a => !topMatchIds.includes(a.id));
+    // The wildcard may stretch TASTE, never FEASIBILITY: drawn from the same
+    // filtered survivors, so it can surprise on theme but can never suggest
+    // something ruled out on cost, company, or anything else asked.
+    const wildcardCandidates = ordered.filter((a) => !topMatchIds.includes(a.id));
 
-    let finalResults = [...topMatches];
+    const finalResults = [...topMatches];
     if (wildcardCandidates.length > 0) {
-      const randomWildcard = wildcardCandidates[Math.floor(Math.random() * wildcardCandidates.length)];
+      const randomWildcard =
+        wildcardCandidates[Math.floor(Math.random() * wildcardCandidates.length)];
       finalResults.push({ ...randomWildcard, isWildcard: true });
     }
 
@@ -417,8 +329,9 @@ export default function Home() {
   const choosePath = (chosen: "bored" | "hobby") => {
     setPath(chosen);
     setCurrentStep(0);
-    setTagHistory([]);
+    setAnswerHistory([]);
     setRecommendations([]);
+    setRelaxedConstraints([]);
     setStage("questions");
   };
 
@@ -426,8 +339,9 @@ export default function Home() {
   const restart = () => {
     setPath(null);
     setCurrentStep(0);
-    setTagHistory([]);
+    setAnswerHistory([]);
     setRecommendations([]);
+    setRelaxedConstraints([]);
     setStage("chooser");
   };
 
@@ -441,8 +355,9 @@ export default function Home() {
     setQuizSession(null);
     setPath(null);
     setCurrentStep(0);
-    setTagHistory([]);
+    setAnswerHistory([]);
     setRecommendations([]);
+    setRelaxedConstraints([]);
     setStage("quiz");
   };
 
@@ -629,15 +544,15 @@ export default function Home() {
             </h2>
 
             <div className="flex flex-col space-y-3">
-              {activeQuiz[currentStep].answers.map((answer, index) => (
+              {activeQuiz[currentStep].options.map((option, index) => (
                 <button
                   key={index}
-                  onClick={() => handleAnswer(answer.tags)}
+                  onClick={() => handleAnswer(option.action)}
                   className={`w-full text-left px-6 py-4 rounded-xl border-2 border-slate-100 transition-all font-medium text-slate-700
                     ${path === 'bored' ? 'hover:border-blue-500 hover:bg-blue-50' : 'hover:border-green-500 hover:bg-green-50'}
                   `}
                 >
-                  {answer.text}
+                  {option.text}
                 </button>
               ))}
             </div>
@@ -647,6 +562,22 @@ export default function Home() {
         {stage === "results" && (
           <div className="space-y-6 text-left animate-in fade-in slide-in-from-bottom-4 duration-500">
             <h2 className="text-3xl font-bold text-slate-900 text-center">Your Curated Results</h2>
+
+            {relaxedConstraints.length > 0 && recommendations.length > 0 && (
+              <p className="text-center text-sm text-sky-800 bg-sky-50 border border-sky-200 rounded-xl px-4 py-3">
+                Nothing matched everything you asked for, so we bent{" "}
+                <strong>{relaxedConstraints.join(", then ")}</strong> to find these. Your budget
+                and who you are with were left exactly as you set them.
+              </p>
+            )}
+
+            {!quizSession && recommendations.length > 0 && (
+              <p className="text-center text-sm text-slate-700 bg-slate-100 border border-slate-200 rounded-xl px-4 py-3">
+                These fit what you asked for, but they are not in any particular order — your
+                browser is blocking storage, so we could not keep your personality result to rank
+                them against.
+              </p>
+            )}
 
             {quizSession && quizSession.skipped > 0 && (
               <p className="text-center text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
@@ -719,8 +650,18 @@ export default function Home() {
                   })
                 ) : (
                   <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 shadow-sm">
-                    <p className="text-slate-800 font-bold text-lg mb-2">No perfect match found.</p>
-                    <p className="text-slate-500 text-sm">Your strict limits filtered out our current database. Try a wider filter!</p>
+                    <p className="text-slate-800 font-bold text-lg mb-2">Nothing fits, even after bending what we could.</p>
+                    <p className="text-slate-500 text-sm mb-4">
+                      We relaxed where you wanted to be, how active it should be, and how much time
+                      you have — and still found nothing. We will not suggest something that costs
+                      more than you said, or needs people you do not have.
+                    </p>
+                    <button
+                      onClick={restart}
+                      className="text-sm font-semibold text-blue-600 hover:text-blue-800 underline underline-offset-4"
+                    >
+                      Try different answers
+                    </button>
                   </div>
                 )}
 

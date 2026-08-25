@@ -24,11 +24,9 @@ export const AXES = [
   "Stimulation",
 ];
 
-/** Hard-filter tag groups, mirroring the constants at the top of app/page.tsx. */
-export const PATHWAY_TAGS = ["quick-fix", "long-term"];
-export const SOCIAL_TAGS = ["solo", "couple", "social"];
-export const LOCATION_TAGS = ["inside", "outside"];
-export const BUDGET_TAGS = ["free", "low-budget", "investment-required"];
+// Tag groups deliberately do NOT live here any more. lib/activityTags.ts is the
+// one definition of the vocabulary, and scripts import it directly so the app
+// and the checks can never disagree about what a legal tag is.
 
 export const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const seedSqlPath = join(repoRoot, "supabase", "step1-schema-rls-seed.sql");
