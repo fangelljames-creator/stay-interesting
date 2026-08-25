@@ -1,0 +1,32 @@
+# Line endings, decided per repo rather than per machine.
+#
+# Without this file, each clone's core.autocrlf setting decides. On Windows that
+# is typically true, which is what produced two long-running annoyances here:
+#
+#   1. "LF will be replaced by CRLF the next time Git touches it" on every
+#      single commit.
+#   2. data/personalityQuiz.ts sitting permanently as " M" in git status while
+#      git diff showed nothing, because the worktree copy had been saved with
+#      CRLF while the committed blob was LF. Content identical, bytes not.
+#
+# text=auto  git decides what is text, and always stores it LF in the repo
+# eol=lf     and checks it out LF too, on every platform
+#
+# LF everywhere is the norm for the JS/TS toolchain, and VS Code handles LF
+# files on Windows without complaint.
+* text=auto eol=lf
+
+# Binaries git must never convert. text=auto usually detects these, but being
+# explicit means a corrupt file can never be blamed on line-ending conversion.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.avif  binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.pdf   binary
