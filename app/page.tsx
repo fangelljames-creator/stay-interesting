@@ -1,8 +1,20 @@
 "use client";
 
 import { useState, useEffect, SubmitEvent } from "react";
-import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import PersonalityQuiz from "@/components/PersonalityQuiz";
+import { readQuizSession, clearQuizSession, type QuizSession } from "@/lib/quizSession";
+
+/**
+ * The funnel, in order. Every visit walks personality quiz -> Bored/Hobby
+ * chooser -> feasibility questions -> results.
+ *
+ * "loading" exists because this page is statically prerendered: sessionStorage
+ * does not exist during that render, so which stage to show cannot be known
+ * until after mount. Resolving it in useEffect and painting a placeholder in
+ * the meantime avoids a hydration mismatch.
+ */
+type FunnelStage = "loading" | "quiz" | "chooser" | "questions" | "results";
 
 // --- QUIZ DEFINITIONS ---
 const BORED_QUIZ = [
@@ -100,10 +112,12 @@ export default function Home() {
   const [isSigningUp, setIsSigningUp] = useState(false);
   const [authMessage, setAuthMessage] = useState("");
 
+  const [stage, setStage] = useState<FunnelStage>("loading");
+  const [quizSession, setQuizSession] = useState<QuizSession | null>(null);
+
   const [path, setPath] = useState<"bored" | "hobby" | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [tagHistory, setTagHistory] = useState<string[][]>([]); 
-  const [isFinished, setIsFinished] = useState(false);
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -132,6 +146,19 @@ export default function Home() {
     });
 
     return () => subscription.unsubscribe();
+  }, []);
+
+  // Resolve the opening stage once the tab's storage is actually readable.
+  // A returning visitor lands on the chooser; a new one takes the quiz first.
+  //
+  // eslint's react-hooks/set-state-in-effect fires here, and unavoidably so:
+  // this page is prerendered, sessionStorage does not exist at that point, and
+  // reading it during render would be a hydration mismatch. Deferring to an
+  // effect is the correct trade. Both setState calls batch into one render.
+  useEffect(() => {
+    const stored = readQuizSession();
+    setQuizSession(stored);
+    setStage(stored ? "chooser" : "quiz");
   }, []);
 
   const fetchSavedActivities = async (userId: string) => {
@@ -222,7 +249,7 @@ export default function Home() {
     if (currentStep < activeQuiz.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
-      setIsFinished(true);
+      setStage("results");
       setIsLoading(true);
       const flattenedTags = newHistory.flat();
       const pathwayTag = path === "bored" ? "quick-fix" : "long-term";
@@ -236,8 +263,11 @@ export default function Home() {
       setCurrentStep(currentStep - 1);
       setTagHistory(tagHistory.slice(0, -1));
     } else {
+      // Back from the first feasibility question returns to the chooser, not
+      // to the quiz -- the vector is already earned and should not be lost.
       setPath(null);
       setTagHistory([]);
+      setStage("chooser");
     }
   };
 
@@ -355,12 +385,43 @@ export default function Home() {
     setIsLoading(false);
   };
 
+  /** Enter the feasibility questions for a pathway, from a clean slate. */
+  const choosePath = (chosen: "bored" | "hobby") => {
+    setPath(chosen);
+    setCurrentStep(0);
+    setTagHistory([]);
+    setRecommendations([]);
+    setStage("questions");
+  };
+
+  /** Back to the chooser, keeping the personality vector. */
   const restart = () => {
     setPath(null);
     setCurrentStep(0);
     setTagHistory([]);
-    setIsFinished(false);
     setRecommendations([]);
+    setStage("chooser");
+  };
+
+  /**
+   * Forget the personality result and start the whole funnel again. Retaking
+   * is a feature: moods change, and the session is the only thing that
+   * remembers, so clearing it is all "start over" needs to mean.
+   */
+  const retakePersonalityQuiz = () => {
+    clearQuizSession();
+    setQuizSession(null);
+    setPath(null);
+    setCurrentStep(0);
+    setTagHistory([]);
+    setRecommendations([]);
+    setStage("quiz");
+  };
+
+  /** The quiz has just written its result; pick it up and move on. */
+  const handleQuizComplete = () => {
+    setQuizSession(readQuizSession());
+    setStage("chooser");
   };
 
   const getMedalStyles = (index: number, isWildcard: boolean) => {
@@ -485,34 +546,43 @@ export default function Home() {
           Stay Interesting
         </h1>
 
-        {path === null && (
+        {stage === "loading" && (
+          <div className="flex flex-col items-center justify-center py-16 space-y-4">
+            <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin" />
+          </div>
+        )}
+
+        {stage === "quiz" && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <PersonalityQuiz onContinue={handleQuizComplete} />
+          </div>
+        )}
+
+        {stage === "chooser" && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <h2 className="text-2xl font-bold text-slate-800 mb-8">What brings you here today?</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <button onClick={() => setPath("bored")} className="bg-white p-8 rounded-2xl shadow-sm border-2 border-slate-100 hover:border-blue-500 hover:shadow-md transition-all text-left group">
+              <button onClick={() => choosePath("bored")} className="bg-white p-8 rounded-2xl shadow-sm border-2 border-slate-100 hover:border-blue-500 hover:shadow-md transition-all text-left group">
                 <h3 className="text-xl font-bold text-slate-900 mb-2 group-hover:text-blue-600">I'm Bored</h3>
                 <p className="text-slate-500 text-sm leading-relaxed">Quick tasks, micro-productivity, and immediate activities to do right now.</p>
               </button>
 
-              <button onClick={() => setPath("hobby")} className="bg-white p-8 rounded-2xl shadow-sm border-2 border-slate-100 hover:border-green-500 hover:shadow-md transition-all text-left group">
+              <button onClick={() => choosePath("hobby")} className="bg-white p-8 rounded-2xl shadow-sm border-2 border-slate-100 hover:border-green-500 hover:shadow-md transition-all text-left group">
                 <h3 className="text-xl font-bold text-slate-900 mb-2 group-hover:text-green-600">Find a Hobby</h3>
                 <p className="text-slate-500 text-sm leading-relaxed">Discover a new ongoing passion tailored to your schedule, domain, and budget.</p>
               </button>
             </div>
 
-            {/* TEMPORARY: the personality quiz lives on its own route and is
-                otherwise unreachable from the UI. Remove this once the two
-                engines are merged into one flow (roadmap step 4). */}
-            <Link
-              href="/quiz"
-              className="inline-block text-sm font-semibold text-indigo-600 hover:text-indigo-800 underline underline-offset-4 transition-colors"
+            <button
+              onClick={retakePersonalityQuiz}
+              className="text-sm font-semibold text-slate-400 hover:text-indigo-600 underline underline-offset-4 transition-colors"
             >
-              Or take the 7-axis personality quiz →
-            </Link>
+              Retake the personality quiz
+            </button>
           </div>
         )}
 
-        {path !== null && !isFinished && (
+        {stage === "questions" && path !== null && (
           <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 relative animate-in fade-in zoom-in-95 duration-300">
             <div className="absolute top-0 left-0 w-full h-1.5 bg-slate-100 rounded-t-3xl overflow-hidden">
               <div className={`h-full transition-all duration-500 ease-out ${path === 'bored' ? 'bg-blue-500' : 'bg-green-500'}`} style={{ width: `${progress}%` }} />
@@ -546,7 +616,7 @@ export default function Home() {
           </div>
         )}
 
-        {isFinished && (
+        {stage === "results" && (
           <div className="space-y-6 text-left animate-in fade-in slide-in-from-bottom-4 duration-500">
             <h2 className="text-3xl font-bold text-slate-900 text-center">Your Curated Results</h2>
 
@@ -605,8 +675,17 @@ export default function Home() {
                 )}
 
                 <button onClick={restart} className="w-full bg-slate-900 text-white py-4 mt-8 rounded-xl font-bold hover:bg-slate-800 transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
-                  Take Another Quiz
+                  Try a different path
                 </button>
+
+                <div className="text-center">
+                  <button
+                    onClick={retakePersonalityQuiz}
+                    className="text-sm font-semibold text-slate-400 hover:text-indigo-600 underline underline-offset-4 transition-colors"
+                  >
+                    Retake the personality quiz
+                  </button>
+                </div>
               </div>
             )}
           </div>
