@@ -118,6 +118,46 @@ and `authenticated` with no write policy at all, so the anon key that ships in t
 cannot modify it; `saved_activities` is restricted to `(select auth.uid()) = user_id` for
 select/insert/delete. Queries 7a and 7b in that file re-check this at any time.
 
+## Tag doctrine — read before touching tags
+
+**Tags encode feasibility. The vector ranks. A tag that no hard filter reads must not exist.**
+
+This is a rule with teeth, not a preference. The previous vocabulary grew to 40 tags, most feeding
+a scoring pass that vector ranking later made irrelevant — four of ten questions ended up fully
+decorative, with users answering them and nothing changing. Tags describing *taste* ("creative",
+"analytical", "vintage") duplicate what the vector already measures and drift out of agreement
+with it. Adding a tag means adding, in the same change, the filter that reads it.
+
+**The closed vocabulary — 20 tags, defined in `lib/activityTags.ts`:**
+
+| Group | Tags |
+|---|---|
+| Pathway | `quick-fix`, `long-term` — an activity may honestly carry **both** |
+| Time (quick) | `10-mins`, `1-hour`, `half-day` — ordered, smallest first |
+| Time (long) | `1-2-hours-week`, `5-hours-week`, `weekend-blocks` — ordered |
+| Energy | `exertion` |
+| Place | `inside`, `outside` |
+| Setting | `at-home`, `facility`, `in-nature` |
+| Company | `solo`, `couple`, `social` |
+| Cost | `free`, `low-budget`, `investment-required` — **exactly one per activity** |
+
+`scripts/validate-activity-seed.mjs` hard-fails on any tag outside this list.
+
+**Why `exertion` is one tag, not a low/high pair.** An activity either demands real effort or it
+does not; the absence of the tag carries the "doesn't" case. A pair lets a row claim both or
+neither, which is how `low-energy` and `high-energy` both ended up on the same activities.
+
+**Why cost is exactly one tier.** Cost is applied as a **ceiling** at query time (`costCeiling`):
+free → `{free}`; low → `{free, low-budget}`; money-no-object → no filter at all. That is what lets
+each activity carry one honest tier. The old vocabulary let a row carry `free` *and* `low-budget`
+to stay visible to everyone, which made the tag mean nothing. Something tagged `free` still shows
+for a big spender — the ceiling handles it.
+
+**Every quiz option maps to an explicit `FilterAction`** — `require`, `exclude`, `allow`, or
+`none`. Options used to emit a bag of tags and leave the engine to infer meaning from which group
+each fell into, which is exactly how tags came to do nothing without anyone noticing. Stating the
+action makes a no-op visible as a no-op. "Don't mind" answers are `none`.
+
 ## One funnel (merged 2026-08-25, roadmap steps 3 + 4)
 
 Every visit walks the same path, in `app/page.tsx`:
