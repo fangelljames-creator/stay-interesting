@@ -144,6 +144,15 @@ Listing all three tags is how an answer says "no budget limit". Under the old sc
 behaviour those tags differentiated nothing; under filtering they are the mechanism. Don't "tidy"
 them away.
 
+**Budget tagging is a judgment call, and the calls are deliberate.** `investment-required` means
+the activity is gear-gated: pool hire, film stock and developing, a road bike. Skateboarding is
+tagged `low-budget` — **confirmed with Owen 2026-08-25** — because a starter board is a one-off
+~£60–80 and skateparks are free, putting it nearer pool hire than a road bike. That call carries
+weight: it is one of two activities holding `long-term | outside | low-cost` at 6 survivors for
+each social value. Retagging it to `investment-required` drops all three to exactly 5, which still
+passes the validator's floor but leaves no headroom for the rotation penalty. Check
+`scripts/validate-activity-seed.mjs` before changing any budget tag.
+
 **Wildcard rule, confirmed 2026-08-25: it may stretch taste, never feasibility.** It is drawn from
 the hard-filtered survivors minus the picks already shown, so it can surprise on theme but can
 never suggest something the user ruled out on social, location, or budget. It reads from
