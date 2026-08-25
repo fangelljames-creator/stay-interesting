@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, SubmitEvent } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 // --- QUIZ DEFINITIONS ---
@@ -155,7 +155,7 @@ export default function Home() {
     }
   };
 
-  const handleAuth = async (e: React.FormEvent) => {
+  const handleAuth = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setAuthMessage("");
 
