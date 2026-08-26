@@ -29,7 +29,8 @@ up, log in, take a 7-axis personality quiz, and save activities to custom lists.
 - `lib/` — Supabase client, imported as `@/lib/supabaseClient` (the `@/*` → `./*` alias is in
   `tsconfig.json`) (verified). Also the pure logic modules: `matchActivities.ts` (ranking),
   `activityTags.ts` (the vocabulary), `feasibilityQuestions.ts`, `quizSession.ts`, and
-  `resultsSelection.ts` (the wildcard draw and the reroll pool). Sibling imports inside `lib/`
+  `resultsSelection.ts` (the wildcard draw) and `rerollMachine.ts` (the results reducer: the
+  deterministic reroll queue, the shared counter, and the wildcard refresh). Sibling imports in `lib/`
   use the explicit `./name.ts` extension so the dev scripts can import them under Node.
 - `scripts/` — dev-only analysis tools, not part of the build. Four of them:
   `validate-activity-seed.mjs`, `verify-activity-matching.mjs`, `verify-results-selection.mjs`,
@@ -263,18 +264,53 @@ The wildcard renders whenever any activity is left beyond the shown cards, and s
 that fit had anything to do with the draw. Same rule as the rotation penalty below; the number never
 lies, the label explains it.
 
-**Reroll — added 2026-08-26.** Each of the three ranked cards carries a `↻ Reroll` control that
-**permanently** (for this run) drops it and replaces it with a random pick from **ranks 4–8 of the
-ranked survivors**. The pool is **shared by all three slots**, so a full pool is ~5 rerolls in total
-and then the results settle; a thinner pool gives fewer. The control is **hidden, not disabled**, on
-an empty pool — five dead buttons would be worse than none. Replacements come from the ranked list,
-so they carry their own true `matchPercent`. **A rerolled card never comes back**, as a ranked card
-or as a wildcard. The wildcard's own control draws a fresh wildcard under the rule above.
+**Reroll — respecified 2026-08-26 (supersedes the original same-day design).** The first version
+used a shared *random* pool with no counter and closure-reading handlers. All three of those were
+wrong; what replaced them is in **`lib/rerollMachine.ts`**, a pure reducer.
 
-⚠️ **The collision guard is real, not defensive coding.** A rank 4–8 replacement can be the very row
-currently showing as the wildcard, so `rerollCard` redraws the wildcard when that happens.
-`verify-results-selection.mjs` hits this 35 times in 516 simulated runs. Excluding the wildcard from
-the reroll pool instead would silently cost the user one of their five rerolls.
+**The rules now:**
+
+- Each of the three ranked cards carries `↻ Reroll`. **The wildcard is not part of this system** — it
+  keeps its own separate `↻ Another` refresh, which costs no reroll.
+- **One shared counter**, rendered above the cards as "N rerolls remaining". At 0 the buttons are
+  **removed, not disabled**, and all three go together.
+- **Rerolls are deterministic.** The queue is ranks 4, 5, 6, 7, 8 in order; the first reroll — on
+  whichever card — serves rank 4, the next serves rank 5. No randomness anywhere in this path.
+- A rerolled card is **gone for the run** and never returns, as a card or as a wildcard.
+- Replacements come from the ranked list so they carry their own true `matchPercent`, and the queue
+  is built from the **relaxed** survivors, the same list the top three came from.
+
+⚠️ **EVERY READ IN THE REDUCER COMES FROM ITS `state` ARGUMENT.** Do not reintroduce a handler that
+closes over results state. The original did, and two rerolls landing in one React batch both built
+their next state from the same pre-update snapshot, so the second silently reverted the first:
+
+```
+baseline           shown=[r1,r2,r3]  pool=5
+separate renders   shown=[r4,r5,r3]  pool=3   correct
+same batch         shown=[r1,r4,r3]  pool=4   card 0's reroll UNDONE
+```
+
+The user clicked twice, saw one card move, and lost a reroll. `app/page.tsx` now holds the entire
+results view in one `useReducer` and both handlers are a bare `dispatch`.
+
+⚠️ **The counter is the queue length, NOT `min(5, survivors − 3)`.** The queue skips the wildcard and
+anything already on screen, so when the wildcard happens to sit inside ranks 4–8 — about one run in
+fifteen — the arithmetic formula promises a reroll that cannot be served. The queue length is the
+honest number, and over-promising is precisely what this respec exists to stop. It also means the
+old collision guard is gone: the wildcard is excluded when the queue is *built*, so there is no
+collision left to repair afterwards.
+
+⚠️ **THE COUNTER USUALLY STARTS BELOW 5, AND THIS IS THE MAIN REASON IT EXISTS.** Relaxation stops
+the moment it reaches `MIN_RESULTS` (3) and never tries for the 8 survivors a full queue needs.
+Measured over every answer combination against the 134-row catalogue: **94% of quick-path and 89% of
+hobby-path combinations start below 5, and more than half start at 0.** Before the counter, those
+users saw three Reroll buttons where only one or two would ever work, and the rest vanished
+mid-interaction. Do not "fix" the pool by raising `MIN_RESULTS` — that would bend more constraints
+than the user asked, for the sake of a reroll they may not use. It is a **content** problem, and it
+shrinks as the catalogue grows.
+
+`scripts/verify-results-selection.mjs` CHECK D and E drive the real reducer, including a rapid
+double-dispatch with no render in between, a small-pool run, and a pool of 3 where nothing renders.
 
 **Rotation** pushes recently-shown activities down by multiplying their distance
 (`ROTATION_DISTANCE_PENALTY`, 1.35). It touches a **sort key only** — the `matchPercent` on the
@@ -576,6 +612,27 @@ stays publicly readable with no write policy.
 
 ## Recently completed
 
+**Reroll fix and respec, 2026-08-26** (branch `reroll-fix`, **merge held for Owen's click-through**):
+
+Diagnosed before anything changed. Four faults, and the severity order was the opposite of what it
+looked like:
+
+1. **Pool underflow was the dominant bug and fires constantly** — 94% of quick-path and 89% of
+   hobby-path answer combinations start with fewer than 5 rerolls available, more than half with
+   none, because relaxation stops at `MIN_RESULTS` (3) and never reaches the 8 a full pool needs.
+   Three buttons, no counter, most of them dead.
+2. **Stale-closure race**, reproduced by modelling the handler exactly: two rerolls in one React
+   batch and the second silently reverts the first.
+3. **Wildcard/reroll overlap** — guarded, but the guard compared against a closure value, and the
+   wildcard sits inside ranks 4–8 about 6% of the time.
+4. **Counter drift** — a symptom of (2), not a separate cause.
+
+Fixed by `lib/rerollMachine.ts`, a pure reducer, plus a visible shared counter and a deterministic
+rank 4→8 queue. `lib/resultsSelection.ts` lost `rerollPoolFrom` and its two constants — dead once the
+queue moved — on the same reasoning that deleted `wildcardEligible`. `verify-results-selection.mjs`
+CHECK D and E now drive the real reducer, including the rapid double-dispatch that used to lose a
+rank. eslint errors in `app/page.tsx` fell 11 → 7 as four `any` state declarations disappeared.
+
 **Vector rebalance, 2026-08-26** (branch `vector-rebalance`, **merge held until Owen has read the
 report and taken the quiz**):
 
@@ -615,6 +672,8 @@ through — `main` auto-deploys**):
   `app/page.tsx` stopped holding results as one `recommendations` array ("the three, then the
   wildcard") and now names each part: `shownActivities`, `wildcard`, `rerollPool`, `wildcardPool`,
   `discardedIds`. Reroll would otherwise have had to mutate that array by position.
+  ⚠️ **The reroll half of this was superseded the same day** — see the `reroll-fix` entry above. The
+  five separate `useState`s described here are exactly what broke; they are now one reducer.
 - **The budget exception was built, then dropped the same day** at Owen's instruction, along with
   the free-user guarantee in the test script. `wildcardEligible` was deleted rather than left as a
   pass-through: a filter function that filters nothing is exactly the dead code this project's tag
