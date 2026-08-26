@@ -40,13 +40,24 @@
  *   E. Sequence     — pass/fail. Deterministic ranks 4,5,6,7,8 exactly once
  *                     each; rapid dispatches keep strict order; no duplicate on
  *                     screen at any point; the counter lands on 0.
+ *   F. Diversity    — pass/fail. A planted twin cluster takes at most one slot
+ *                     across the shown cards AND the reroll queue while
+ *                     alternatives remain; a pool of nothing but twins still
+ *                     fills every slot; the pass is deterministic and stable;
+ *                     and on the real seed every within-D pick is a genuine
+ *                     relaxation rather than a distinct candidate passed over.
  *
  * CHECKS D AND E DRIVE THE REAL REDUCER from lib/rerollMachine.ts. Dispatching
  * against one state object without an intervening render is exactly the
  * rapid-click case that broke the previous implementation, where every handler
  * read its inputs from a closure and the second click silently undid the first.
  */
-import { availableWildcards, drawRandom } from "../lib/resultsSelection.ts";
+import {
+  availableWildcards,
+  drawRandom,
+  diverseSelect,
+  DIVERSITY_MIN_DISTANCE,
+} from "../lib/resultsSelection.ts";
 import {
   rerollReducer,
   initRerollState,
@@ -65,6 +76,7 @@ import {
   rankActivities,
   userVectorFromQuizTotals,
   matchPercentFor,
+  euclideanDistance,
 } from "../lib/matchActivities.ts";
 import { personalityQuestions } from "../data/personalityQuiz.ts";
 import { parseSeedActivities } from "./lib/parse-seed.mjs";
@@ -523,6 +535,269 @@ function assertNoDuplicates(state, where) {
     }
   }
   console.log(`  E6  ${runs} real answer combinations, ${rerolls} rerolls, all invariants held`);
+}
+
+// ---------------------------------------------------------------------------
+// CHECK F — Diversity: one idea per slot
+//
+// rankActivities sorts by distance from the USER and cannot see that two
+// activities are near-identical to EACH OTHER, so a cluster that suits someone
+// takes every slot and the reroll queue behind them. diverseSelect walks the
+// same fit order and skips a candidate that only restates one already picked.
+//
+// These drive the REAL diverseSelect and hand its output to the REAL reducer,
+// which is the whole point of the wiring: the three shown cards and ranks 4-8
+// of the reroll queue come from one greedy pass, so rerolls serve the next
+// distinct idea rather than the rest of the cluster.
+// ---------------------------------------------------------------------------
+console.log("\n\nCHECK F — Diversity: one idea per slot, and fit wins at the margin\n");
+
+/** Five rows within ~2 of each other: the same idea, said five ways. */
+const TWINS = [
+  [5, 5, 5, 5, 5, 5, 5],
+  [6, 5, 5, 5, 5, 5, 5],
+  [4, 5, 5, 5, 5, 5, 5],
+  [5, 6, 5, 5, 5, 5, 5],
+  [5, 5, 6, 5, 5, 5, 5],
+].map((vector, i) => ({ id: `twin-${i}`, title: `twin-${i}`, vector }));
+
+/** Nine rows far from the twins and from each other. */
+const ALTERNATIVES = [
+  [10, 1, 1, 1, 1, 1, 1],
+  [1, 10, 1, 1, 1, 1, 1],
+  [1, 1, 10, 1, 1, 1, 1],
+  [1, 1, 1, 10, 1, 1, 1],
+  [1, 1, 1, 1, 10, 1, 1],
+  [1, 1, 1, 1, 1, 10, 1],
+  [1, 1, 1, 1, 1, 1, 10],
+  [10, 10, 1, 1, 1, 1, 1],
+  [1, 1, 10, 10, 1, 1, 1],
+].map((vector, i) => ({ id: `alt-${i}`, title: `alt-${i}`, vector }));
+
+const isTwin = (activity) => activity.id.startsWith("twin-");
+
+// F1 — a planted twin cluster must not take more than one slot while
+//      alternatives remain. The user sits ON the cluster, so fit alone would
+//      hand them all five.
+{
+  const user = [5, 5, 5, 5, 5, 5, 5];
+  const ranked = rankActivities(user, [...TWINS, ...ALTERNATIVES]);
+
+  const fitOnly = ranked.slice(0, SHOWN_COUNT + MAX_REROLLS).filter(isTwin).length;
+
+  const selected = diverseSelect(ranked, DIVERSITY_MIN_DISTANCE, ranked.length);
+  const state = initRerollState(selected, null, []);
+  const served = [...state.shown, ...state.queue];
+  const twinsServed = served.filter(isTwin).length;
+
+  if (served.length !== SHOWN_COUNT + MAX_REROLLS) {
+    failures.push(`F1: expected ${SHOWN_COUNT + MAX_REROLLS} served cards, got ${served.length}`);
+  } else if (twinsServed > 1) {
+    failures.push(
+      `F1: ${twinsServed} twins across the shown cards and the reroll queue, with ` +
+        `${ALTERNATIVES.length} alternatives available — expected at most 1`
+    );
+  } else if (!isTwin(state.shown[0])) {
+    failures.push("F1: the best-fitting candidate was not taken — fit must still rank");
+  } else {
+    console.log(
+      `  F1  twin cluster: fit alone serves ${fitOnly} of the 5 twins across ` +
+        `${SHOWN_COUNT} slots + ${MAX_REROLLS} rerolls; diversity serves ${twinsServed}. OK`
+    );
+  }
+
+  // The skipped twins are NOT gone. They stay in the selection's tail, so they
+  // are still in the pathway pool the wildcard draws from and still surface
+  // when the answers or constraints differ.
+  const survivors = selected.filter(isTwin).length;
+  if (survivors !== TWINS.length) {
+    failures.push(`F1: ${TWINS.length - survivors} twin(s) dropped from the list entirely`);
+  } else {
+    console.log(`  F1b all ${TWINS.length} twins remain in the list — skipped, not deleted. OK`);
+  }
+}
+
+// F2 — graceful degradation. Fit wins at the margin: a slot is never left
+//      empty to protect the rule.
+{
+  for (const size of [SHOWN_COUNT + 1, SHOWN_COUNT, 2]) {
+    const pool = TWINS.slice(0, size);
+    const ranked = rankActivities([5, 5, 5, 5, 5, 5, 5], pool);
+    const selected = diverseSelect(ranked, DIVERSITY_MIN_DISTANCE, ranked.length);
+
+    if (selected.length !== size) {
+      failures.push(`F2: a pool of ${size} all-twins returned ${selected.length} — nothing may be dropped`);
+      continue;
+    }
+    const state = initRerollState(selected, null, []);
+    const expectedShown = Math.min(SHOWN_COUNT, size);
+    if (state.shown.length !== expectedShown) {
+      failures.push(
+        `F2: a pool of ${size} all-twins filled ${state.shown.length} slots, expected ${expectedShown}`
+      );
+    }
+  }
+  if (!failures.some((f) => f.startsWith("F2"))) {
+    console.log(
+      `  F2  all-twin pools of ${SHOWN_COUNT + 1}, ${SHOWN_COUNT} and 2 still fill every slot they can. OK`
+    );
+  }
+}
+
+// F3 — deterministic, and stable for equal distances.
+//
+// Stability is checked as a general property rather than on a hand-picked
+// tie: the output must be a SUBSEQUENCE of the input, since every choice is
+// "first eligible in the given order". Anything that reordered equal-distance
+// candidates would break that.
+{
+  const ranked = rankActivities([5, 5, 5, 5, 5, 5, 5], [...TWINS, ...ALTERNATIVES]);
+
+  const runs = Array.from({ length: 3 }, () =>
+    diverseSelect(ranked, DIVERSITY_MIN_DISTANCE, ranked.length).map((a) => a.id).join(",")
+  );
+  if (new Set(runs).size !== 1) {
+    failures.push("F3: diverseSelect returned different orders for identical input");
+  }
+
+  const selected = diverseSelect(ranked, DIVERSITY_MIN_DISTANCE, ranked.length);
+
+  // ⚠️ The output is TWO monotone runs, not one. The diverse pass walks the
+  // input in order, then the relaxation tail walks what is left — also in
+  // order, but from indices the first pass already went past. Stability is
+  // therefore "indices increase within each phase", and asserting one global
+  // subsequence would be asserting that relaxation does not exist.
+  const indexOf = (activity) => ranked.findIndex((r) => r.id === activity.id);
+  const kept = [];
+  let phase = "diverse";
+  let cursor = -1;
+  let stable = true;
+
+  for (const activity of selected) {
+    const relaxed = kept.some(
+      (earlier) => euclideanDistance(activity.vector, earlier.vector) < DIVERSITY_MIN_DISTANCE
+    );
+    if (relaxed && phase === "diverse") {
+      phase = "relaxed";
+      cursor = -1;
+    } else if (!relaxed && phase === "relaxed") {
+      // Impossible by the monotonicity argument in lib/resultsSelection.ts:
+      // picks only accumulate, so nothing can become eligible again.
+      failures.push("F3: a distinct pick appeared AFTER relaxation began");
+    }
+    const at = indexOf(activity);
+    if (at <= cursor) stable = false;
+    cursor = at;
+    kept.push(activity);
+  }
+
+  if (!stable) {
+    failures.push("F3: indices do not increase within a phase — ties were reordered");
+  }
+
+  const returned = new Set(selected.map((a) => a.id));
+  if (returned.size !== selected.length || selected.length !== ranked.length) {
+    failures.push(
+      `F3: asked for all ${ranked.length}, got ${selected.length} with ${returned.size} distinct`
+    );
+  }
+
+  if (!failures.some((f) => f.startsWith("F3"))) {
+    console.log(
+      "  F3  identical across repeated runs; monotone within each phase; nothing dropped or repeated. OK"
+    );
+  }
+}
+
+// F4 — the real catalogue.
+//
+// ⚠️ THE ASSERTION HERE IS THE RELAXATION INVARIANT, NOT "no two cards are ever
+// within D". Cards CAN sit within D of each other, when the feasible pool has
+// nothing else left to offer — that is fit winning at the margin, and it is
+// the intended behaviour. What must hold is that it only ever happens for that
+// reason: if a pick is within D of an earlier one, then EVERY candidate still
+// unpicked at that moment was too.
+{
+  const walkingFamily = [
+    "A walk with no destination",
+    "Photo walk down your own street",
+    "Walk a street you have never walked down",
+    "Walk somewhere with a view and take a flask",
+    "Trail running and hillwalking",
+    "Hiking and hillwalking",
+  ];
+
+  let checked = 0;
+  let relaxations = 0;
+  const walkCounts = [];
+
+  for (let axis = 0; axis < 7; axis++) {
+    const picks = personalityQuestions.map((q) =>
+      q.options.reduce((best, o) => (o.vector[axis] > best.vector[axis] ? o : best))
+    );
+    const purist = userVectorFromQuizTotals(
+      picks.reduce((totals, p) => totals.map((t, i) => t + p.vector[i]), new Array(7).fill(0)),
+      picks.length
+    );
+
+    for (const { tag } of PATHWAYS) {
+      const ranked = rankActivities(purist, poolFor(tag));
+      if (ranked.length === 0) continue;
+      const selected = diverseSelect(ranked, DIVERSITY_MIN_DISTANCE, ranked.length);
+      checked++;
+
+      const kept = [];
+      for (let k = 0; k < selected.length; k++) {
+        const current = selected[k];
+        const tooClose = kept.some(
+          (earlier) => euclideanDistance(current.vector, earlier.vector) < DIVERSITY_MIN_DISTANCE
+        );
+        if (tooClose) {
+          relaxations++;
+          // Everything not yet picked at this point must ALSO have been too
+          // close, or a distinct candidate was passed over.
+          const pickedIds = new Set(selected.slice(0, k).map((a) => a.id));
+          const missed = ranked.filter(
+            (candidate) =>
+              !pickedIds.has(candidate.id) &&
+              kept.every(
+                (earlier) =>
+                  euclideanDistance(candidate.vector, earlier.vector) >= DIVERSITY_MIN_DISTANCE
+              )
+          );
+          if (missed.length) {
+            failures.push(
+              `F4: axis ${axis} / ${tag}: took "${current.title}" within D of an earlier pick ` +
+                `while "${missed[0].title}" was distinct and available`
+            );
+          }
+        }
+        kept.push(current);
+      }
+
+      const served = selected.slice(0, SHOWN_COUNT + MAX_REROLLS);
+      walkCounts.push(served.filter((a) => walkingFamily.includes(a.title)).length);
+    }
+  }
+
+  if (!failures.some((f) => f.startsWith("F4"))) {
+    console.log(
+      `  F4  ${checked} purist x pathway runs on the real seed: every within-D pick was a ` +
+        `genuine relaxation (${relaxations} of them). OK`
+    );
+  }
+
+  // DIAGNOSTIC, never a failure. D measures TASTE PROFILE, not surface
+  // category, so several genuinely different walks can and do survive it. This
+  // number is here so that limit stays visible instead of being assumed away.
+  const worst = Math.max(...walkCounts);
+  console.log(
+    `  F4* diagnostic: the most walking-family cards served in one run is ${worst} ` +
+      `of ${SHOWN_COUNT + MAX_REROLLS}.\n` +
+      `      NOT a failure. On the canonical seed those four walks sit 5.39-7.87 apart, ` +
+      `so they are\n      not taste twins and D correctly leaves them alone. See the ` +
+      `known limit in CLAUDE.md.`
+  );
 }
 
 // ---------------------------------------------------------------------------

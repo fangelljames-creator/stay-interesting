@@ -12,7 +12,12 @@ import {
   type FilterAction,
   type PathwayTag,
 } from "@/lib/activityTags";
-import { availableWildcards, drawRandom } from "@/lib/resultsSelection";
+import {
+  availableWildcards,
+  drawRandom,
+  diverseSelect,
+  DIVERSITY_MIN_DISTANCE,
+} from "@/lib/resultsSelection";
 import {
   rerollReducer,
   rerollsRemaining,
@@ -355,7 +360,33 @@ export default function Home() {
       ordered = survivors;
     }
 
-    const topMatches = ordered.slice(0, MIN_RESULTS);
+    /**
+     * DIVERSITY RE-RANK. `ordered` is sorted by fit; nothing in that sort
+     * knows two activities can be near-identical to EACH OTHER, so a cluster
+     * that suits this user takes every slot and the reroll queue behind them.
+     * diverseSelect walks the same list and skips a candidate that only
+     * restates one already chosen.
+     *
+     * ⚠️ ONE PASS OVER THE WHOLE LIST, not just the three shown. The reroll
+     * queue is built by lib/rerollMachine.ts from ranks 4-8 of whatever it is
+     * handed, so re-ordering the input here IS "every reroll is the next best
+     * distinct idea" -- and the reducer, the shared counter and the wildcard
+     * need no change at all.
+     *
+     * ⚠️ NOT applied on the no-vector path. Without a user vector there is no
+     * fit order to re-rank, and the results page tells the user in as many
+     * words that these are "not in any particular order". A greedy pass would
+     * impose one and make that sentence false.
+     *
+     * Skipped-as-redundant activities are NOT gone: they stay in `pool`, so
+     * they remain wildcard-eligible and surface normally whenever the answers
+     * or the constraints differ.
+     */
+    const selected = userVector
+      ? diverseSelect(ordered, DIVERSITY_MIN_DISTANCE, ordered.length)
+      : ordered;
+
+    const topMatches = selected.slice(0, MIN_RESULTS);
     const topMatchIds = topMatches.map((m) => m.id);
 
     try {
@@ -374,7 +405,7 @@ export default function Home() {
     // window where some of the results state is new and some is old.
     dispatchResults({
       type: "init",
-      ordered,
+      ordered: selected,
       wildcard: decorateWildcard(drawRandom(availableWildcards(pool, topMatchIds)), userVector),
       wildcardPool: pool,
     });

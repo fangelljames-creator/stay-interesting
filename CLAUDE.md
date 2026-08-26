@@ -35,13 +35,13 @@ up, log in, take a 7-axis personality quiz, and save activities to custom lists.
 - `lib/` — Supabase client, imported as `@/lib/supabaseClient` (the `@/*` → `./*` alias is in
   `tsconfig.json`) (verified). Also the pure logic modules: `matchActivities.ts` (ranking),
   `activityTags.ts` (the vocabulary), `feasibilityQuestions.ts`, `quizSession.ts`,
-  `resultsSelection.ts` (the wildcard draw), `rerollMachine.ts` (the results reducer: the
+  `resultsSelection.ts` (the wildcard draw and `diverseSelect`), `rerollMachine.ts` (the results reducer: the
   deterministic reroll queue, the shared counter, and the wildcard refresh), `radarGeometry.ts`
   (vector → SVG coordinates) and `personalityTypes.ts` (the profile argmax). Sibling imports in
   `lib/` use the explicit `./name.ts` extension so the dev scripts can import them under Node.
-- `scripts/` — dev-only analysis tools, not part of the build. Five of them:
+- `scripts/` — dev-only analysis tools, not part of the build. Six of them:
   `validate-activity-seed.mjs`, `verify-activity-matching.mjs`, `verify-results-selection.mjs`,
-  `verify-taste-radar.mjs`, `analyze-quiz-balance.mjs`
+  `verify-taste-radar.mjs`, `analyze-quiz-balance.mjs`, `measure-activity-diversity.mjs`
 - `supabase/` — SQL to paste into the Supabase SQL editor. Not run by any CLI or migration
   tool; these are hand-run scripts, written to be idempotent so re-running is safe.
 
@@ -593,6 +593,106 @@ that something is mis-scored; it is not itself the defect, and flattening it by 
 scoring the report instead of scoring the behaviour. Vectors are re-scored against the rubric,
 honestly, and the shares land where they land.
 
+## Result diversity — the greedy re-rank
+
+Added 2026-08-26 (branch `result-diversity`). `diverseSelect` in `lib/resultsSelection.ts`.
+
+**Fit ranks. D de-duplicates ideas. The wildcard stays chaotic.** Those three sentences are
+the whole design.
+
+`rankActivities` sorts by distance from the **user** and has no way to see that two
+activities are near-identical to **each other**. So a cluster that suits someone ranks
+adjacently, takes all three slots, and the reroll queue behind it serves more of the same.
+`diverseSelect` walks the same fit order and skips a candidate that only restates one
+already picked.
+
+```
+pathway filter -> per-question filter actions -> rank by vector -> diverseSelect -> top 3 + queue
+```
+
+- The best-fitting candidate is **always** taken — fit is still what ranks.
+- After that, the first candidate at least **D** from **every** pick so far.
+- If nothing qualifies, **relax** and take the best remaining by fit. A slot is never left
+  empty to protect the rule, and it never returns fewer than asked while candidates exist.
+
+⚠️ **One pass produces both the three slots and the reroll queue.** `app/page.tsx` hands the
+re-ranked list to `initRerollState`, which already takes `slice(0, 3)` as the cards and ranks
+4–8 as the queue — so "every reroll is the next best distinct idea" needed **no change to
+`lib/rerollMachine.ts` at all**. The deterministic order, the shared counter and the pinned
+badge cluster are untouched.
+
+⚠️ **A single forward pass IS the algorithm**, and the reason is worth keeping: eligibility
+only ever shrinks. A candidate rejected for sitting too close to some pick stays too close to
+it forever, because picks are only added. So nothing can become eligible again, there is
+nothing to re-scan for, and the relaxation tail is a plain "take what is left in fit order" —
+once one relaxed pick is made, every later slot relaxes too. That is also why the output is
+**two monotone runs, not one**; `verify-results-selection.mjs` CHECK F3 asserts stability
+within each phase, and asserting a single global subsequence would be asserting that
+relaxation does not exist.
+
+⚠️ **Not applied on the no-vector path.** With storage blocked there is no fit order to
+re-rank, and the page tells the user in as many words that these are "not in any particular
+order". A greedy pass would impose one and make that sentence false.
+
+⚠️ **Skipped is not deleted.** Passed-over activities stay in `pool`, so they remain
+wildcard-eligible and return to the ranked slots the moment the answers or constraints
+differ. **The wildcard is untouched** — it is drawn from the raw pathway pool by
+`availableWildcards`, which this never enters. Chaos is its diversity.
+
+### Why D = 3.0 — both halves
+
+**(i) The measurement.** `scripts/measure-activity-diversity.mjs` — report only, always exits
+0, takes `--seed <path>`. Pairs are computed **within each pathway**, since an activity is
+only ever ranked against its own pool. Run 2026-08-26 against the 134-row wave-1 catalogue
+(the one that contains the named twins) and the 37-row canonical seed:
+
+| catalogue | pathway | pairs | p1 | p5 | p10 | median | share below 3.0 |
+|---|---|---|---|---|---|---|---|
+| 134-row | quick-fix | 2080 | 1.73 | 3.00 | 3.74 | 8.00 | **5.0%** |
+| 134-row | long-term | 2850 | 2.45 | 3.87 | 4.80 | 9.43 | **2.1%** |
+| 37-row | quick-fix | 190 | 2.00 | 3.61 | 5.10 | 9.33 | 3.7% |
+| 37-row | long-term | 210 | 3.16 | 4.36 | 5.66 | 9.17 | 1.0% |
+
+D = 3.0 sits **exactly on the quick-fix 5th percentile** and the long-term 2nd. It prunes the
+tail of true twins and leaves the body of the distribution alone — nowhere near the 10–15%
+line at which a threshold stops de-duplicating and starts thinning the catalogue.
+
+Named pairs it merges: `Restore a cast iron skillet` ↔ `Restore a vintage typewriter` (2.45),
+`Playing pool` ↔ `Darts or table tennis` (2.65), `Hiking and hillwalking` ↔ `Trail running
+and hillwalking` (2.65), `Chess puzzle rush` ↔ `EV market analysis` (2.83), `Kickabout at the
+nearest bit of grass` ↔ `Knockabout on a public court` (2.00). Named pairs it keeps apart:
+`Indoor bouldering` ↔ `hillwalking` (9.27 and 9.75), and every walking pair except the two
+hillwalks.
+
+**One D, not two.** Long-term is genuinely more spread out than quick-fix (median 9.43 vs
+8.00), but all three candidate values land inside the p1–p10 band on **both** pathways: the
+distributions differ in spread without disagreeing about where the tail ends. A second
+constant would be a second thing to keep true.
+
+**(ii) The geometry.** By the reverse triangle inequality, for any user U and any two
+activities A, B: `| d(U,A) − d(U,B) | <= d(A,B)`. So two activities within D of each other
+can never differ by more than `(D / MAX_DISTANCE) * 100` match points **for any user
+whatsoever** — at D = 3.0 against `MAX_DISTANCE = 9 * sqrt(7) ≈ 23.81`, a ceiling of **12.6
+points**. Showing both spends a slot on information the user already has, and the one
+diversity passed over was never much better than the one they got. That is also why small
+`matchPercent` gaps between the three shown cards are correct rather than a ranking bug.
+
+### ⚠️ The known limit: taste twins, not category monotony
+
+**D measures the taste profile, not the surface category, and the motivating example is
+mostly the latter.** On the canonical seed the four walking activities sit **5.39 to 7.87**
+apart — genuinely different profiles that happen to suit the same person — so an Outdoors
+purist still sees several walks, and that is D working correctly, not failing.
+
+Measured before and after on that user: diversity removed `Kickabout at the nearest bit of
+grass` from the top 8 (2.00 from `Knockabout on a public court`) and changed nothing else.
+`verify-results-selection.mjs` CHECK F4* reports the walking count as a **diagnostic that
+never fails**, so this limit stays visible instead of being assumed away.
+
+If category monotony shows up in practice, the remedy is a **family tag** — deliberately not
+built now. ⚠️ Note it would have to satisfy the tag doctrine: a tag that no hard filter reads
+must not exist, so it would need the filter shipped in the same change.
+
 ## Vector matching — `lib/matchActivities.ts`
 
 `rankActivities(userVector, activities)` sorts activities by closeness to the user's 7-axis vector,
@@ -752,6 +852,25 @@ stays publicly readable with no write policy.
   correct.
 
 ## Recently completed
+
+**Result diversity, 2026-08-26** (branch `result-diversity`, **merge held for Owen's
+click-through**). Full design under **Result diversity** above.
+
+- `scripts/measure-activity-diversity.mjs` — new, report only. Built and run FIRST, so D came
+  out of the catalogue's actual distance distribution rather than a number that felt right.
+- `diverseSelect` + `DIVERSITY_MIN_DISTANCE = 3.0` in `lib/resultsSelection.ts`, wired in
+  `app/page.tsx` with a single `ordered -> selected` substitution. `lib/rerollMachine.ts`
+  unchanged.
+- `verify-results-selection.mjs` CHECK F: planted twin cluster, graceful degradation,
+  determinism and phase-stability, and the relaxation invariant over 14 purist × pathway runs
+  on the real seed.
+- ⚠️ **The measurement contradicted the brief's motivating example, and that is recorded
+  rather than smoothed over.** Walking variants are 5.39–7.87 apart, so they are not taste
+  twins and D leaves them alone; what it actually removed for an Outdoors purist was
+  `Kickabout` vs `Knockabout` at 2.00. See **The known limit** above. CHECK F4* reports the
+  walking count as a permanent non-failing diagnostic.
+- `landing-flow` was merged into `main` at the start of this branch (not pushed) — the brief
+  assumed it already had been.
 
 **Landing flow and visual identity, 2026-08-26** (branch `landing-flow`, **merge held for Owen's
 click-through**):
