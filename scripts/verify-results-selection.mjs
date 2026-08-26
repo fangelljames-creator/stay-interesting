@@ -794,7 +794,7 @@ const isTwin = (activity) => activity.id.startsWith("twin-");
   console.log(
     `  F4* diagnostic: the most walking-family cards served in one run is ${worst} ` +
       `of ${SHOWN_COUNT + MAX_REROLLS}.\n` +
-      `      NOT a failure. On the canonical seed those four walks sit 5.39-7.87 apart, ` +
+      `      NOT a failure. The four core walks sit 5.39-8.89 apart on the canonical seed, ` +
       `so they are\n      not taste twins and D correctly leaves them alone. See the ` +
       `known limit in CLAUDE.md.`
   );

@@ -733,10 +733,14 @@ only ever ranked against its own pool. Run 2026-08-26 against the 134-row wave-1
 
 | catalogue | pathway | pairs | p1 | p5 | p10 | median | share below 3.0 |
 |---|---|---|---|---|---|---|---|
-| 134-row | quick-fix | 2080 | 1.73 | 3.00 | 3.74 | 8.00 | **5.0%** |
-| 134-row | long-term | 2850 | 2.45 | 3.87 | 4.80 | 9.43 | **2.1%** |
-| 37-row | quick-fix | 190 | 2.00 | 3.61 | 5.10 | 9.33 | 3.7% |
-| 37-row | long-term | 210 | 3.16 | 4.36 | 5.66 | 9.17 | 1.0% |
+| 134-row, **now canonical** | quick-fix | 2080 | 1.73 | 3.00 | 3.74 | 8.00 | **5.0%** |
+| 134-row, **now canonical** | long-term | 2850 | 2.45 | 3.87 | 4.80 | 9.43 | **2.1%** |
+| 37-row, the seed before wave 1 | quick-fix | 190 | 2.00 | 3.61 | 5.10 | 9.33 | 3.7% |
+| 37-row, the seed before wave 1 | long-term | 210 | 3.16 | 4.36 | 5.66 | 9.17 | 1.0% |
+
+At the time D was chosen the 134 rows lived on the unmerged `content-wave-1` branch and were read
+out of it with `--seed`. `content-wave-1` was merged the same day, so the canonical seed **is** that
+catalogue now and the dev scripts measure the same rows the report did.
 
 D = 3.0 sits **exactly on the quick-fix 5th percentile** and the long-term 2nd. It prunes the
 tail of true twins and leaves the body of the distribution alone — nowhere near the 10–15%
@@ -765,14 +769,31 @@ diversity passed over was never much better than the one they got. That is also 
 ### ⚠️ The known limit: taste twins, not category monotony
 
 **D measures the taste profile, not the surface category, and the motivating example is
-mostly the latter.** On the canonical seed the four walking activities sit **5.39 to 7.87**
+mostly the latter.** On the canonical seed the four core walking activities sit **5.39 to 8.89**
 apart — genuinely different profiles that happen to suit the same person — so an Outdoors
-purist still sees several walks, and that is D working correctly, not failing.
+purist still sees several walks, and that is D working correctly, not failing. Exactly one pair in
+the whole seven-strong walking family falls below D: `Hiking and hillwalking` ↔ `Trail running and
+hillwalking`, at 2.65.
 
-Measured before and after on that user: diversity removed `Kickabout at the nearest bit of
-grass` from the top 8 (2.00 from `Knockabout on a public court`) and changed nothing else.
-`verify-results-selection.mjs` CHECK F4* reports the walking count as a **diagnostic that
-never fails**, so this limit stays visible instead of being assumed away.
+**What it does remove is real, though.** Measured before and after for the Outdoors purist on the
+134-row catalogue, three of the fit-only top 8 are near-duplicates and all three go:
+
+```
+fit only                                        diverse
+1. A round of disc golf                         1. A round of disc golf
+2. Walk somewhere with a view   (2.45 from 1)   --- dropped
+3. A walk with no destination                   2. A walk with no destination
+4. Find five constellations                     3. Find five constellations
+5. Walk a street you have never walked          4. Walk a street you have never walked
+6. Identify trees by their bark (1.73 from 4)   --- dropped
+7. Knockabout on a public court                 5. Knockabout on a public court
+8. Identify garden birds        (2.00 from 4)   --- dropped
+                                                6-8. three genuinely new ideas
+```
+
+The spotting cluster (constellations / trees / birds) collapses to one, and one of the four walks
+goes with it. `verify-results-selection.mjs` CHECK F4* reports the surviving walking count as a
+**diagnostic that never fails**, so this limit stays visible instead of being assumed away.
 
 If category monotony shows up in practice, the remedy is a **family tag** — deliberately not
 built now. ⚠️ Note it would have to satisfy the tag doctrine: a tag that no hard filter reads
@@ -958,9 +979,10 @@ click-through**). Full design under **Result diversity** above.
   on the real seed.
 - ⚠️ **The measurement contradicted the brief's motivating example, and that is recorded
   rather than smoothed over.** Walking variants are 5.39–7.87 apart, so they are not taste
-  twins and D leaves them alone; what it actually removed for an Outdoors purist was
-  `Kickabout` vs `Knockabout` at 2.00. See **The known limit** above. CHECK F4* reports the
-  walking count as a permanent non-failing diagnostic.
+  twins and D leaves them alone. What it actually removes for an Outdoors purist is the spotting
+  cluster — constellations / trees / birds — plus one of the four walks: three of the fit-only top
+  8. See **The known limit** above. CHECK F4* reports the surviving walking count as a permanent
+  non-failing diagnostic.
 - `landing-flow` was merged into `main` at the start of this branch (not pushed) — the brief
   assumed it already had been.
 

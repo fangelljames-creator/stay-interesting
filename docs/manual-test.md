@@ -147,10 +147,10 @@ of it.
       quick path, and answer the feasibility questions permissively. Then reroll to
       exhaustion and look at the whole set.
       ⚠️ **You should still expect to see several walks.** On the current catalogue the four
-      walking activities sit 5.4–7.9 apart in taste space — they are genuinely different
-      profiles, and D correctly leaves them alone. What you should NOT see is a pair that
-      feels interchangeable, e.g. `Kickabout at the nearest bit of grass` alongside
-      `Knockabout on a public court` (2.00 apart), which diversity does remove.
+      core walking activities sit 5.4–8.9 apart in taste space — they are genuinely different
+      profiles, and D correctly leaves them alone. What you should NOT see is a set that feels
+      interchangeable: `Find five constellations`, `Identify trees by their bark` and
+      `Identify garden birds` are 1.7–2.0 apart, and only one of the three may appear.
       *This is the known limit: D catches taste-profile twins, not surface-category
       monotony. See the diversity section of CLAUDE.md.*
 - [ ] **Skipped activities are not deleted.** The same run's wildcard can still hand you one
