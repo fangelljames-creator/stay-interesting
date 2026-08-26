@@ -392,23 +392,70 @@ implementation detail they never learn about.
 
 | Mode | Where | Treatment |
 |---|---|---|
-| `demo` | the hero | 280px, labelled, autoplaying four example shapes on a 2.6s loop |
-| `building` | beside each quiz question; the returning banner | 132px (72 in the banner), unlabelled, quiet |
-| `final` | the profile card | 260px, labelled, vertex dots, the axis value beside each label |
+| `demo` | the hero | max 320px, labelled, autoplaying four example shapes on a 2.6s loop |
+| `building` | beside each quiz question; the returning banner | max 132px (72 in the banner), unlabelled, quiet |
+| `final` | the profile card | max 300px, labelled, vertex dots |
 
 ⚠️ **`mode` controls PRESENTATION, not where the data comes from.** The returning banner passes a
 settled vector to `building` because it wants the small treatment, not because anything is still
 being built. Do not add a data path to a mode.
 
+### ⚠️ The radar is display-normalized: it draws SHAPE, never magnitude
+
+Added 2026-08-26 after design review. `normalizeForDisplay` in `lib/radarGeometry.ts` scales every
+vector by **one factor** so its largest axis lands at `DISPLAY_MAX_FRACTION` (0.92) of the radius,
+with every ratio between axes preserved exactly. `polygonPoints` and `radarVertices` both apply it
+internally, so no caller can forget and plot a raw magnitude next to six normalized ones.
+
+**Why.** The user's vector is a running MEAN of their answers, and a mean of honestly-scored options
+pulls every axis toward the middle of the option pool. Plotted raw, the shape therefore **shrank as
+the quiz went on** — the more the user told us, the smaller their map got — and a finished profile
+sat as a small blob near the centre. What a reader wants off a radar is which axes dominate, and
+that is a matter of ratios, not of how large the numbers happen to be.
+
+⚠️ **What it costs, stated plainly:** absolute intensity is no longer readable off the chart. A
+gentle user and an intense one whose axes sit in the same proportions draw the same polygon.
+Intensity is still information the MATCHER uses — it is exactly why Euclidean distance was chosen
+over cosine similarity, see **Vector matching** — it just is not information this chart carries. If
+it ever needs showing, that needs a second visual channel, not the removal of this normalization.
+
+⚠️ **Nothing but the drawing may call it.** A normalized vector must never reach the session, the
+profile argmax, or `rankActivities` — all three depend on the magnitudes it deliberately discards.
+
+⚠️ **No clamping to 1-10 in that path, and this is load-bearing.** `normalizeForDisplay(2v)` has to
+equal `normalizeForDisplay(v)`, and it cannot if doubling pushes an axis into a ceiling the original
+never touched. No ceiling is needed anyway: dividing by the largest axis means nothing can escape
+the chart by construction. The floor at zero stays, because a negative axis would plot through the
+centre and turn the polygon inside out.
+
+⚠️ **Consequences for what the chart can say.** A flat vector — all-1s, all-10s, anything even —
+draws a **full even heptagon**, because it has no shape to show. That is also what the
+"nothing answered yet" ghost is; it reads as an empty frame because it is FADED, not because it is
+small. The old assertion "all-1s collapses to the centre" is superseded and was replaced in
+`verify-taste-radar.mjs` rather than deleted.
+
+### ⚠️ No numbers appear on the radar, in any mode
+
+Axis names only: no value beside a label, no tooltip, nothing against the rings. A number on a
+display-normalized polygon would be a number that does not mean what it looks like it means. The
+accessible description names the two strongest axes rather than reading out figures, and the
+gridline rings are **structure, not a scale** — there is no value a ring could stand for.
+
+This is also why there is **no rounding anywhere in the radar at all**. `labelValue` was the one
+rounding this module had, and it was deleted with the value labels. CHECK C of the verify script
+fails the run if anything that formats a value for printing is exported again.
+
+⚠️ **Axis labels need real room, and getting it wrong fails silently.** The chart is drawn in fixed
+viewBox units and scaled by CSS, with `LABEL_SPACE` (84 units against a radius of 100) reserved
+outside the ring. A label is anchored just past the ring and drawn OUTWARD, so too small a reserve
+does not throw or warn — the text simply runs outside the viewBox and is clipped mid-word. It read
+"imulation", "velty" and "Crea" at every size until it was measured in a browser. The widest label
+is "Stimulation" at 11 characters; the two most horizontal axes sit at cos ≈ 0.975 of the ring.
+
 ⚠️ **All the maths is in `lib/radarGeometry.ts` and none of it is in the component.** `TasteRadar` is
 `"use client"`, which means no dev script can import it — the geometry lives outside so
 `scripts/verify-taste-radar.mjs` checks the real functions rather than a hand-copied mirror. Nothing
 in the component may compute a coordinate.
-
-⚠️ **`Math.round` appears exactly once in the whole radar: `labelValue`,** and only for the number
-printed beside an axis. The polygon is always drawn from the raw unrounded vector — the same vector
-that ranks activities. This is the same rule as everywhere else in the project; CHECK C of the verify
-script fails the run if a fractional vector ever draws the same shape as its rounded form.
 
 **Morphs are interpolated with `requestAnimationFrame`, not with CSS.** This is not a stylistic
 choice and should not be "simplified" back: **CSS cannot transition an SVG `<polygon>`'s `points`
@@ -729,9 +776,27 @@ click-through**):
   can read a profile title from a stored session.
 - **`totalsFrom` added to `lib/matchActivities.ts`** and adopted by `calculateFinalProfile`, so the
   running average the radar draws and the totals the session stores are literally one code path.
-- **`scripts/verify-taste-radar.mjs`** — 16 pass/fail checks over geometry, the running average
-  (including the rewind and the every-option-moves-the-shape property a skip depends on), and the
-  confinement of rounding to `labelValue`.
+- **`scripts/verify-taste-radar.mjs`** — 19 pass/fail checks over geometry and the display
+  normalization (scale invariance, ratio preservation, flat vectors, nothing escaping the ring), the
+  running average (including the rewind, and the every-option-visibly-moves-the-shape property a
+  skip depends on — re-measured on the NORMALIZED polygon, which is the harder test), and the
+  absence of any number-formatting export.
+- **Design-review amendments, same day**: the hero mechanism sub-line reworded; the radar
+  display-normalized with all numbers removed from it (see **Visual identity**); the results-card
+  badge cluster pinned top-right on every card.
+
+  ⚠️ **The badge cluster is pinned with flex, not `absolute`.** The review asked for absolute
+  positioning; measuring at 375px in a browser showed why it cannot work here. An absolutely
+  positioned cluster does not contribute to the card's height and cannot reserve a width for itself,
+  and the WILDCARD card breaks it outright — its badge is a 57-character sentence, so its cluster is
+  166px tall against a 56px header and would lie across the description. The header is instead a
+  non-wrapping row: `shrink-0` plus `max-w-32` fixes the cluster's corner and lets it wrap
+  internally, `min-w-0 flex-1` gives the title the rest. Verified at a 371px viewport: cluster inset
+  25px from top and right on all four cards, 12px clear of the title, description clear of both.
+
+  The `max-w-32` and the `text-lg` title below `sm` are **measured, not guessed**. The longest
+  catalogue title ("Learn a two-player card game neither of you knows", 49 characters) runs to 8
+  lines and a 224px header if the cluster takes 168px, against 4 lines and 118px at 128px.
 - **`docs/manual-test.md`** — new, backfilled from this file's feature records and then extended
   with the landing flow. See **Manual testing** above.
 - **Rename**: `app/layout.tsx` metadata went from "Create Next App" to "Stay Interesting" plus a real

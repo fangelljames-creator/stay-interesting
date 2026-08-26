@@ -3,13 +3,11 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   AXES,
-  AXIS_COUNT,
   axisLabelPoint,
   axisSpokeEnd,
-  labelValue,
   neutralVector,
   polygonPoints,
-  radarPoint,
+  radarVertices,
   ringPoints,
 } from "../lib/radarGeometry";
 import { isValidVector } from "../lib/matchActivities";
@@ -29,11 +27,16 @@ import { isValidVector } from "../lib/matchActivities";
  * instead of a hand-copied mirror of them. Nothing in this file should compute
  * a coordinate.
  *
- * ⚠️ Math.round appears nowhere here either. The one rounding in the radar is
- * radarGeometry's labelValue, used for the number printed beside an axis. The
- * shape itself is always drawn from the raw, unrounded vector — the same
- * vector that ranks the user's activities. See CLAUDE.md on the no-rounding
- * rule.
+ * ⚠️ NO NUMBERS APPEAR ON THE CHART, in any mode. Axis names only: no values
+ * beside the labels, no tooltips, nothing against the rings. A number on a
+ * display-normalised chart would be a number that does not mean what it looks
+ * like it means, and the raw magnitudes are not what this drawing carries
+ * anyway — see normalizeForDisplay in lib/radarGeometry.ts. That also means
+ * there is no rounding anywhere in the radar at all.
+ *
+ * ⚠️ SHAPE, NOT MAGNITUDE. Every polygon here is normalised before it is
+ * plotted, in all three modes, so the hero and the quiz read on the same
+ * terms. The raw vector still drives everything that is not drawing.
  */
 
 /** How long a morph takes. Long enough to read as a change, short enough to
@@ -81,12 +84,51 @@ interface TasteRadarProps {
   className?: string;
 }
 
-/** Per-mode presentation. Data never varies by mode; only these do. */
-const PRESENTATION: Record<RadarMode, { size: number; labels: boolean; strokeWidth: number }> = {
-  demo: { size: 280, labels: true, strokeWidth: 2 },
-  building: { size: 132, labels: false, strokeWidth: 1.5 },
-  final: { size: 260, labels: true, strokeWidth: 2 },
+/**
+ * The two axes a shape leads on, named. Used for the accessible description,
+ * which says the same thing the picture does — which axes dominate — rather
+ * than reading out numbers the sighted user never sees.
+ */
+function strongestAxes(vector: number[]): string[] {
+  return AXES.map((axis, index) => ({ axis, value: vector[index] }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 2)
+    .map((entry) => entry.axis);
+}
+
+/**
+ * Per-mode presentation. Data never varies by mode; only these do.
+ *
+ * `maxWidth` is a CAP, not a fixed size — the chart is drawn in viewBox units
+ * and scaled to its container, so it shrinks on a narrow screen instead of
+ * overflowing. See the geometry constants below for why that matters.
+ */
+const PRESENTATION: Record<RadarMode, { maxWidth: number; labels: boolean; strokeWidth: number }> = {
+  demo: { maxWidth: 320, labels: true, strokeWidth: 2 },
+  building: { maxWidth: 132, labels: false, strokeWidth: 1.5 },
+  final: { maxWidth: 300, labels: true, strokeWidth: 2 },
 };
+
+/**
+ * The chart is drawn at a fixed size in viewBox units and scaled by CSS, so
+ * every ratio below holds at every rendered width.
+ *
+ * ⚠️ LABEL_SPACE IS NOT DECORATION, IT IS THE REASON THE LABELS ARE READABLE.
+ * An axis name is anchored just outside the ring and drawn OUTWARD from there,
+ * so the box has to contain the ring plus the longest name. The widest axis
+ * label is "Stimulation" at 11 characters, and the two most horizontal axes
+ * sit at cos ~0.975 of the ring, so the box needs roughly
+ * 0.975 * (RADIUS + LABEL_OFFSET) + text width - RADIUS of clearance. Getting
+ * this wrong does not throw or warn: the text simply runs outside the viewBox
+ * and is clipped mid-word. It read "imulation", "velty" and "Crea" before this
+ * was measured in a browser.
+ */
+const RADIUS = 100;
+const LABEL_OFFSET = 16;
+const LABEL_FONT_SIZE = 11;
+const LABEL_SPACE = 84;
+/** No labels to clear, so just enough that the stroke is not cut off. */
+const BARE_SPACE = 8;
 
 /** The gridline rings, innermost first. */
 const RINGS = [0.25, 0.5, 0.75, 1];
@@ -205,7 +247,7 @@ export default function TasteRadar({ mode, vector, size, className }: TasteRadar
   }, [mode, reduced]);
 
   const presentation = PRESENTATION[mode];
-  const width = size ?? presentation.size;
+  const maxWidth = size ?? presentation.maxWidth;
 
   // No vector yet — the quiz has not been answered. The neutral shape is a
   // regular heptagon halfway out: visibly a shape, visibly not a result, so
@@ -222,28 +264,30 @@ export default function TasteRadar({ mode, vector, size, className }: TasteRadar
 
   const shape = useAnimatedVector(target);
 
-  // Labels need room outside the outer ring; without them the chart can fill
-  // its box. axisLabelPoint's own offset is 16, so 34 leaves space for text.
-  const padding = presentation.labels ? 34 : 6;
-  const center = width / 2;
-  const radius = center - padding;
+  const center = RADIUS + (presentation.labels ? LABEL_SPACE : BARE_SPACE);
+  const box = center * 2;
+  const radius = RADIUS;
 
   const points = polygonPoints(shape, radius, center);
 
   return (
     <div className={className}>
       <svg
-        width={width}
-        height={width}
-        viewBox={`0 0 ${width} ${width}`}
+        // Scales to its container up to maxWidth, rather than being pinned to
+        // a pixel size that a 375px screen cannot afford.
+        width="100%"
+        viewBox={`0 0 ${box} ${box}`}
+        style={{ maxWidth, height: "auto" }}
         role="img"
         aria-label={
           mode === "demo"
             ? `Example taste profile: ${DEMO_SHAPES[demoIndex].label}`
             : isGhost
               ? "Your taste profile, not yet measured"
-              : `Your taste profile across ${AXIS_COUNT} axes: ` +
-                AXES.map((axis, i) => `${axis} ${labelValue(shape[i])}`).join(", ")
+              : // Named, not numbered, for the same reason the labels are. The
+                // chart says which axes lead; a screen reader should hear the
+                // same thing rather than a list of figures nobody can see.
+                `Your taste profile, strongest on ${strongestAxes(shape).join(" and ")}`
         }
       >
         {RINGS.map((fraction) => (
@@ -281,17 +325,16 @@ export default function TasteRadar({ mode, vector, size, className }: TasteRadar
           strokeLinejoin="round"
         />
 
+        {/* Vertex dots come from radarVertices, so they sit on the normalised
+            polygon rather than floating off it at raw magnitudes. */}
         {mode === "final" &&
-          shape.map((value, index) => {
-            const point = radarPoint(value, index, radius, center);
-            return (
-              <circle key={AXES[index]} cx={point.x} cy={point.y} r={3} fill="#4f46e5" />
-            );
-          })}
+          radarVertices(shape, radius, center).map((point, index) => (
+            <circle key={AXES[index]} cx={point.x} cy={point.y} r={3} fill="#4f46e5" />
+          ))}
 
         {presentation.labels &&
           AXES.map((axis, index) => {
-            const point = axisLabelPoint(index, radius, center);
+            const point = axisLabelPoint(index, radius, center, LABEL_OFFSET);
             // Anchor by which side of the chart the label sits on, so text
             // grows outward rather than back across the polygon.
             const anchor =
@@ -303,14 +346,11 @@ export default function TasteRadar({ mode, vector, size, className }: TasteRadar
                 y={point.y}
                 textAnchor={anchor}
                 dominantBaseline="middle"
-                fontSize={10}
+                fontSize={LABEL_FONT_SIZE}
                 fontWeight={600}
                 fill="#64748b"
               >
                 {axis}
-                {mode === "final" && !isGhost && (
-                  <tspan fill="#4f46e5"> {labelValue(shape[index])}</tspan>
-                )}
               </text>
             );
           })}

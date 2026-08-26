@@ -131,6 +131,20 @@ node scripts/validate-activity-seed.mjs
 - [ ] **The wildcard has no Reroll button** — it has its own `↻ Another`, and using it does
       not decrease the shared counter.
 
+## D2. Results card layout
+
+- [ ] **The badge cluster is top-right on every card**, in the same place regardless of how
+      long the title is. Compare two cards with very different title lengths in one list —
+      the cluster must not move.
+      *Verifies: the header is a non-wrapping flex row with a `shrink-0` cluster, so the
+      cluster's corner is fixed and the title takes what is left.*
+- [ ] **Longest title, narrowest width.** At 375px, a card titled "Learn a two-player card
+      game neither of you knows" (49 characters, the longest in the catalogue) keeps the
+      cluster top-right, wraps the title in its own column, and never lets the two touch.
+- [ ] **The wildcard card gets the same treatment.** Its badge is a whole sentence, so its
+      cluster is much taller — the description must still sit BELOW it, never underneath.
+- [ ] **Nothing overflows the card** at 375px. No badge is clipped by the rounded corner.
+
 ## E. Wildcard
 
 - [ ] **The badge states the rule**: "✨ Wildcard — completely random, ignores everything
@@ -169,9 +183,11 @@ Added by the `landing-flow` branch.
 
 - [ ] **A fresh tab lands on the hero**, not on question 1 of the quiz.
 - [ ] The hero shows: the name **Stay Interesting**, a one-line promise naming *both*
-      intents (beat boredom now / find a hobby that sticks), a sub-line explaining the
-      mechanism, three expectation chips (`~2 minutes`, `no wrong answers`,
-      `skip anything`), and exactly **one** CTA.
+      intents (beat boredom now / find a hobby that sticks), the mechanism sub-line
+      ("First answer a few quick scenarios so we can learn what would best suit you as a
+      person, and then we will give you the ability to outline some key conditions."),
+      three expectation chips (`~2 minutes`, `no wrong answers`, `skip anything`), and
+      exactly **one** CTA.
 - [ ] **Only one "Stay Interesting" heading is on screen.** The persistent wordmark
       heading is suppressed on the hero; the small header wordmark at the very top stays.
 - [ ] **The demo radar morphs** between four example shapes on a loop, and the label
@@ -181,10 +197,30 @@ Added by the `landing-flow` branch.
 - [ ] **A returning tab never sees the hero.** Complete the quiz, then reload: you get the
       banner and chooser.
 
+## I2. Radar normalization and labels
+
+The radar draws **shape, never magnitude** — every polygon is scaled so its largest axis
+reaches the outer area, with the ratios between axes untouched.
+
+- [ ] **The shape does not shrink as the quiz goes on.** Answer all 8 questions and watch:
+      the polygon changes shape but stays the same overall size. It used to shrink, because
+      a running mean of honest option vectors drifts toward the middle of the pool.
+- [ ] **The finished shape fills the chart** rather than sitting as a small blob near the
+      centre.
+- [ ] **There are no numbers anywhere on any radar** — no values beside the axis names, no
+      tooltips on hover, nothing against the rings. Axis names only, in all three modes.
+- [ ] **All seven axis labels are complete**, not clipped mid-word. "Stimulation" is the
+      longest and the first to break; check it at 375px, at 768px and full width.
+- [ ] **The radar scales with its container** and never overflows it at 375px.
+- [ ] **Two users with the same proportions draw the same shape.** This is by design — the
+      chart is about which axes lead, not how strong the numbers are. Absolute intensity is
+      still what the matcher ranks on; it just is not what this picture shows.
+
 ## I. Radar during the quiz
 
-- [ ] **Before question 1 is answered**, the radar shows a faint regular heptagon — the
-      neutral shape. Visibly a shape, visibly not a result.
+- [ ] **Before question 1 is answered**, the radar shows a faint even heptagon — the
+      neutral ghost. It reads as an empty frame because it is FADED, not because it is
+      small: under normalization a flat vector has no shape to show.
 - [ ] **The caption "Every answer reshapes your taste map." appears on question 1 only**,
       and is gone from question 2 onward.
 - [ ] **Clicking an answer reshapes the radar**, smoothly rather than jumping.
@@ -208,11 +244,11 @@ Added by the `landing-flow` branch.
       description**, stacking above it on a narrow window.
 - [ ] **The shape matches the answers you gave** — it is the same shape the building radar
       ended on, not a new one.
-- [ ] **Axis labels carry a rounded number** (e.g. `Creative 7`). Rounding appears in the
-      label only.
-- [ ] **The profile title still follows the raw sums.** A run whose rounded numbers tie
-      must still produce a stable, sensible title.
+- [ ] **Axis labels are names only.** No values, no tooltips — see section I2.
+- [ ] **The profile title still follows the raw sums**, which normalization never touches.
+      Take a run dominated by one axis and confirm you get that axis's profile.
 - [ ] There is **no numeric vector table** anywhere — the radar is the whole display.
+- [ ] **Vertex dots sit on the polygon's corners**, not floating off it.
 
 ## K. Returning-in-session banner
 

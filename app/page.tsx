@@ -610,8 +610,8 @@ export default function Home() {
                 </p>
 
                 <p className="text-slate-500 mt-3 leading-relaxed">
-                  A few quick scenarios learn what you are actually like, then we match that
-                  against what tonight will genuinely allow — your time, your energy, your budget.
+                  First answer a few quick scenarios so we can learn what would best suit you as
+                  a person, and then we will give you the ability to outline some key conditions.
                 </p>
 
                 <div className="flex flex-wrap gap-2 mt-6">
@@ -844,12 +844,51 @@ export default function Home() {
                         ${activity.isWildcard ? 'bg-white border-purple-200' : 'bg-white border-slate-200 hover:shadow-md'}
                       `}
                     >
-                      <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
-                        <h3 className={`text-xl font-bold ${activity.isWildcard ? 'text-purple-900' : 'text-slate-900'}`}>
+                      {/*
+                        THE BADGE CLUSTER IS PINNED TOP-RIGHT ON EVERY CARD.
+                        It used to sit in a `flex-wrap justify-between` row, so
+                        a long title pushed it onto its own line and a short
+                        one left it beside the title -- the position moved
+                        with the content, which reads as a layout bug when two
+                        cards in the same list disagree.
+
+                        ⚠️ Pinned with flex, NOT with `absolute top-6 right-6`,
+                        and the difference matters at the sizes this app is
+                        actually used at. An absolutely positioned cluster does
+                        not participate in the card's height, and it cannot
+                        reserve space for itself: the title would need a fixed
+                        right padding matched to a cluster whose width varies
+                        by card. On the WILDCARD card that breaks outright --
+                        its badge is a 57-character sentence, so at 375px the
+                        cluster is taller than the header and would lie across
+                        the description.
+
+                        Here the two are siblings in a non-wrapping row, so
+                        they share the width instead of competing for it:
+                        `shrink-0` plus a max-width keeps the cluster's corner
+                        fixed and lets it wrap INTERNALLY when narrow, while
+                        `min-w-0 flex-1` gives the title whatever is left and
+                        lets it wrap. Overlap is impossible and the row grows
+                        to fit the taller of the two.
+                      */}
+                      <div className="flex flex-nowrap justify-between items-start gap-3 mb-4">
+                        <h3 className={`text-lg sm:text-xl font-bold min-w-0 flex-1 ${activity.isWildcard ? 'text-purple-900' : 'text-slate-900'}`}>
                           {activity.title}
                         </h3>
-                        
-                        <div className="flex flex-wrap items-center gap-2">
+
+                        {/*
+                          max-w-32 (128px) and text-lg below `sm` are MEASURED,
+                          not guessed. At a 371px viewport the card gives the
+                          header 276px, and the split decides how tall the card
+                          gets: the longest catalogue title ("Learn a
+                          two-player card game neither of you knows", 49 chars)
+                          runs to 8 lines and a 224px header if the cluster
+                          takes 168px, against 4 lines and 118px at 128px.
+                          Above `sm` the cluster fits on one row well inside
+                          20rem, so the cap stops constraining and the title
+                          takes the rest.
+                        */}
+                        <div className="flex flex-wrap items-center justify-end gap-2 shrink-0 max-w-32 sm:max-w-[20rem]">
                           {typeof activity.matchPercent === "number" && (
                             <span
                               title="How closely this matches your personality vector"
