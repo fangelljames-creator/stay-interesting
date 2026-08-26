@@ -397,10 +397,24 @@ Precision lost upstream would inflate the profile tie rate *and* flatten genuine
 onto the same match ordering. The rule is no longer "keep rounding out of the argmax" but the
 simpler "there is no rounding here; don't reintroduce any".
 
-`scripts/analyze-quiz-balance.mjs` measures this — it walks every possible answer combination and
-reports the tie rate and profile distribution. Run it after any change to the vectors in
-`data/personalityQuiz.ts` or to the scoring itself. It mirrors the scoring logic by hand, so it goes
-stale if the component changes and must be updated alongside it.
+⚠️ **THE PURIST TEST IS THE STANDING ACCEPTANCE GATE.** `scripts/analyze-quiz-balance.mjs` must be
+run and must pass after **any** change to a quiz option vector, to a question, or to the scoring
+itself. For each axis it answers every question with that axis's strongest option; if the resulting
+user does not come out as that axis, the axis is effectively unreachable and something else is
+riding along on its own best options. That check exits non-zero. The other four gates (floor,
+ceiling, discrimination, tie rate) are reported rather than fatal, so a run mid-rebalance stays
+useful while some are legitimately red.
+
+The script imports `personalityQuestions` directly rather than regex-parsing the file, so the
+questions cannot drift out of sync with it. **The argmax is still mirrored by hand** — it lives
+inside a `"use client"` component and cannot be imported — so a change to
+`determinePersonalityType` must be copied into the script. It is two lines and is quoted where it
+is used.
+
+⚠️ **The walk shares are a smoke alarm, never an optimisation target.** An uneven split is evidence
+that something is mis-scored; it is not itself the defect, and flattening it by nudging scores is
+scoring the report instead of scoring the behaviour. Vectors are re-scored against the rubric,
+honestly, and the shares land where they land.
 
 ## Vector matching — `lib/matchActivities.ts`
 
@@ -519,24 +533,73 @@ stays publicly readable with no write policy.
 
 ## Known issues
 
-- **Quiz vector balance is skewed.** With the tie-break fixed, the underlying vector imbalance is
-  now visible and unmasked: Stimulation wins 36.7% of all 65,536 answer paths while Creative wins
-  3.6%, against an even split of 14.3%. Stimulation has both the highest option-pool average (5.03)
-  and the highest floor (2.9), so it starts every path ahead. Rebalancing means editing vectors in
-  `data/personalityQuiz.ts` and re-running `scripts/analyze-quiz-balance.mjs`.
-- **The seed pool still leans the opposite way to the quiz, on the same two axes.** Dominant axis
-  across the 37 seeded activities: Creative 8, Social 7, Energy 6, Outdoors 6, Analytical 5,
-  **Novelty 3, Stimulation 2**. The two axes that win most quiz paths (Stimulation 36.7%,
-  Novelty 17.6% — together 54% of users) are still the two the catalogue has least of.
-  Improved 2026-08-25 from Novelty 1 / Stimulation 0 by the four activities added for the budget
-  filter, but `verify-activity-matching.mjs` **still flags the Stimulation purist**: skateboarding
-  lands at d=4.90, a hair behind darts, so it misses the top 3 by a rounding error rather than by
-  a mile. Not a matcher bug — the matches returned are sensible — but the profile label still
-  cannot point at something the catalogue agrees is Stimulation-dominant. Fix from either end:
-  rebalance the quiz vectors down, or seed more genuinely Stimulation-dominant activities. These
-  vectors were authored by Claude, so this is seed data to correct, not a user decision to preserve.
+- ~~**Quiz vector balance is skewed.**~~ **Resolved 2026-08-26** by the rebalance — see **Recently
+  completed**. Stimulation's 36.7% share is down to 8.4%, its floor from 2.88 to 1.50. Two ceiling
+  gates remain red for a reason that is recorded and deliberate, below.
+- ⚠️ **THE CATALOGUE IS NOW SCORED ON A DIFFERENT STANDARD FROM THE QUIZ.** This is the most
+  important open issue in the file, and it was created by fixing the quiz.
+
+  The rebalance re-scored all 33 quiz options against **The 7-axis rubric**. The 37 activity vectors
+  were **not** touched, and they carry exactly the same side-effect inflation the quiz just had.
+  `rankActivities` measures the distance between the two, so the two ends of every match now
+  disagree about what a score means.
+
+  It is already measurable. `verify-activity-matching.mjs` CHECK B has the Stimulation purist
+  finding skateboarding at **rank 6, d=6.68** — before the rebalance it was d=4.90, a hair behind
+  darts. The gap widened from nothing to 2.58, and the cause is visible in the row itself:
+  `Skateboarding at a public park` is `[5, 8, 5, 3, 7, 6, 10]`, and that **Creative 5** is for an
+  activity that makes nothing. Under the rubric it is a 1 or a 2. The corrected quiz now says
+  Creative 1.13 for a Stimulation purist, so the uncorrected activity is pushed away by an axis
+  that should never have separated them.
+
+  Note what did *not* move: 6 of 7 purists find their own axis in the top 3, exactly as before. The
+  headline count is flat while the underlying agreement got worse, which is the whole reason to
+  read `d=` and not just the pass count. The matcher is fine and the orderings are sensible.
+  **The fix is the wave 1 audit** — see **Content pipeline** — not another pass over the quiz.
+- **Two ceiling gates are red, deliberately.** `Energy 6.88` and `Novelty 6.50` against a 7.0 gate.
+  Not a scoring fault: a ceiling is the mean of the best option available per question, and Q3
+  (spending £100) and Q4 (approaching a puzzle) contain no physical option, while Q1 (Saturday
+  instinct) and Q4 contain no novelty-seeking option. Both **passed before only because of
+  side-effect scores the rebalance removed**, so the gate is now reporting a hole the old numbers
+  hid. Energy is one point short and Novelty four. ⚠️ **Do not close these by editing scores** —
+  one arguable point exists (`Only if it's outdoors`, Energy 7→8) and taking it would clear Energy
+  at exactly the size required, which is the behaviour the rebalance existed to remove. The fix is
+  content: a physical option in Q3, a novelty-seeking option in Q1 or Q4 — the same move that took
+  Creative from 6.25 to 7.00 when Q4 gained one.
+- **Social is the new share outlier**, at 27.2% of paths. Recorded because the walk is a smoke
+  alarm and it is worth reading, **not because it is a target**. Social's own average barely moved
+  (4.09 → 3.96); it did not rise, everything else fell as side-effect points came off. Social was
+  scored on described behaviour all along and has the widest honest range here (floor 1.12, ceiling
+  8.25). Whether that is a defect or simply what these eight scenarios ask about is a question for
+  a future pass, and it is **not** to be fixed by lowering Social scores that are individually
+  correct.
 
 ## Recently completed
+
+**Vector rebalance, 2026-08-26** (branch `vector-rebalance`, **merge held until Owen has read the
+report and taken the quiz**):
+
+- **The 7-axis rubric** recorded as the canonical standard for both quiz options and activities,
+  with the scoring principle that does the real work: *score the described behaviour, not its side
+  effects.*
+- `scripts/analyze-quiz-balance.mjs` rebuilt as an acceptance gate **before** any vector moved:
+  hard-fail purist test, near-purist rate, floor/avg/ceiling, spread matrix, tie rate, and the walk
+  shares labelled DIAGNOSTIC. It imports the questions now instead of regex-parsing them.
+- Fifth Q4 option added, `Sketch your way in` — text and vector supplied, untouched. Q4's Creative
+  spread was 1, the worst cell in the matrix; the question was missing a creative answer.
+- **All 33 option vectors re-scored.** 231 scores reviewed, 38 moved by ≥ 2, no wording changed
+  anywhere. Per-score reasoning in `data/vector-rescore-justifications.md`; before/after in
+  `data/vector-rebalance-before.md` and `data/vector-rebalance-after.md`.
+- **Gates: 4 of 5, up from 2 of 5.** Purist 7/7 throughout — it was a regression guard, and it never
+  went red. Floors, tie rate and the Creative/Analytical ceilings all fixed. The two remaining red
+  ceilings and the catalogue-drift they exposed are under **Known issues**, deliberately not forced.
+
+The finding worth keeping: Stimulation had been acting as a general "this is exciting" tax on
+options whose described behaviour is social, creative or entirely passive — worst case `Sink into a
+story` at Stimulation 8, a person sitting still, where the tension belongs to the fiction and not to
+the activity. Its share fell 36.7% → 8.4% without a single score being aimed at that number. Genuine
+thrill was untouched (`Something that scares you a little` keeps 10) and one score was *raised*
+(`Physical exhaustion`, 3 → 5), which is the check that this was a re-score and not a haircut.
 
 **Quick wins, 2026-08-26** (branch `quick-wins`, **held back from `main` until Owen has clicked
 through — `main` auto-deploys**):
