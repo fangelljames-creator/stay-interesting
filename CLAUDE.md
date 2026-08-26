@@ -27,8 +27,13 @@ up, log in, take a 7-axis personality quiz, and save activities to custom lists.
 - `components/` — UI components (`PersonalityQuiz.tsx`)
 - `data/` — static data and logic (`personalityQuiz.ts`)
 - `lib/` — Supabase client, imported as `@/lib/supabaseClient` (the `@/*` → `./*` alias is in
-  `tsconfig.json`) (verified)
-- `scripts/` — dev-only analysis tools, not part of the build
+  `tsconfig.json`) (verified). Also the pure logic modules: `matchActivities.ts` (ranking),
+  `activityTags.ts` (the vocabulary), `feasibilityQuestions.ts`, `quizSession.ts`, and
+  `resultsSelection.ts` (the wildcard draw and the reroll pool). Sibling imports inside `lib/`
+  use the explicit `./name.ts` extension so the dev scripts can import them under Node.
+- `scripts/` — dev-only analysis tools, not part of the build. Four of them:
+  `validate-activity-seed.mjs`, `verify-activity-matching.mjs`, `verify-results-selection.mjs`,
+  `analyze-quiz-balance.mjs`
 - `supabase/` — SQL to paste into the Supabase SQL editor. Not run by any CLI or migration
   tool; these are hand-run scripts, written to be idempotent so re-running is safe.
 
@@ -200,7 +205,7 @@ Rebuilt 2026-08-25. **There is no tag scoring.** No `+2`/`+6` weights, no multip
 `score > 0` gate. Tags decide what is FEASIBLE; `rankActivities` decides what FITS.
 
 ```
-pathway filter -> per-question filter actions -> rank by vector -> top 3 + wildcard
+pathway filter -> per-question filter actions -> rank by vector -> top 3 (rerollable) + wildcard
 ```
 
 **Nine questions**, five on the quick path and four on the hobby path, in
@@ -230,12 +235,42 @@ cannot act on a paid suggestion, and someone on their own cannot act on one need
 Those are facts about their situation, not preferences to nudge. Bending either produces a
 recommendation the user physically cannot take.
 
-**The wildcard may stretch taste, never feasibility** — drawn from the same filtered survivors
-minus the picks already shown, so it can surprise on theme but never suggests something ruled out.
+**The wildcard ignores your filters on purpose — except budget.** *Changed 2026-08-26 (Owen's
+decision). This supersedes the previous rule, "the wildcard may stretch taste, never feasibility",
+which drew it from the filtered survivors.* It is now drawn **at random from the user's whole
+pathway**, ignoring both the taste ranking and the practical filters, so it really can offer the
+thing they ruled out on time, energy, place or company. The card says so: the badge reads
+"✨ Wildcard — ignores your filters on purpose". Unlabelled it would read as a filtering bug.
+
+⚠️ **Budget is the one filter it never breaks**, for exactly the reason `cost` is absent from
+`RELAXATION_STEPS`: someone who said "keep it free" cannot act on a paid suggestion, so that is not
+a surprise, it is a dead card. In `lib/resultsSelection.ts` this is a single filter inside
+`wildcardEligible` — deleting that line is the whole of "full chaos", should it ever be wanted.
+
+The wildcard **excludes the three cards on screen and everything rerolled away**, and renders
+whenever any eligible activity is left beyond them. It shows its real `matchPercent`: a true number
+on a randomly drawn row, saying how well the draw happens to fit — not that fit had anything to do
+with the draw. Same rule as the rotation penalty below; the number never lies, the label explains it.
+
+**Reroll — added 2026-08-26.** Each of the three ranked cards carries a `↻ Reroll` control that
+**permanently** (for this run) drops it and replaces it with a random pick from **ranks 4–8 of the
+ranked survivors**. The pool is **shared by all three slots**, so a full pool is ~5 rerolls in total
+and then the results settle; a thinner pool gives fewer. The control is **hidden, not disabled**, on
+an empty pool — five dead buttons would be worse than none. Replacements come from the ranked list,
+so they carry their own true `matchPercent`. **A rerolled card never comes back**, as a ranked card
+or as a wildcard. The wildcard's own control draws a fresh wildcard under the rule above.
+
+⚠️ **The collision guard is real, not defensive coding.** A rank 4–8 replacement can be the very row
+currently showing as the wildcard, so `rerollCard` redraws the wildcard when that happens.
+`verify-results-selection.mjs` hits this 35 times in 516 simulated runs. Excluding the wildcard from
+the reroll pool instead would silently cost the user one of their five rerolls.
 
 **Rotation** pushes recently-shown activities down by multiplying their distance
 (`ROTATION_DISTANCE_PENALTY`, 1.35). It touches a **sort key only** — the `matchPercent` on the
 card stays the true distance. Never let the penalty reach the displayed number.
+
+Its `recent_shown_*` key records the *originally* shown three, and rerolls do not touch it. Rerolls
+happen inside one results view; that key is about what to push down on the user's **next** run.
 
 ⚠️ **No-vector fallback.** `writeQuizSession` fails silently when storage is blocked, so the
 results really can be reached with no vector. Nothing can rank then, so the survivors are shown
@@ -352,6 +387,10 @@ Two consequences of that switch worth knowing:
   stays the true one. Never let the penalty reach the displayed number; it would make the card
   lie about the fit in order to make rotation work.
 
+⚠️ The wildcard no longer follows from this. As of 2026-08-26 it is drawn from the pathway, not from
+the filtered survivors — see **The wildcard ignores your filters on purpose** above. Anything in this
+file dated 2026-08-25 that says the wildcard obeys the hard filters is describing the old rule.
+
 ## Tag scoring — retired 2026-08-25
 
 Done, as part of the feasibility redesign. The `+2`/`+6` weights and the ×1.6/×1.4 multipliers
@@ -430,6 +469,27 @@ stays publicly readable with no write policy.
   vectors were authored by Claude, so this is seed data to correct, not a user decision to preserve.
 
 ## Recently completed
+
+**Quick wins, 2026-08-26** (branch `quick-wins`, **held back from `main` until Owen has clicked
+through — `main` auto-deploys**):
+
+- Thrill Seeker profile copy: "high arousal" → "You chase intensity and excitement". The clinical
+  term was the only thing changed; the rest of the sentence stands.
+- `lib/resultsSelection.ts` — new, pure, no React or Supabase, like `lib/matchActivities.ts`. Holds
+  the wildcard draw (`wildcardEligible`, `availableWildcards`), the reroll pool (`rerollPoolFrom`)
+  and `drawRandom`, whose `rng` is injectable so the dev script is reproducible and so the
+  `Math.random()` call sits at module scope rather than in a component body (`react-hooks/purity`,
+  same reason as `pickRandomOption`).
+- The wildcard rule changed and reroll added — both documented under **Feasibility engine** above.
+  `app/page.tsx` stopped holding results as one `recommendations` array ("the three, then the
+  wildcard") and now names each part: `shownActivities`, `wildcard`, `rerollPool`, `wildcardPool`,
+  `discardedIds`. Reroll would otherwise have had to mutate that array by position.
+- `scripts/verify-results-selection.mjs` — new. Imports the real functions and real questions.
+  Checks budget (a strictly-free user's wildcard pool is checked **exhaustively**, not sampled),
+  that the new rule is genuinely in force (100% of quick and 98% of hobby combinations can draw a
+  wildcard their own filters ruled out — otherwise it would be silently equivalent to the old rule),
+  exclusion over 7,747 draws, pool sizing, and 516 reroll runs. It deliberately does **not**
+  re-implement relaxation; its pool-size histogram is therefore pre-relaxation and pessimistic.
 
 **Feasibility redesign, 2026-08-25** (branch `funnel-integration`):
 
