@@ -93,6 +93,34 @@ export function matchPercentFor(distance: number): number {
 }
 
 /**
+ * Sums a list of answer vectors per axis — the quiz's raw totals.
+ *
+ * Extracted so there is ONE summation in the project. The personality quiz
+ * needs these totals twice over: once at the end, to store in the session and
+ * to judge the profile from, and once per answer, to draw the running shape on
+ * the building-mode radar. Those two must agree exactly or the chart drawn
+ * while answering would not be the vector the answers actually produce, so
+ * they run the same code rather than two loops that look alike.
+ *
+ * Ignores nothing and rounds nothing. An empty list gives all zeroes, which is
+ * a valid input to nothing downstream — userVectorFromQuizTotals rejects a
+ * questionCount of 0, and callers with no answers yet should not be asking for
+ * a vector at all.
+ */
+export function totalsFrom(vectors: readonly number[][]): number[] {
+  const totals = new Array<number>(AXIS_COUNT).fill(0);
+
+  for (const vector of vectors) {
+    if (!isValidVector(vector)) continue;
+    for (let i = 0; i < AXIS_COUNT; i++) {
+      totals[i] += vector[i];
+    }
+  }
+
+  return totals;
+}
+
+/**
  * Builds the user's vector from the quiz's raw per-axis sums.
  *
  * Divides by the question count to land on the same 1-10 scale the activities
