@@ -75,7 +75,7 @@ check `node_modules/next/dist/docs/` before relying on remembered App Router con
   | `time_required` | `text` | **being dropped** — see cleanup file STEP 4 |
   | `created_at` | `timestamptz` | default `timezone('utc', now())` |
   | `tags` | `text[]` | not null, default `'{}'` |
-  | `vector` | `integer[]` | 7 axes, CHECK-constrained to 7 values of 1–10 |
+  | `vector` | `integer[]` | 7 axes, CHECK-constrained to 7 values of 1–10. Scored against **The 7-axis rubric** — the CHECK enforces the range, only the rubric enforces the meaning |
 
 - `saved_activities`: `id`, `user_id` (uuid), `activity_id` (uuid), `created_at`, unique on
   (`user_id`, `activity_id`).
@@ -297,6 +297,8 @@ which point starvation largely evaporates on its own.
 
 - Axis order is a fixed invariant everywhere:
   `[Social, Energy, Creative, Analytical, Outdoors, Novelty, Stimulation]`, each scored 1–10.
+  **What those numbers mean is defined in **The 7-axis rubric** above** — the order is an invariant,
+  the rubric is the standard, and no option vector may be authored or edited without applying it.
 - 8 scenario questions in `data/personalityQuiz.ts`. The dominant axis picks 1 of 7 profile types —
   see **Personality quiz scoring** below for how that axis is chosen, which is easy to break.
 - Back button and progress bar as before. The results card shows the **personality type only** —
@@ -311,6 +313,56 @@ which point starvation largely evaporates on its own.
   `react-hooks/purity`.
 - The CTA takes an optional `onContinue`; without one it routes to `/`. That keeps
   `app/quiz/page.tsx` a server component.
+
+## The 7-axis rubric — every vector is a rubric application
+
+**This is the canonical scoring standard for all 7 axes, and it governs BOTH consumers: the quiz
+option vectors in `data/personalityQuiz.ts` and the activity vectors in the seed SQL.** One standard,
+two places it is applied. A vector that was not scored against this rubric is not a vector, it is a
+guess — and guesses on either side of the comparison corrupt the match, because `rankActivities`
+measures the straight-line distance between them and has no way to tell an honest 8 from a generous
+one.
+
+| Axis | 1 | 5 | 10 |
+|---|---|---|---|
+| **Social** | solitary by nature | works alone or with company | only exists as a group experience |
+| **Energy** | completely still | light movement involved | physically demanding, sweat guaranteed |
+| **Creative** | nothing is made or expressed | making within rules | open-ended making, the output is yours alone |
+| **Analytical** | no problem-solving | systems or rules to learn | strategy, systems, or numbers at the core |
+| **Outdoors** | strictly indoors | works either side of the door | defined by being out in nature and weather |
+| **Novelty** | comfort and repetition | familiar shape, fresh content | a skill or world most people never touch |
+| **Stimulation** | calming, meditative | pleasantly engaging | intensity, stakes, adrenaline |
+
+⚠️ **The scoring principle: score the described behaviour, not its side effects.**
+
+This is the rule that does the real work, and nearly every bad score in the original vectors broke
+it. An option is not Stimulation-8 because doing it *feels exciting*; it is Stimulation-8 if the
+behaviour described **is** intensity, stakes or adrenaline. "Get lost in a gripping story" is a
+person sitting still — the excitement is a side effect of the fiction, not a property of the
+activity, and scoring it high on Stimulation taxes every other axis it should have been measured on.
+Same trap in the other direction: a pub quiz is Social because it is played in a group, not because
+socialising happens to be stimulating.
+
+Side-effect scoring is self-concealing. It never looks wrong on any single option — it only shows up
+as one axis quietly winning a third of all answer paths, which is exactly how the imbalance recorded
+below went unnoticed.
+
+## Content pipeline — catalogue growth
+
+Full pipeline doctrine (topic map, anti-clone rules, wave protocol) lands with wave 1. Recorded here
+now because it is a **rubric** obligation rather than a pipeline one:
+
+⚠️ **Wave 1 must audit the existing activity vectors against the rubric above and propose corrections
+in its review file** — as proposals for review, not as silent edits. Those vectors predate the rubric
+and were authored by Claude, so they are seed data to correct rather than user decisions to preserve.
+The catalogue side of the comparison is worth exactly as much as the quiz side, and the quiz side is
+being rebuilt on this rubric; leaving 37 activity vectors scored by an older, unwritten standard
+would put a corrected quiz and an uncorrected catalogue on opposite ends of the same distance
+calculation.
+
+Note the count: the **canonical seed has 37 rows** (20 quick-fix, 21 long-term, 4 carrying both).
+The live database still holds 33 until `supabase/step1-schema-rls-seed.sql` is re-run — see the
+budget-filter entry under **Recently completed**. Audit all 37; the SQL is the source of truth.
 
 ## Personality quiz scoring
 
@@ -355,6 +407,11 @@ stale if the component changes and must be updated alongside it.
 `rankActivities(userVector, activities)` sorts activities by closeness to the user's 7-axis vector,
 nearest first, decorating each with `distance` and `matchPercent` (the same way `app/page.tsx`
 decorates with `score`).
+
+⚠️ **Both sides of this comparison must be scored against **The 7-axis rubric** above.** The metric
+is a straight-line distance between a quiz-derived vector and an activity vector, so it is only
+meaningful if a 7 means the same thing on both. Nothing in the code can detect a drift in that
+standard — a mis-scored vector produces a confident, wrong match percentage and no error anywhere.
 
 **Metric: Euclidean distance.** Straight-line distance across the 7 axes, so an activity matches
 when it sits near the user on every axis at once. `matchPercent = (1 - d / (9 * sqrt(7))) * 100`,
