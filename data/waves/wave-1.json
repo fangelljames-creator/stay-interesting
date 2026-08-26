@@ -1,0 +1,1044 @@
+{
+  "wave": 1,
+  "source": "data/curated-activities.csv",
+  "note": "Production only — no new ideas. Every row here is one of the 99 approved rows from the curated keep list, with its description rewritten in house voice, its tags assigned from scratch under the closed 20-tag vocabulary, and its vector scored against The 7-axis rubric in CLAUDE.md. The CSV's `tier` and `note` columns were veto metadata and do not survive into the seed. Titles are normalised to sentence case to match the existing catalogue.",
+  "findings": [
+    {
+      "title": "One exact duplicate, and two near-duplicates, of rows already in the seed",
+      "body": "**`Indoor bouldering` is a byte-for-byte title match** with a row already seeded. The SQL matches on title, so re-running would silently skip it and you would keep the existing vector rather than the audited one — a confusing outcome rather than a broken one. My recommendation is to veto the wave row and take the audit correction to the existing one instead, but it is your call and I have not dropped it.\n\n`Fifteen-minute mobility flow` against the seeded `Ten minutes of mobility work` is the same activity twice at two lengths. `Sourdough from a wild starter` against `Sourdough and bread baking` is arguably a deeper long-term version of the same thing. `Hiking and hillwalking` against `Trail running and hillwalking` I would keep — walking a ridge and running a trail are genuinely different activities that happen to share a word."
+    },
+    {
+      "title": "Four template families are over the anti-clone cap",
+      "body": "`build X` has 6, `learn/study X` has 5, `make X` and `plan/design X` have 3 each, against a cap of 2 per wave.\n\nTwo things worth saying plainly. First, wave 1 is **production of a list you already approved**, not generation, so these are your rows rather than clones I invented — the cap was written for waves 2+. Second, the detector reads the first word of the titles, **and I chose the titles**. `Build a blanket fort` could just as easily have been `Blanket fort`, which would drop the count without changing anything real. I have not renamed anything to get under the cap, because that would be gaming the check rather than passing it."
+    },
+    {
+      "title": "I made the side-effect error myself, on Analytical, and corrected it",
+      "body": "My first pass had **Analytical dominant on 40% of the wave**. Reviewing it against the rubric, I had been scoring \"this is an intellectual activity\" rather than \"strategy, systems or numbers are at the core\" — the exact error the rubric exists to prevent, committed in the same week I wrote it down.\n\n79 rows were re-scored on that axis. Observation, memorisation and recall came down (`Learn the NATO alphabet` 5→3, `Geography quiz blitz` 8→5, `Study old maps` 8→5); genuine problem-solving stayed (`Play through a famous chess game` 10, `Three bullets on today's markets` 9, `Build an Arduino weather station` 10, `Small engine repair` 9). Analytical is now dominant on 28%, still the largest share and worth your eye."
+    },
+    {
+      "title": "The curated list is overwhelmingly solo and calm — a real gap for waves 2+",
+      "body": "Across all 99 rows, **Social is dominant on 4 and Stimulation on 2**. That is not a scoring artefact: the keep list is a list of hobbies and micro-tasks a person does by themselves, and it was assembled that way.\n\nCombined with the audit — which removes the catalogue's only fictional Stimulation row — the whole 136-row catalogue would end up with **3 Stimulation-dominant activities out of 136** — `Skateboarding at a public park`, `Geography quiz blitz` and `Two minutes of cold shower`. CLAUDE.md already flags that a Stimulation purist cannot be shown anything the catalogue agrees is Stimulation-dominant. Wave 1 does not fix that, and waves 2+ should be weighted hard toward **social** and **high-stakes** content from the idea bank."
+    },
+    {
+      "title": "A vocabulary gap: there is no setting tag for \"out in the town\"",
+      "body": "`Sketch buildings from a bench` genuinely happens on a pavement in a town centre. The setting vocabulary is `at-home` / `facility` / `in-nature`, and none of them is true. I tagged it `at-home` + `in-nature` because both are real venues for it, which is a fudge rather than a fact.\n\nNot proposing a new tag — the doctrine is that a tag no filter reads must not exist, and adding one means adding the filter in the same change. Recording it because if waves 2+ bring more urban-outdoor activities, this becomes a real hole in the hobby path's setting question."
+    },
+    {
+      "title": "Two tag observations outside this audit's remit",
+      "body": "The audit you asked for covers **vectors**. Two seeded rows also look wrong on **tags**, which I have not touched:\n\n- `Ten minutes of mobility work` carries `exertion`, but the tag doctrine defines that as demanding real effort. Gentle mobility work does not, and the tag currently hides it from anyone who answers \"something low-key\".\n- `A walk with no destination` carries `exertion` for the same reason.\n\nBoth would need a separate change with its own review, since re-tagging alters which users can see a row at all."
+    }
+  ],
+  "vetoed": ["Indoor bouldering", "Fifteen-minute mobility flow"],
+  "activities": [
+    {
+      "title": "Train for a half-marathon",
+      "source": "csv 1",
+      "tags": ["long-term", "5-hours-week", "exertion", "outside", "in-nature", "solo", "social", "free"],
+      "vector": [3, 10, 1, 4, 8, 4, 5],
+      "description": "Twelve weeks of mostly easy miles with one hard session a week, building towards 13.1. The training is unglamorous and the shoes are the only real cost — but the finish line does exactly what it promises."
+    },
+    {
+      "title": "Traditional bookbinding",
+      "source": "csv 2",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "solo", "low-budget"],
+      "vector": [1, 2, 8, 4, 1, 7, 2],
+      "description": "Fold the paper into signatures, sew them onto linen cords, and case the whole thing in cloth. A starter kit is a few pounds of thread and needles, and your first book will be crooked in a way you end up fond of."
+    },
+    {
+      "title": "Classical oil painting",
+      "source": "csv 3",
+      "tags": ["long-term", "5-hours-week", "inside", "at-home", "solo", "investment-required"],
+      "vector": [1, 2, 10, 3, 1, 6, 2],
+      "description": "Copy the old masters to learn what they knew about layering, glazing, and how colour behaves while it is still wet. Oils and canvas are not cheap, and every layer needs days to dry before the next one goes on."
+    },
+    {
+      "title": "Sourdough from a wild starter",
+      "source": "csv 4",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "solo", "free"],
+      "vector": [2, 3, 6, 6, 1, 6, 2],
+      "description": "Catch the yeast already living in your kitchen, feed it daily until it is reliable, then learn what hydration actually does to a crumb. Flour and time are the only costs, and the first month of loaves are for you rather than for guests.",
+      "note": "Dedupe candidate against the seeded 'Sourdough and bread baking'."
+    },
+    {
+      "title": "Carve a wooden spoon",
+      "source": "csv 5",
+      "tags": ["long-term", "1-2-hours-week", "inside", "outside", "at-home", "solo", "low-budget"],
+      "vector": [1, 3, 8, 3, 3, 7, 2],
+      "description": "A straight knife, a hook knife, and a green branch turn into something you can actually eat with. Expect a whole evening on the first one, and keep the plasters within reach."
+    },
+    {
+      "title": "A round of disc golf",
+      "source": "csv 6",
+      "tags": ["quick-fix", "half-day", "long-term", "1-2-hours-week", "exertion", "outside", "in-nature", "solo", "couple", "social", "low-budget"],
+      "vector": [6, 5, 1, 3, 8, 5, 4],
+      "description": "Two or three discs and a public course, which in most towns costs nothing to walk. It plays like golf with none of the membership, the dress code, or the waiting."
+    },
+    {
+      "title": "Build a miniature diorama",
+      "source": "csv 7",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "solo", "low-budget"],
+      "vector": [1, 2, 9, 4, 1, 6, 2],
+      "description": "Foam board, acrylics and twigs from the garden become a scene at 1:35 — a ruined building, a station platform, whatever you can picture. Cheap to start, and genuinely absorbing once you begin thinking about the lighting."
+    },
+    {
+      "title": "Basic bicycle maintenance",
+      "source": "csv 8",
+      "tags": ["long-term", "1-2-hours-week", "inside", "outside", "at-home", "solo", "low-budget"],
+      "vector": [1, 3, 2, 7, 3, 5, 2],
+      "description": "Degrease the chain, index the gears, and patch a tube on the kitchen floor until none of it feels intimidating. A basic tool roll pays for itself the first time you skip the shop."
+    },
+    {
+      "title": "Pressed flower art",
+      "source": "csv 9",
+      "tags": ["long-term", "1-2-hours-week", "inside", "outside", "at-home", "in-nature", "solo", "free"],
+      "vector": [1, 2, 7, 1, 5, 4, 1],
+      "description": "Pick up what has already fallen on a walk, press it flat inside the heaviest books you own, and frame the results weeks later. It costs nothing but patience, and the waiting is most of it."
+    },
+    {
+      "title": "Shadowboxing rounds",
+      "source": "csv 10",
+      "tags": ["long-term", "1-2-hours-week", "exertion", "inside", "at-home", "solo", "free"],
+      "vector": [1, 9, 2, 3, 1, 4, 5],
+      "description": "Fifteen rounds in front of a mirror thinking about nothing but footwork, guard and hand speed. No kit and no gym, and you will be properly out of breath by the fourth."
+    },
+    {
+      "title": "Chess study and correspondence games",
+      "source": "csv 11",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "solo", "couple", "free"],
+      "vector": [3, 1, 1, 10, 1, 4, 5],
+      "description": "Learn one opening properly rather than five badly, and play correspondence games where you get days to think about each move. Free everywhere, and the losses teach much faster than the wins."
+    },
+    {
+      "title": "Close-up card and coin magic",
+      "source": "csv 12",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "solo", "social", "low-budget"],
+      "vector": [4, 2, 7, 4, 1, 7, 4],
+      "description": "Card controls, a coin vanish, and the discipline of practising one move until it stops looking like a move. A deck of cards is the entire budget and the mirror does the rest."
+    },
+    {
+      "title": "Indoor bouldering",
+      "source": "csv 13",
+      "tags": ["long-term", "1-2-hours-week", "exertion", "inside", "facility", "solo", "social", "low-budget"],
+      "vector": [5, 9, 1, 5, 1, 6, 6],
+      "description": "Short problems, thick mats, no ropes — just you working out where to put your feet. A session with shoe hire is about a tenner, and your forearms will tell you when to stop.",
+      "note": "EXACT title collision with the seeded 'Indoor bouldering'. See the dedupe section."
+    },
+    {
+      "title": "Hiking and hillwalking",
+      "source": "csv 14",
+      "tags": ["long-term", "weekend-blocks", "exertion", "outside", "in-nature", "solo", "couple", "social", "low-budget"],
+      "vector": [4, 8, 1, 3, 10, 5, 3],
+      "description": "Plan a ridge line or a stretch of a national trail and give a whole Saturday to it. Boots and a waterproof are the real cost; the walking is free and the weather is part of the deal."
+    },
+    {
+      "title": "Foraging for wild plants",
+      "source": "csv 15",
+      "tags": ["long-term", "1-2-hours-week", "outside", "in-nature", "solo", "couple", "low-budget"],
+      "vector": [2, 4, 2, 7, 10, 8, 3],
+      "description": "Learn a handful of species properly — where they grow, when they are ready, and when to leave them alone. Start with a good regional guide, and never eat anything you are not completely certain of."
+    },
+    {
+      "title": "Web design and front-end coding",
+      "source": "csv 16",
+      "tags": ["long-term", "5-hours-week", "inside", "at-home", "solo", "free"],
+      "vector": [1, 1, 7, 9, 1, 6, 3],
+      "description": "Build something small and real — a page for a friend's band, a tool you actually want — and learn the layout engine by fighting it. Free to start, and the browser is the only thing you need to install."
+    },
+    {
+      "title": "The big books project",
+      "source": "csv 17",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "solo", "free"],
+      "vector": [1, 1, 1, 3, 1, 5, 2],
+      "description": "Pick one of the doorstops you have been avoiding — Moby-Dick, Middlemarch, War and Peace — and read fifty pages a week until it is done. The library makes it free, and the length is the point rather than the obstacle."
+    },
+    {
+      "title": "Fermenting and kombucha brewing",
+      "source": "csv 18",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "solo", "low-budget"],
+      "vector": [2, 2, 5, 6, 1, 7, 2],
+      "description": "A jar, a starter culture, and a fortnight of doing very little while the microbes work. Hot sauce and kombucha both forgive beginners, and the smell tells you how it is going long before the taste does."
+    },
+    {
+      "title": "Bonsai cultivation",
+      "source": "csv 19",
+      "tags": ["long-term", "1-2-hours-week", "inside", "outside", "at-home", "solo", "low-budget"],
+      "vector": [1, 2, 7, 5, 4, 7, 1],
+      "description": "Wire, prune and wait — a tree you shape across years rather than an afternoon. A starter tree and decent snips are modest, but the real commitment is watering it every day for a decade."
+    },
+    {
+      "title": "Moroccan tagine cooking",
+      "source": "csv 20",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "solo", "couple", "social", "low-budget"],
+      "vector": [5, 3, 6, 4, 1, 7, 2],
+      "description": "Ras el hanout, preserved lemon, and three hours at the lowest heat your hob will hold. A proper tagine pot is the one real purchase and it earns its shelf space by the third dinner."
+    },
+    {
+      "title": "Amateur astronomy",
+      "source": "csv 21",
+      "tags": ["long-term", "1-2-hours-week", "outside", "in-nature", "solo", "couple", "investment-required"],
+      "vector": [2, 2, 3, 8, 9, 8, 3],
+      "description": "A starter scope, a reasonably dark field, and a list of what is up tonight. The moon and Jupiter come easily; anything fainter is a lesson in patience and cold hands."
+    },
+    {
+      "title": "Tabletop roleplaying",
+      "source": "csv 22",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "facility", "social", "low-budget"],
+      "vector": [10, 1, 8, 5, 1, 7, 5],
+      "description": "Four friends, a set of dice, and a story none of you can predict in advance. The starter rules are free to download and the only real cost is finding a night everyone can keep."
+    },
+    {
+      "title": "Make a zine",
+      "source": "csv 23",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "solo", "low-budget"],
+      "vector": [3, 2, 9, 2, 1, 7, 3],
+      "description": "Fold one sheet of A4 into eight pages and fill it with something nobody asked for — a guide to local benches, a comic, a rant. A photocopier turns it into a stack you can hand out."
+    },
+    {
+      "title": "3D printing and CAD",
+      "source": "csv 24",
+      "tags": ["long-term", "5-hours-week", "inside", "at-home", "solo", "investment-required"],
+      "vector": [1, 2, 7, 9, 1, 7, 3],
+      "description": "Model a bracket that does not exist yet, print it overnight, and find out exactly where your measurements were wrong. The printer is the expensive part; the software is free and the failures are cheap."
+    },
+    {
+      "title": "Map a historic walking tour",
+      "source": "csv 25",
+      "tags": ["quick-fix", "1-hour", "outside", "solo", "couple", "free"],
+      "vector": [2, 4, 5, 6, 6, 6, 2],
+      "description": "Find five buildings within a mile that have a story and string them into a loop you could walk a visitor round. It costs a phone and an hour, and you will never see the high street quite the same way."
+    },
+    {
+      "title": "Revive scuffed leather boots",
+      "source": "csv 26",
+      "tags": ["quick-fix", "1-hour", "inside", "at-home", "solo", "low-budget"],
+      "vector": [1, 2, 3, 2, 1, 3, 1],
+      "description": "Clean the salt off, work conditioner in with your fingers, and let them dry well away from the radiator. A tin costs a few pounds and will outlast several pairs of boots."
+    },
+    {
+      "title": "Identify garden birds",
+      "source": "csv 27",
+      "tags": ["quick-fix", "10-mins", "1-hour", "inside", "outside", "in-nature", "solo", "couple", "free"],
+      "vector": [2, 1, 1, 5, 8, 4, 1],
+      "description": "Sit by a window or on a park bench for half an hour and write down everything that lands. Binoculars help but are not required, and a robin at four feet beats a rarity at four hundred."
+    },
+    {
+      "title": "Ten-minute room reset",
+      "source": "csv 28",
+      "tags": ["quick-fix", "10-mins", "inside", "at-home", "solo", "free"],
+      "vector": [1, 4, 1, 2, 1, 1, 3],
+      "description": "One loud playlist, one bin bag, and ten minutes of not deciding anything — just clearing. It is not deep cleaning and it is not trying to be."
+    },
+    {
+      "title": "List something for resale",
+      "source": "csv 29",
+      "tags": ["quick-fix", "1-hour", "inside", "at-home", "solo", "free"],
+      "vector": [2, 2, 3, 4, 1, 3, 2],
+      "description": "Photograph the jacket you have not worn in two years against a plain wall, and write the listing honestly. Twenty minutes for something that might pay for dinner."
+    },
+    {
+      "title": "Geography quiz blitz",
+      "source": "csv 30",
+      "tags": ["quick-fix", "10-mins", "inside", "at-home", "solo", "couple", "free"],
+      "vector": [2, 1, 1, 5, 1, 4, 6],
+      "description": "Name every country in Africa against a running clock, get thoroughly humbled, and immediately go again. Free, mildly addictive, and you genuinely end up knowing where things are."
+    },
+    {
+      "title": "Dig into local history",
+      "source": "csv 31",
+      "tags": ["quick-fix", "1-hour", "inside", "at-home", "solo", "free"],
+      "vector": [2, 1, 1, 5, 1, 6, 2],
+      "description": "Search the archives for what your street looked like a century ago and find out what stood where the supermarket is. Free through most library services, and it escalates quickly."
+    },
+    {
+      "title": "Ring someone for no reason",
+      "source": "csv 32",
+      "tags": ["quick-fix", "10-mins", "inside", "outside", "at-home", "couple", "free"],
+      "vector": [9, 1, 1, 1, 3, 2, 3],
+      "description": "Pick the person you keep meaning to call and simply call them, with no agenda and no occasion. Ten minutes, free, and disproportionately good for both of you."
+    },
+    {
+      "title": "Mend what needs mending",
+      "source": "csv 33",
+      "tags": ["quick-fix", "10-mins", "1-hour", "inside", "at-home", "solo", "low-budget"],
+      "vector": [1, 2, 4, 3, 1, 3, 1],
+      "description": "Sew the button back on, close the hem, and stop stepping around the pile on the chair. A basic needle-and-thread kit costs a couple of pounds and lasts years."
+    },
+    {
+      "title": "Make a lemon posset",
+      "source": "csv 34",
+      "tags": ["quick-fix", "10-mins", "inside", "at-home", "solo", "couple", "low-budget"],
+      "vector": [3, 2, 4, 2, 1, 4, 2],
+      "description": "Cream, sugar, lemon. Boil, stir, pour, chill — three ingredients and no technique, and it comes out looking like you tried far harder than you did."
+    },
+    {
+      "title": "Learn three knots that matter",
+      "source": "csv 35",
+      "tags": ["quick-fix", "10-mins", "inside", "at-home", "solo", "free"],
+      "vector": [1, 2, 2, 4, 1, 5, 2],
+      "description": "The bowline, the clove hitch and the figure-eight, tied with a bootlace on the sofa. Ten minutes each, and once they land they stay learned for good."
+    },
+    {
+      "title": "Find five constellations",
+      "source": "csv 36",
+      "tags": ["quick-fix", "10-mins", "outside", "in-nature", "solo", "couple", "free"],
+      "vector": [2, 2, 1, 5, 9, 5, 2],
+      "description": "Step outside, hold up a star app, and learn five shapes well enough to find them again without it. Free, best on a cold clear night, and Orion is the one to start with."
+    },
+    {
+      "title": "Fold an origami crane",
+      "source": "csv 37",
+      "tags": ["quick-fix", "10-mins", "inside", "at-home", "solo", "free"],
+      "vector": [1, 1, 6, 4, 1, 4, 1],
+      "description": "One square of paper and about twenty folds, most of which you will get wrong the first time. The second one takes five minutes and the tenth takes two."
+    },
+    {
+      "title": "Fifteen-minute mobility flow",
+      "source": "csv 38",
+      "tags": ["quick-fix", "10-mins", "inside", "at-home", "solo", "free"],
+      "vector": [1, 4, 1, 1, 1, 2, 1],
+      "description": "Follow a full-body stretch routine on the living room floor and discover which side is tighter. Free, and the difference shows up within a week rather than a month."
+    },
+    {
+      "title": "Learn to moonwalk",
+      "source": "csv 39",
+      "tags": ["quick-fix", "10-mins", "inside", "at-home", "solo", "free"],
+      "vector": [1, 5, 4, 2, 1, 6, 4],
+      "description": "Smooth socks, a hard floor, and a tutorial you will re-watch about eight times. Completely useless and entirely worth the twenty minutes."
+    },
+    {
+      "title": "Plan a trip you may never take",
+      "source": "csv 40",
+      "tags": ["quick-fix", "1-hour", "inside", "at-home", "solo", "couple", "free"],
+      "vector": [2, 1, 3, 6, 2, 6, 2],
+      "description": "Pick a country and build the actual route — the trains, the towns, where you would sleep on each night. Free, and roughly half of these do eventually happen."
+    },
+    {
+      "title": "Build a blanket fort",
+      "source": "csv 41",
+      "tags": ["quick-fix", "1-hour", "inside", "at-home", "solo", "couple", "social", "free"],
+      "vector": [5, 4, 6, 2, 1, 5, 2],
+      "description": "Every cushion in the house, two chairs, and the big blanket nobody ever uses. Free, faintly ridiculous, and a genuinely good place to read for an hour."
+    },
+    {
+      "title": "Two minutes of cold shower",
+      "source": "csv 42",
+      "tags": ["quick-fix", "10-mins", "inside", "at-home", "solo", "free"],
+      "vector": [1, 4, 1, 1, 1, 5, 8],
+      "description": "Turn the dial all the way over at the end of a normal shower and stay there for two minutes. Free, deeply unpleasant, and you will feel switched on for an hour afterwards."
+    },
+    {
+      "title": "Write a review someone will actually read",
+      "source": "csv 43",
+      "tags": ["quick-fix", "10-mins", "inside", "at-home", "solo", "free"],
+      "vector": [4, 1, 4, 2, 1, 2, 2],
+      "description": "Think of the small place that quietly gets it right, and write them the specific, glowing review you never got round to. Five minutes of yours, a real difference to theirs."
+    },
+    {
+      "title": "Microwave mug cake",
+      "source": "csv 44",
+      "tags": ["quick-fix", "10-mins", "inside", "at-home", "solo", "low-budget"],
+      "vector": [2, 1, 3, 2, 1, 3, 2],
+      "description": "Flour, sugar, cocoa and milk, stirred in the mug you are going to eat it out of. Ninety seconds, and exactly as good as it needs to be at eleven at night."
+    },
+    {
+      "title": "Ten minutes of guided breathing",
+      "source": "csv 45",
+      "tags": ["quick-fix", "10-mins", "inside", "at-home", "solo", "free"],
+      "vector": [1, 1, 1, 1, 1, 3, 1],
+      "description": "Open a meditation app, take the beginner track, and do the full ten minutes without checking how long is left. The free tiers cover everything you need to find out whether it suits you."
+    },
+    {
+      "title": "Build and paint a scale model",
+      "source": "csv 46",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "solo", "low-budget"],
+      "vector": [1, 2, 7, 4, 1, 5, 2],
+      "description": "A plastic kit of something with a history, assembled in the right order and painted slowly. Kits and paints are modest, and the patience is the actual skill being trained."
+    },
+    {
+      "title": "Olympic lifting, properly coached",
+      "source": "csv 47",
+      "tags": ["long-term", "5-hours-week", "exertion", "inside", "facility", "social", "investment-required"],
+      "vector": [6, 10, 1, 6, 1, 7, 7],
+      "description": "The snatch and the clean-and-jerk are technique long before they are strength, which is why this belongs in a club with a coach rather than on YouTube. Expect a membership fee and several weeks on an empty barbell."
+    },
+    {
+      "title": "Build a mechanical keyboard",
+      "source": "csv 48",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "solo", "investment-required"],
+      "vector": [1, 2, 6, 7, 1, 7, 3],
+      "description": "Choose the switches, solder the board, and lubricate the stabilisers until it sounds the way you want it to. Parts add up quickly and the soldering iron is a genuine purchase."
+    },
+    {
+      "title": "Restore a cast iron skillet",
+      "source": "csv 49",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "solo", "low-budget"],
+      "vector": [1, 4, 4, 5, 1, 6, 2],
+      "description": "Strip a rusted junk-shop pan back to bare metal, then build the seasoning up again in thin layers in a hot oven. The pan costs a few pounds and will outlive you if you get it right."
+    },
+    {
+      "title": "Build an Arduino weather station",
+      "source": "csv 50",
+      "tags": ["long-term", "5-hours-week", "inside", "at-home", "solo", "low-budget"],
+      "vector": [1, 2, 5, 10, 2, 7, 3],
+      "description": "Solder up temperature, humidity and pressure sensors and log your own garden's readings to a chart. A starter kit is affordable; the frustration is free and arrives in bulk."
+    },
+    {
+      "title": "Rowing at a river club",
+      "source": "csv 51",
+      "tags": ["long-term", "5-hours-week", "exertion", "outside", "facility", "in-nature", "social", "investment-required"],
+      "vector": [9, 10, 1, 5, 8, 7, 6],
+      "description": "Learn the catch, the drive and the recovery from people who will tell you precisely what your blade is doing wrong. Club fees are real and the early starts are worse, but the water at six in the morning is why people stay."
+    },
+    {
+      "title": "Hill sprint intervals",
+      "source": "csv 52",
+      "tags": ["long-term", "1-2-hours-week", "exertion", "outside", "in-nature", "solo", "free"],
+      "vector": [1, 10, 1, 3, 7, 3, 7],
+      "description": "Find the steepest street or path near you and run up it hard, eight or ten times, walking back down between. Free, brutally simple, and over inside twenty-five minutes."
+    },
+    {
+      "title": "Design an icon set",
+      "source": "csv 53",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "solo", "free"],
+      "vector": [1, 1, 8, 6, 1, 5, 2],
+      "description": "Draw ten icons that have to look like a family — same weight, same corners, same logic — and then vectorise them. Free tools cover all of it, and the constraint is what makes it interesting."
+    },
+    {
+      "title": "Wall-supported handstands",
+      "source": "csv 54",
+      "tags": ["long-term", "1-2-hours-week", "exertion", "inside", "at-home", "solo", "free"],
+      "vector": [1, 8, 1, 3, 1, 5, 5],
+      "description": "Kick up against a wall and hold a hollow line, adding ten seconds a week. Free, and your wrists will complain long before your shoulders do."
+    },
+    {
+      "title": "Orienteering in the park",
+      "source": "csv 55",
+      "tags": ["long-term", "weekend-blocks", "exertion", "outside", "in-nature", "solo", "social", "low-budget"],
+      "vector": [5, 7, 1, 9, 9, 7, 5],
+      "description": "A compass, a topographic map, and a set of control points to find in the right order. Local clubs run cheap events most weekends, and getting lost is part of the curriculum."
+    },
+    {
+      "title": "Speed cup stacking",
+      "source": "csv 56",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "solo", "low-budget"],
+      "vector": [2, 4, 1, 4, 1, 8, 6],
+      "description": "Learn the 3-3-3 and 3-6-3 sequences until your hands stop consulting your brain about them. A set of cups is under twenty pounds and the whole thing is gloriously pointless."
+    },
+    {
+      "title": "Cold brew coffee",
+      "source": "csv 57",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "solo", "low-budget"],
+      "vector": [2, 1, 3, 5, 1, 4, 1],
+      "description": "Coarse grounds, cold water, eighteen hours in the fridge, then strain it. No equipment beyond a jar and a sieve, and the result is stronger and far less bitter than you expect."
+    },
+    {
+      "title": "Read military history properly",
+      "source": "csv 58",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "solo", "free"],
+      "vector": [1, 1, 1, 8, 1, 5, 2],
+      "description": "Work through campaign histories that explain the logistics rather than just the battles, and follow the decisions instead of the outcomes. Library territory mostly, and it rewards taking notes."
+    },
+    {
+      "title": "Sketch buildings from a bench",
+      "source": "csv 59",
+      "tags": ["long-term", "1-2-hours-week", "inside", "outside", "at-home", "in-nature", "solo", "low-budget"],
+      "vector": [1, 3, 9, 3, 6, 5, 2],
+      "description": "Sit somewhere with a good roofline and draw what is actually there — the brick courses, the drainpipe, the window that is not quite straight. A pencil and a pad, and the weather decides how long you get.",
+      "note": "Vocabulary gap: the true setting is 'out in the town', which at-home/facility/in-nature cannot express. Tagged at-home + in-nature because both are real venues for it. Flagged in the review."
+    },
+    {
+      "title": "Hand-stitch a felt wallet",
+      "source": "csv 60",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "solo", "low-budget"],
+      "vector": [1, 2, 7, 3, 1, 6, 1],
+      "description": "Cut thick wool felt, mark your holes, and saddle-stitch with waxed thread until it holds together. Materials come to a few pounds and the result is a cardholder you will actually carry."
+    },
+    {
+      "title": "Build a cardboard automaton",
+      "source": "csv 61",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "solo", "low-budget"],
+      "vector": [2, 2, 9, 8, 1, 8, 3],
+      "description": "Cardboard, skewers and glue, arranged so that turning a crank makes something nod or flap. Almost free, genuinely clever, and the first mechanism that works properly is a small triumph."
+    },
+    {
+      "title": "Small engine repair",
+      "source": "csv 62",
+      "tags": ["long-term", "5-hours-week", "outside", "at-home", "solo", "low-budget"],
+      "vector": [1, 5, 2, 9, 4, 7, 3],
+      "description": "Buy a mower that will not start, work out whether it is fuel, spark or air, and fix it. Non-runners are cheap or free, and the diagnosis is more satisfying than the repair."
+    },
+    {
+      "title": "Classic car market research",
+      "source": "csv 63",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "solo", "free"],
+      "vector": [2, 1, 1, 10, 1, 6, 4],
+      "description": "Follow the auction results, learn which chassis numbers matter, and build a real view on what is undervalued. Free to research and extremely expensive to act on."
+    },
+    {
+      "title": "Antiquarian book collecting",
+      "source": "csv 64",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "facility", "solo", "investment-required"],
+      "vector": [3, 2, 2, 7, 1, 7, 3],
+      "description": "Learn to read a title page, spot a genuine first edition, and tell honest wear from damage. Fairs and junk shops keep the hunt cheap; the books you actually want will not be."
+    },
+    {
+      "title": "Sport lockpicking",
+      "source": "csv 65",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "solo", "low-budget"],
+      "vector": [1, 2, 2, 9, 1, 9, 4],
+      "description": "A clear practice padlock and a pick set, and the slow understanding of how pin tumblers actually fail. Legal on locks you own — and only on locks you own."
+    },
+    {
+      "title": "Amateur radio",
+      "source": "csv 66",
+      "tags": ["long-term", "5-hours-week", "inside", "outside", "at-home", "solo", "social", "investment-required"],
+      "vector": [6, 2, 3, 9, 3, 9, 4],
+      "description": "Study for the foundation licence, then build an antenna and talk to a stranger three countries away. The exam is cheap; the radio is where the money goes."
+    },
+    {
+      "title": "Kite surfing lessons",
+      "source": "csv 67",
+      "tags": ["long-term", "weekend-blocks", "exertion", "outside", "in-nature", "facility", "social", "investment-required"],
+      "vector": [5, 9, 2, 5, 10, 9, 10],
+      "description": "Start with a trainer kite on a field, then take proper lessons before you go anywhere near deep water. This is an expensive sport with a real learning curve, and teaching yourself is how people get hurt."
+    },
+    {
+      "title": "A glassblowing taster class",
+      "source": "csv 68",
+      "tags": ["quick-fix", "half-day", "long-term", "weekend-blocks", "exertion", "inside", "facility", "solo", "social", "investment-required"],
+      "vector": [5, 6, 8, 4, 1, 9, 6],
+      "description": "One studio session where you gather molten glass on the end of a pipe and make something pleasingly wobbly. Not cheap for a few hours, but there is no other way to find out whether the heat and the timing suit you."
+    },
+    {
+      "title": "Orchid cultivation",
+      "source": "csv 69",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "solo", "low-budget"],
+      "vector": [1, 2, 3, 6, 2, 6, 1],
+      "description": "Work out the light, humidity and watering rhythm that makes a moth orchid re-bloom instead of sulking. A supermarket plant costs a few pounds and the whole skill is in doing less than you think."
+    },
+    {
+      "title": "Historical European martial arts",
+      "source": "csv 70",
+      "tags": ["long-term", "5-hours-week", "exertion", "inside", "facility", "social", "investment-required"],
+      "vector": [8, 8, 2, 7, 1, 10, 8],
+      "description": "Learn longsword or rapier from the surviving manuscripts, at a club that will lend you a blunt to start with. Kit adds up if you stay, and the clubs are far friendlier than the swords make them sound."
+    },
+    {
+      "title": "Watchmaking and horology",
+      "source": "csv 71",
+      "tags": ["long-term", "5-hours-week", "inside", "at-home", "solo", "investment-required"],
+      "vector": [1, 1, 4, 10, 1, 9, 3],
+      "description": "Take a cheap mechanical movement apart, oil it, and get it running again without losing a screw into the carpet. Tools and a loupe are a real investment and the tolerances are unforgiving."
+    },
+    {
+      "title": "A blacksmithing taster day",
+      "source": "csv 72",
+      "tags": ["quick-fix", "half-day", "long-term", "weekend-blocks", "exertion", "inside", "outside", "facility", "solo", "social", "investment-required"],
+      "vector": [5, 9, 7, 4, 3, 9, 7],
+      "description": "A day at a forge, heating steel until it moves and hammering it into a hook or a knife. Introductory courses are widely available and priced like a good day out, which is exactly what it is."
+    },
+    {
+      "title": "Stand-up paddleboarding",
+      "source": "csv 73",
+      "tags": ["long-term", "1-2-hours-week", "exertion", "outside", "in-nature", "solo", "couple", "social", "investment-required"],
+      "vector": [4, 7, 1, 3, 10, 7, 5],
+      "description": "An inflatable board, a calm lake, and about ten minutes of falling in before it clicks. The board is the whole cost and it packs down into a rucksack."
+    },
+    {
+      "title": "Parkour, at a class",
+      "source": "csv 74",
+      "tags": ["long-term", "5-hours-week", "exertion", "inside", "facility", "social", "low-budget"],
+      "vector": [7, 10, 3, 5, 2, 9, 9],
+      "description": "Vaults, rolls and landings, learned on gym mats long before anything involving a wall. Find a coached session — this is the one where teaching yourself off videos goes badly."
+    },
+    {
+      "title": "Restore a vintage typewriter",
+      "source": "csv 75",
+      "tags": ["long-term", "1-2-hours-week", "inside", "at-home", "solo", "low-budget"],
+      "vector": [1, 3, 4, 7, 1, 7, 2],
+      "description": "Free a seized carriage, clean fifty years of grime off the typebars, and get it clicking again. Junk-shop machines are cheap and ribbon is easier to find than you would think."
+    },
+    {
+      "title": "Urban beekeeping",
+      "source": "csv 76",
+      "tags": ["long-term", "5-hours-week", "exertion", "outside", "at-home", "in-nature", "solo", "social", "investment-required"],
+      "vector": [4, 5, 2, 7, 8, 9, 5],
+      "description": "A hive on a roof or at the end of a garden, and a full year of learning before there is any honey. Real money up front, a proper time commitment, and you will need to check both the local rules and your neighbours."
+    },
+    {
+      "title": "Scuba certification",
+      "source": "csv 77",
+      "tags": ["long-term", "weekend-blocks", "exertion", "outside", "facility", "in-nature", "social", "investment-required"],
+      "vector": [8, 7, 1, 7, 9, 10, 8],
+      "description": "Pool sessions, then the theory, then open water with an instructor and a buddy. The course is a serious cost and the rule that matters most is that you never dive alone."
+    },
+    {
+      "title": "Block out your week on one page",
+      "source": "csv 78",
+      "tags": ["quick-fix", "1-hour", "inside", "at-home", "solo", "free"],
+      "vector": [1, 1, 2, 6, 1, 3, 2],
+      "description": "Draw the week as a grid and put deep work, admin and actual rest into it as blocks. Twenty minutes, and the useful part is seeing how little is left once sleep is on there."
+    },
+    {
+      "title": "Bake rosemary sea salt crackers",
+      "source": "csv 79",
+      "tags": ["quick-fix", "1-hour", "inside", "at-home", "solo", "low-budget"],
+      "vector": [2, 3, 5, 3, 1, 4, 2],
+      "description": "Roll the dough thinner than feels sensible, scatter salt and rosemary, and watch them closely for the last two minutes. Store-cupboard ingredients and about forty minutes start to finish."
+    },
+    {
+      "title": "Study old maps",
+      "source": "csv 80",
+      "tags": ["quick-fix", "1-hour", "inside", "at-home", "solo", "free"],
+      "vector": [1, 1, 2, 5, 1, 7, 2],
+      "description": "Open high-resolution scans of seventeenth-century world maps and work out what they got wrong and why. Free through the national library collections, and the sea monsters are load-bearing."
+    },
+    {
+      "title": "Identify trees by their bark",
+      "source": "csv 81",
+      "tags": ["quick-fix", "1-hour", "outside", "in-nature", "solo", "couple", "free"],
+      "vector": [2, 3, 1, 5, 9, 6, 1],
+      "description": "Walk a familiar bit of woodland and learn to tell oak, beech and birch apart without looking anything up. Free, and it permanently changes what a walk looks like."
+    },
+    {
+      "title": "Watch a film like a cinematographer",
+      "source": "csv 82",
+      "tags": ["quick-fix", "1-hour", "inside", "at-home", "solo", "couple", "free"],
+      "vector": [2, 1, 4, 6, 1, 5, 2],
+      "description": "Pick one scene you already know well and work out why it feels the way it does — the lens, the light, where the camera is standing. Free, and it ruins nothing and improves everything."
+    },
+    {
+      "title": "Learn Morse code",
+      "source": "csv 83",
+      "tags": ["quick-fix", "10-mins", "inside", "at-home", "solo", "free"],
+      "vector": [1, 1, 1, 5, 1, 7, 3],
+      "description": "Start with your own initials, then work up to short messages decoded by ear with a pen and paper. Free apps generate the audio, and it turns out to be more rhythmic than technical."
+    },
+    {
+      "title": "Repair a broken book spine",
+      "source": "csv 84",
+      "tags": ["quick-fix", "1-hour", "inside", "at-home", "solo", "low-budget"],
+      "vector": [1, 2, 4, 4, 1, 5, 1],
+      "description": "Neutral-pH glue, archival tape, and a careful hour reattaching a spine that has given up. The materials cost a few pounds and will fix a whole shelf's worth of books."
+    },
+    {
+      "title": "Sequence a playlist properly",
+      "source": "csv 85",
+      "tags": ["quick-fix", "1-hour", "inside", "at-home", "solo", "free"],
+      "vector": [2, 1, 7, 4, 1, 4, 2],
+      "description": "Order forty minutes of music the way an album is ordered — by key, by tempo, by what the previous track has earned. Free, and the gap between this and a shuffle is enormous."
+    },
+    {
+      "title": "Plot a running route worth running",
+      "source": "csv 86",
+      "tags": ["quick-fix", "1-hour", "inside", "at-home", "solo", "free"],
+      "vector": [1, 1, 2, 5, 3, 4, 2],
+      "description": "Use mapping software to build a five or ten kilometre loop that avoids the main roads and finishes near a bakery. Free, and the planning is genuinely half the pleasure."
+    },
+    {
+      "title": "Write with your other hand",
+      "source": "csv 87",
+      "tags": ["quick-fix", "10-mins", "inside", "at-home", "solo", "free"],
+      "vector": [1, 2, 3, 3, 1, 7, 2],
+      "description": "Do the shopping list, or a diary entry, with the hand you never use for anything. Free, briefly infuriating, and oddly good for the part of your brain that has gone quiet."
+    },
+    {
+      "title": "Play through a famous chess game",
+      "source": "csv 88",
+      "tags": ["quick-fix", "1-hour", "inside", "at-home", "solo", "free"],
+      "vector": [1, 1, 1, 10, 1, 5, 3],
+      "description": "Pull up the Immortal Game, or Fischer at thirteen, and step through it move by move guessing before you look. Free everywhere, and far more instructive than another game of blitz."
+    },
+    {
+      "title": "Turn bottles into vases",
+      "source": "csv 89",
+      "tags": ["quick-fix", "1-hour", "inside", "at-home", "solo", "free"],
+      "vector": [1, 2, 6, 2, 1, 4, 1],
+      "description": "Soak the labels off in warm water and oil, scrub the glue away, and put something from the garden in them. Free, and it takes an evening of roughly half your attention."
+    },
+    {
+      "title": "Clear out the camera roll",
+      "source": "csv 90",
+      "tags": ["quick-fix", "1-hour", "inside", "at-home", "solo", "free"],
+      "vector": [1, 1, 1, 2, 1, 1, 1],
+      "description": "Delete the eleven near-identical photos of the same thing, and empty the downloads folder while you are in there. Free, tedious, and the phone will thank you."
+    },
+    {
+      "title": "Put the radio on",
+      "source": "csv 91",
+      "tags": ["quick-fix", "10-mins", "1-hour", "inside", "at-home", "solo", "free"],
+      "vector": [1, 1, 1, 2, 1, 4, 2],
+      "description": "Live discussion on Radio 4, or the first episode of the narrative podcast someone keeps recommending. Free, and it counts — not everything has to be a project."
+    },
+    {
+      "title": "Write a quiz for the house",
+      "source": "csv 92",
+      "tags": ["quick-fix", "1-hour", "inside", "at-home", "couple", "social", "free"],
+      "vector": [8, 1, 6, 6, 1, 5, 5],
+      "description": "Fifteen questions across history, sport and whatever everyone argues about, pitched so that nobody scores zero. Free, an hour to write, and the arguments afterwards are the whole point."
+    },
+    {
+      "title": "Translate a news article line by line",
+      "source": "csv 93",
+      "tags": ["quick-fix", "1-hour", "inside", "at-home", "solo", "free"],
+      "vector": [1, 1, 2, 7, 1, 6, 2],
+      "description": "Take a short piece in the language you are learning and work through it properly with the dictionary open. Free, and it teaches you more idiom in an hour than an app manages in a week."
+    },
+    {
+      "title": "Three bullets on today's markets",
+      "source": "csv 94",
+      "tags": ["quick-fix", "10-mins", "inside", "at-home", "solo", "free"],
+      "vector": [1, 1, 2, 9, 1, 4, 3],
+      "description": "Read the front half of the FT and write three lines on what actually moved and why. Free with a library login, and doing it daily is the thing that makes it work."
+    },
+    {
+      "title": "Check the car's fluids",
+      "source": "csv 95",
+      "tags": ["quick-fix", "10-mins", "outside", "at-home", "solo", "free"],
+      "vector": [1, 3, 1, 4, 4, 3, 1],
+      "description": "Oil, coolant and screenwash, with the engine cold and the bonnet propped properly. Ten minutes, needs a car, and it is the cheapest breakdown you will ever avoid."
+    },
+    {
+      "title": "Sort the spice drawer",
+      "source": "csv 96",
+      "tags": ["quick-fix", "1-hour", "inside", "at-home", "solo", "free"],
+      "vector": [1, 2, 1, 2, 1, 1, 1],
+      "description": "Everything out, the drawer wiped, anything older than you can remember thrown away, and the rest in an order you will actually maintain. Free and disproportionately satisfying."
+    },
+    {
+      "title": "Learn the NATO alphabet",
+      "source": "csv 97",
+      "tags": ["quick-fix", "10-mins", "inside", "at-home", "solo", "free"],
+      "vector": [2, 1, 1, 3, 1, 4, 2],
+      "description": "Alpha through Zulu, learned well enough to spell your surname down a bad phone line without hesitating. Free, twenty minutes, and permanently useful."
+    },
+    {
+      "title": "Foam roll everything that hurts",
+      "source": "csv 98",
+      "tags": ["quick-fix", "1-hour", "inside", "at-home", "solo", "low-budget"],
+      "vector": [1, 4, 1, 2, 1, 2, 3],
+      "description": "Half an hour on a roller and a lacrosse ball, working through calves, quads and upper back. The kit is about fifteen pounds and the first pass is not enjoyable."
+    },
+    {
+      "title": "Tie a half-Windsor",
+      "source": "csv 99",
+      "tags": ["quick-fix", "10-mins", "inside", "at-home", "solo", "free"],
+      "vector": [1, 2, 2, 3, 1, 4, 2],
+      "description": "Stand at the mirror and tie it until the knot comes out symmetrical and the tip lands at your belt. Two minutes once it clicks, and it stays learned."
+    }
+  ],
+  "audit": [
+    {
+      "title": "Learn one card flourish",
+      "proposed": [
+        1,
+        3,
+        3,
+        4,
+        1,
+        6,
+        3
+      ],
+      "reason": "Creative 6→3 and Social 3→1: a flourish is a learned move, not an open-ended output, and it is practised alone in front of a mirror."
+    },
+    {
+      "title": "Cook from whatever is already in the fridge",
+      "proposed": [
+        3,
+        4,
+        7,
+        5,
+        1,
+        5,
+        3
+      ],
+      "reason": "Stimulation 5→3: improvising dinner is absorbed, not stakes. Creative 7 stands — this genuinely is open-ended making."
+    },
+    {
+      "title": "A walk with no destination",
+      "proposed": [
+        1,
+        4,
+        1,
+        1,
+        8,
+        3,
+        1
+      ],
+      "reason": "Energy 6→4 and Analytical 3→1: an aimless walk is light movement with nothing to solve. The rubric's 1 on Stimulation is exactly this."
+    },
+    {
+      "title": "Reset one single surface",
+      "proposed": [
+        1,
+        3,
+        1,
+        2,
+        1,
+        1,
+        1
+      ],
+      "reason": "Analytical 4→2: clearing one surface involves no problem-solving."
+    },
+    {
+      "title": "Ten minutes of mobility work",
+      "proposed": [
+        1,
+        4,
+        1,
+        2,
+        1,
+        2,
+        1
+      ],
+      "reason": "Energy 7→4 and Stimulation 3→1: mobility work is deliberately gentle and calming — nowhere near sweat-guaranteed."
+    },
+    {
+      "title": "Run a quiz round on whoever is nearby",
+      "proposed": [
+        9,
+        2,
+        3,
+        7,
+        1,
+        4,
+        5
+      ],
+      "reason": "Stimulation 7→5: a kitchen-table quiz is pleasantly engaging. The liveliness is already carried by Social 9."
+    },
+    {
+      "title": "Kickabout at the nearest bit of grass",
+      "proposed": [
+        8,
+        8,
+        1,
+        2,
+        8,
+        3,
+        5
+      ],
+      "reason": "Stimulation 7→5: a kickabout has no score and no stakes — that is what distinguishes it from a match."
+    },
+    {
+      "title": "Walk a street you have never walked down",
+      "proposed": [
+        5,
+        5,
+        1,
+        3,
+        9,
+        9,
+        3
+      ],
+      "reason": "Creative 4→1: nothing is made or expressed. The interest here is Novelty, which is already 9."
+    },
+    {
+      "title": "A board game short enough to actually finish",
+      "proposed": [
+        8,
+        2,
+        1,
+        6,
+        1,
+        4,
+        5
+      ],
+      "reason": "Creative 3→1: playing to someone else's rules makes nothing."
+    },
+    {
+      "title": "Knockabout on a public court",
+      "proposed": [
+        7,
+        8,
+        1,
+        3,
+        7,
+        3,
+        5
+      ],
+      "reason": "Stimulation 7→5: 'knockabout' is explicitly the non-competitive version."
+    },
+    {
+      "title": "Learn a two-player card game neither of you knows",
+      "proposed": [
+        8,
+        2,
+        1,
+        6,
+        1,
+        9,
+        5
+      ],
+      "reason": "Creative 3→1: learning rules makes nothing. Novelty 9 already carries what is interesting about it."
+    },
+    {
+      "title": "Blind taste test whatever is in the cupboard",
+      "proposed": [
+        8,
+        2,
+        1,
+        6,
+        1,
+        8,
+        5
+      ],
+      "reason": "Stimulation 9→5 and Creative 4→1. A cupboard taste test is a party game, not adrenaline — this was the clearest side-effect score in the catalogue, and it was one of only two Stimulation-dominant rows."
+    },
+    {
+      "title": "Spanish language practice",
+      "proposed": [
+        4,
+        2,
+        2,
+        7,
+        2,
+        8,
+        3
+      ],
+      "reason": "Social 6→4 and Stimulation 5→3: most practice is solo with an app, and study is engaging rather than intense."
+    },
+    {
+      "title": "Small-build woodworking",
+      "proposed": [
+        2,
+        5,
+        8,
+        5,
+        2,
+        5,
+        2
+      ],
+      "reason": "Stimulation 4→2: quiet absorbed making. Creative 8 stands."
+    },
+    {
+      "title": "Indoor bouldering",
+      "proposed": [
+        6,
+        9,
+        1,
+        6,
+        2,
+        6,
+        7
+      ],
+      "reason": "Creative 3→1: nothing is made — reading a route is Analytical, which is already 6. Stimulation stays high; the height and the fall are real."
+    },
+    {
+      "title": "Learning guitar",
+      "proposed": [
+        4,
+        3,
+        9,
+        5,
+        1,
+        5,
+        4
+      ],
+      "reason": "Stimulation 6→4: practising alone has no stakes. Analytical 4→5 for the theory and chord shapes that genuinely are a system."
+    },
+    {
+      "title": "Trail running and hillwalking",
+      "proposed": [
+        3,
+        9,
+        1,
+        3,
+        10,
+        6,
+        5
+      ],
+      "reason": "Stimulation 7→5: endurance rather than adrenaline. The effort is already Energy 9."
+    },
+    {
+      "title": "Build a small tool you actually use",
+      "proposed": [
+        1,
+        2,
+        6,
+        9,
+        1,
+        6,
+        3
+      ],
+      "reason": "Stimulation 5→3: solving a problem at a desk is absorbing, not intense."
+    },
+    {
+      "title": "Restoring a vintage bicycle",
+      "proposed": [
+        2,
+        5,
+        4,
+        7,
+        4,
+        5,
+        2
+      ],
+      "reason": "Creative 6→4 and Stimulation 4→2: restoration is making within rules — returning something to spec rather than open-ended creation."
+    },
+    {
+      "title": "Singing in a local choir",
+      "proposed": [
+        8,
+        4,
+        5,
+        4,
+        1,
+        6,
+        4
+      ],
+      "reason": "Creative 7→5 and Stimulation 6→4: you are performing someone else's arrangement. Analytical 2→4 because reading parts and holding harmony genuinely is a system."
+    },
+    {
+      "title": "Social dance classes",
+      "proposed": [
+        9,
+        7,
+        4,
+        4,
+        1,
+        7,
+        5
+      ],
+      "reason": "Creative 6→4 and Stimulation 8→5: a class teaches set steps, and the enjoyment is social rather than adrenal — Social is already 9."
+    },
+    {
+      "title": "Club road cycling",
+      "proposed": [
+        7,
+        9,
+        1,
+        4,
+        9,
+        4,
+        6
+      ],
+      "reason": "Stimulation 8→6: riding in a group at speed has genuine stakes, but less than the score implied relative to open-water swimming."
+    },
+    {
+      "title": "Geocaching",
+      "proposed": [
+        5,
+        6,
+        1,
+        7,
+        8,
+        7,
+        4
+      ],
+      "reason": "Creative 3→1, Novelty 10→7, Stimulation 6→4: nothing is made, and a hobby with millions of participants is not a world most people never touch."
+    },
+    {
+      "title": "Skateboarding at a public park",
+      "proposed": [
+        5,
+        8,
+        1,
+        3,
+        7,
+        6,
+        10
+      ],
+      "reason": "Creative 5→1. This is the row CLAUDE.md names: skating expresses style but makes nothing, and that phantom Creative 5 is what pushed it away from a corrected Stimulation purist. Stimulation 10 stands — the falls are real."
+    }
+  ]
+}

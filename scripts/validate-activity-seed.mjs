@@ -25,6 +25,7 @@ import {
   TIME_LADDER,
 } from "../lib/activityTags.ts";
 import { parseSeedActivities } from "./lib/parse-seed.mjs";
+import { formatCatalogueStats } from "./lib/catalogue-stats.mjs";
 import { QUICK_QUESTIONS, HOBBY_QUESTIONS, MIN_RESULTS } from "../lib/feasibilityQuestions.ts";
 import { satisfiesFilter } from "../lib/activityTags.ts";
 
@@ -98,6 +99,23 @@ if (unused.length) {
   console.log(`\nLegal but unused tags: ${unused.join(", ")}`);
   console.log("  (not a failure, but a tag nothing carries filters everything out)");
 }
+
+// --- Axis balance (DIAGNOSTIC, never fatal) --------------------------------
+//
+// Tags decide what is FEASIBLE; the vector decides what FITS. Everything above
+// checks the tags. This checks the other half: whether the catalogue's vectors
+// span enough of the 7-axis space to answer the users the quiz can produce.
+//
+// Not fatal, for the same reason coverage is not: a lopsided catalogue is a
+// content gap to fill, not a structural error in any row. Scored against
+// The 7-axis rubric in CLAUDE.md -- and note the rubric governs BOTH ends of
+// the match, so a drift here shows up as confidently wrong match percentages
+// rather than as an error anywhere.
+console.log(SEPARATOR);
+console.log("AXIS BALANCE (diagnostic - the vector half of the catalogue)");
+console.log("");
+formatCatalogueStats(rows).forEach((line) => console.log(line));
+console.log("");
 
 // --- Coverage report (DIAGNOSTIC, never fatal) -----------------------------
 //

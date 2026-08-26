@@ -526,20 +526,85 @@ below went unnoticed.
 
 ## Content pipeline — catalogue growth
 
-Full pipeline doctrine (topic map, anti-clone rules, wave protocol) lands with wave 1. Recorded here
-now because it is a **rubric** obligation rather than a pipeline one:
+Target: **~500 activities, 300 quick-fix and 200 long-term**, grown in reviewed waves. Wave 1 landed
+2026-08-26 and took the canonical seed from 37 to 134.
 
-⚠️ **Wave 1 must audit the existing activity vectors against the rubric above and propose corrections
-in its review file** — as proposals for review, not as silent edits. Those vectors predate the rubric
-and were authored by Claude, so they are seed data to correct rather than user decisions to preserve.
-The catalogue side of the comparison is worth exactly as much as the quiz side, and the quiz side is
-being rebuilt on this rubric; leaving 37 activity vectors scored by an older, unwritten standard
-would put a corrected quiz and an uncorrected catalogue on opposite ends of the same distance
-calculation.
+### The wave protocol — every wave, in this order
 
-Note the count: the **canonical seed has 37 rows** (20 quick-fix, 21 long-term, 4 carrying both).
-The live database still holds 33 until `supabase/step1-schema-rls-seed.sql` is re-run — see the
-budget-filter entry under **Recently completed**. Audit all 37; the SQL is the source of truth.
+1. **Tooling first, if anything is missing.** A wave that cannot be measured should not be authored.
+2. **Author into `data/waves/wave-N.json`** — one row per activity: title, tags, vector, description.
+   This is the single source of truth for the wave.
+3. **`node scripts/build-wave.mjs N`** renders `data/waves/wave-N-review.md`. **Then STOP for Owen's
+   veto pass.** Nothing touches the seed SQL or the database before that.
+4. **On approval**, put the struck titles in the wave file's `vetoed` array, re-render, then append
+   the survivors to `supabase/step1-schema-rls-seed.sql` and hand Owen **one idempotent SQL block**
+   (`node scripts/build-wave.mjs N --sql`). Commit.
+5. **Never run two waves without a review in between.**
+
+⚠️ **The review file and the SQL are rendered from the same JSON, deliberately.** There is no step
+where rows are retyped, so what Owen approves is byte-for-byte what reaches the database. Do not
+hand-edit the wave rows in the seed SQL — edit the wave file and regenerate, or the two drift apart
+and the review stops meaning anything.
+
+⚠️ **The SQL block needs TWO statements to be idempotent.** The seed's `insert ... where not exists
+(a.title = w.title)` only ever inserts, so vector corrections to existing rows need a match-by-title
+`update` beside it. Both are re-runnable.
+
+### Waves 2+ — draw from the idea bank, do not invent
+
+**`data/activity-idea-bank.csv`** (395 rows, 250 quick-fix / 145 long-term, 20 topics) is the source
+of ideas. Expand a chosen row's `concept` into a house-voice description; **generate new ideas only
+if the bank runs dry of a needed pathway**. Every other wave rule is unchanged: fuzzy dedupe,
+closed-vocabulary tags with exactly one cost tier, rubric-scored vectors, review file, Owen's
+approval, one SQL block.
+
+Roughly **65 per wave**, weighted toward the remaining gap. After wave 1 that is **~237 quick-fix and
+~123 long-term**.
+
+**The topic map**, drawn from evenly:
+
+| Quick-fix | Long-term |
+|---|---|
+| kitchen quick-wins · move-your-body · tidy-and-sort · learn-or-drill · observe-and-identify · social micro-acts · repair-and-restore · make-something-small · plan-and-dream · calm-and-recover | crafts & making · food drink & fermenting · growing things · sport & training arcs · strategy & mind games · collecting & culture · tech & maker · music & performance · outdoor pursuits · clubs community & volunteering |
+
+### Anti-clone rules — hard
+
+- **Max 2 entries per template family per wave** ("polish X", "memorise X", "organise X"…).
+  `build-wave.mjs` counts these and flags any family over the cap. ⚠️ The detector reads the first
+  word of the title, **and the titles are ours** — renaming `Build a blanket fort` to `Blanket fort`
+  to get under the cap is gaming the check, not passing it.
+- **Fuzzy-dedupe every candidate** against the whole existing catalogue and all prior waves.
+  Reported, never auto-dropped: a high score can be a real duplicate or just a shared word.
+- **5–8 entries per wave must be delightfully specific** — the biro-sketching tier: quirky, but
+  startable this week by an ordinary person in the UK.
+- **Nothing needing rare gear, animals, or licences.** Anything with real physical risk gets
+  find-a-class framing or gets cut. (Wave 1 examples: Olympic lifting, parkour and kite surfing are
+  all framed as coached; scuba is a certification arc.)
+
+### What wave 1 learned, worth not relearning
+
+- **The catalogue carried the same side-effect inflation the quiz did.** 24 of the 37 seeded vectors
+  needed correcting. The clearest was `Blind taste test whatever is in the cupboard` at Stimulation
+  9 — a party game, not adrenaline — which was one of only two Stimulation-dominant rows.
+- ⚠️ **Stimulation is the real content gap: 3 rows out of 134.** Social is thin too at 9%. The
+  curated keep list was overwhelmingly solo and calm, and correcting the fictional Stimulation
+  scores made the gap visible rather than causing it. **Waves 2+ should weight hard toward social
+  and high-stakes content.**
+- **Analytical is not "this is an intellectual activity".** Wave 1's first pass had Analytical
+  dominant on 40% of the wave because observation, memorisation and recall were being scored as
+  problem-solving. The rubric asks whether strategy, systems or numbers are *at the core*. 79 rows
+  were re-scored; it landed at 28%.
+- **Vocabulary gap, unresolved:** there is no setting tag for "out in the town". `Sketch buildings
+  from a bench` is tagged `at-home` + `in-nature`, which is a fudge. Not adding a tag — the doctrine
+  is that a tag no filter reads must not exist — but if waves 2+ bring more urban-outdoor
+  activities, this becomes a real hole in the hobby path's setting question.
+
+### The live database still lags
+
+The **canonical seed SQL is the source of truth** and holds 134 rows. The live database holds 33
+until both `supabase/step1-schema-rls-seed.sql` (for the 4 budget-filter rows) and
+`supabase/wave-1-activities.sql` (for wave 1's 97 inserts and 24 vector corrections) are run in the
+Supabase SQL editor. Both are idempotent.
 
 ## Personality quiz scoring
 
@@ -729,10 +794,14 @@ stays publicly readable with no write policy.
   Creative 1.13 for a Stimulation purist, so the uncorrected activity is pushed away by an axis
   that should never have separated them.
 
-  Note what did *not* move: 6 of 7 purists find their own axis in the top 3, exactly as before. The
-  headline count is flat while the underlying agreement got worse, which is the whole reason to
-  read `d=` and not just the pass count. The matcher is fine and the orderings are sensible.
-  **The fix is the wave 1 audit** — see **Content pipeline** — not another pass over the quiz.
+  **Corrected in the seed SQL by wave 1** (2026-08-26): 24 of the 37 rows were re-scored, including
+  skateboarding's phantom `Creative 5` → 1. ⚠️ **Still live in the database** until
+  `supabase/wave-1-activities.sql` is run — until then the deployed app is matching a corrected quiz
+  against an uncorrected catalogue.
+
+  Note what did *not* move: 6 of 7 purists find their own axis in the top 3, exactly as before, and
+  the Stimulation purist still sees none. That is now a **content** gap rather than a scoring one —
+  3 Stimulation-dominant rows out of 134 — and it belongs to waves 2+.
 - **Two ceiling gates are red, deliberately.** `Energy 6.88` and `Novelty 6.50` against a 7.0 gate.
   Not a scoring fault: a ceiling is the mean of the best option available per question, and Q3
   (spending £100) and Q4 (approaching a puzzle) contain no physical option, while Q1 (Saturday
