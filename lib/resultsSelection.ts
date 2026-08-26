@@ -1,6 +1,10 @@
 /**
- * How the results page assembles what it shows: the wildcard draw, and the
- * pool a reroll draws its replacement from.
+ * How the results page assembles what it shows: the wildcard draw.
+ *
+ * The reroll pool used to live here too. It moved to lib/rerollMachine.ts when
+ * rerolls became a deterministic queue owned by a reducer -- the pool is not a
+ * standalone list any more, it is state that only makes sense next to what is
+ * on screen and what has been discarded.
  *
  * Pure and composable for the same reason lib/matchActivities.ts is — no
  * fetching, no React, no Supabase. Both rules here have real edge cases
@@ -26,15 +30,6 @@
  * budget answer absolutely. One deliberately labelled random card is a
  * different thing from a ranked recommendation the user cannot act on.
  */
-
-/**
- * The reroll pool is ranks 4-8 of the ranked survivors, zero-indexed here as
- * slice(3, 8). SHARED by all three slots rather than one pool per card: five
- * replacements across three cards means the results visibly settle after about
- * five rerolls instead of churning forever.
- */
-export const REROLL_POOL_START = 3;
-export const REROLL_POOL_END = 8;
 
 /** Rows arrive from Supabase untyped; all this module needs is the uuid. */
 export interface HasId {
@@ -75,12 +70,4 @@ export function availableWildcards<T extends HasId>(
 ): T[] {
   const excluded = new Set(excludedIds);
   return pathwayPool.filter((activity) => !excluded.has(activity.id));
-}
-
-/**
- * Ranks 4-8 of the ranked survivors. Named ...From so it cannot be confused
- * with the caller's own `rerollPool` state, which is this list as it depletes.
- */
-export function rerollPoolFrom<T>(ordered: readonly T[]): T[] {
-  return ordered.slice(REROLL_POOL_START, REROLL_POOL_END);
 }

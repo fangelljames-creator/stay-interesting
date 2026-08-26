@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, SubmitEvent } from "react";
+import { useState, useEffect, useReducer, SubmitEvent } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import PersonalityQuiz from "@/components/PersonalityQuiz";
 import { readQuizSession, clearQuizSession, sessionUserVector, type QuizSession } from "@/lib/quizSession";
@@ -10,11 +10,13 @@ import {
   type FilterAction,
   type PathwayTag,
 } from "@/lib/activityTags";
+import { availableWildcards, drawRandom } from "@/lib/resultsSelection";
 import {
-  availableWildcards,
-  drawRandom,
-  rerollPoolFrom,
-} from "@/lib/resultsSelection";
+  rerollReducer,
+  rerollsRemaining,
+  resultCardsOf,
+  EMPTY_REROLL_STATE,
+} from "@/lib/rerollMachine";
 
 /**
  * Rotation penalty, expressed as a distance multiplier. Ranking is now by
@@ -80,19 +82,15 @@ export default function Home() {
   // Which constraints, if any, had to be bent to find anything. Surfaced on
   // the results so relaxation is never silent.
   const [relaxedConstraints, setRelaxedConstraints] = useState<string[]>([]);
-  // The results view, split into what each thing actually is. This used to be
-  // one `recommendations` array holding "the three, then the wildcard", which
-  // reroll would have had to mutate by position.
-  /** The ranked cards on screen now, at most MIN_RESULTS of them. */
-  const [shownActivities, setShownActivities] = useState<any[]>([]);
-  /** The wildcard row, decorated with its true match, or null if none is left. */
-  const [wildcard, setWildcard] = useState<any | null>(null);
-  /** Ranks 4-8, depleting as rerolls consume it. Shared by all three slots. */
-  const [rerollPool, setRerollPool] = useState<any[]>([]);
-  /** Pathway pool the budget answer permits. Fixed when the results are built. */
-  const [wildcardPool, setWildcardPool] = useState<any[]>([]);
-  /** Everything rerolled away. Nothing in here is ever shown again this run. */
-  const [discardedIds, setDiscardedIds] = useState<string[]>([]);
+  /**
+   * The whole results view, as ONE reducer. It was five useStates whose
+   * handlers read every value out of their closure, which meant two rerolls
+   * landing before a re-render both built from the same stale snapshot and the
+   * second silently undid the first. See lib/rerollMachine.ts.
+   */
+  const [results, dispatchResults] = useReducer(rerollReducer, EMPTY_REROLL_STATE);
+  const { shown: shownActivities, wildcard } = results;
+  const rerollsLeft = rerollsRemaining(results);
   const [isLoading, setIsLoading] = useState(false);
   
   // Activity ids are uuid strings (activities.id defaults to gen_random_uuid()),
@@ -216,18 +214,15 @@ export default function Home() {
   const activeQuiz = path === "bored" ? QUICK_QUESTIONS : HOBBY_QUESTIONS;
   const progress = path ? Math.round((currentStep / activeQuiz.length) * 100) : 0;
 
-  // The cards to render: the ranked ones, then the wildcard if one is left.
-  const resultCards = wildcard
-    ? [...shownActivities, { ...wildcard, isWildcard: true }]
-    : shownActivities;
+  const resultCards = resultCardsOf(results);
 
   // Whether a FRESH wildcard could still be drawn -- the current one is
-  // excluded because rerolling it discards it. False hides its reroll control.
-  const wildcardRerollAvailable =
+  // excluded because refreshing it discards it. False hides its control.
+  const wildcardRefreshAvailable =
     wildcard != null &&
-    availableWildcards(wildcardPool, [
+    availableWildcards(results.wildcardPool, [
       ...shownActivities.map((a) => a.id),
-      ...discardedIds,
+      ...results.discarded,
       wildcard.id,
     ]).length > 0;
 
@@ -364,23 +359,21 @@ export default function Home() {
     // The only rows it will not return are the cards already on screen and
     // anything rerolled away. The card is labelled to say exactly this; if a
     // filter is ever put back, the label has to change with it.
-    setShownActivities(topMatches);
-    setRerollPool(rerollPoolFrom(ordered));
-    setWildcardPool(pool);
-    setDiscardedIds([]);
-    setWildcard(
-      decorateWildcard(drawRandom(availableWildcards(pool, topMatchIds)), userVector)
-    );
+    // ONE dispatch rather than five setters. The reroll queue, the exclusions
+    // and the counter are all derived inside initRerollState, so there is no
+    // window where some of the results state is new and some is old.
+    dispatchResults({
+      type: "init",
+      ordered,
+      wildcard: decorateWildcard(drawRandom(availableWildcards(pool, topMatchIds)), userVector),
+      wildcardPool: pool,
+    });
     setIsLoading(false);
   };
 
   /** Everything the results view owns. Every way back out clears all of it. */
   const resetResults = () => {
-    setShownActivities([]);
-    setWildcard(null);
-    setRerollPool([]);
-    setWildcardPool([]);
-    setDiscardedIds([]);
+    dispatchResults({ type: "reset" });
     setRelaxedConstraints([]);
   };
 
@@ -390,57 +383,24 @@ export default function Home() {
   /**
    * Reroll one ranked card.
    *
-   * PERMANENT for this run: the card is discarded and never comes back, as a
-   * ranked card or as a wildcard. The replacement comes out of a pool SHARED by
-   * all three slots (ranks 4-8), so a healthy pool gives about five rerolls in
-   * total and then the results settle. A thinner pool gives fewer, and the
-   * control disappears rather than sitting there dead.
+   * DELIBERATELY JUST A DISPATCH. All the logic lives in the reducer, which
+   * reads only from the state it is handed, so two of these landing in the
+   * same batch consume ranks 4 then 5 in order rather than fighting over one
+   * stale snapshot. Nothing here may read results state from the closure.
    */
-  const rerollCard = (index: number) => {
-    const outgoing = shownActivities[index];
-    if (!outgoing) return;
-
-    const replacement = drawRandom(rerollPool);
-    if (!replacement) return;
-
-    const nextShown = [...shownActivities];
-    nextShown[index] = replacement;
-    const nextDiscarded = [...discardedIds, outgoing.id];
-
-    setShownActivities(nextShown);
-    setRerollPool(rerollPool.filter((a) => a.id !== replacement.id));
-    setDiscardedIds(nextDiscarded);
-
-    // A rank 4-8 replacement can be the very row currently sitting as the
-    // wildcard. Redraw the wildcard rather than skipping that row in the pool:
-    // skipping it would quietly cost the user one of their five rerolls.
-    if (wildcard && wildcard.id === replacement.id) {
-      const excluded = [...nextShown.map((a) => a.id), ...nextDiscarded];
-      setWildcard(
-        decorateWildcard(
-          drawRandom(availableWildcards(wildcardPool, excluded)),
-          currentUserVector()
-        )
-      );
-    }
-  };
+  const rerollCard = (index: number) => dispatchResults({ type: "reroll", index });
 
   /**
-   * Draw a fresh wildcard under the same rule. The one on screen is discarded
-   * for good, so the wildcard's own pool shrinks with each roll; when nothing
-   * eligible is left the card stops rendering.
+   * The wildcard's own refresh, unchanged in behaviour: independent of the
+   * shared reroll counter, random, and obeying nothing but "not already on
+   * screen and not already discarded". Moved into the reducer only so it
+   * cannot race the ranked cards.
    */
-  const rerollWildcard = () => {
-    if (!wildcard) return;
-
-    const nextDiscarded = [...discardedIds, wildcard.id];
-    setDiscardedIds(nextDiscarded);
-
-    const excluded = [...shownActivities.map((a) => a.id), ...nextDiscarded];
-    setWildcard(
-      decorateWildcard(drawRandom(availableWildcards(wildcardPool, excluded)), currentUserVector())
-    );
-  };
+  const refreshWildcard = () =>
+    dispatchResults({
+      type: "refreshWildcard",
+      decorate: (a) => decorateWildcard(a, currentUserVector()),
+    });
 
   /** Enter the feasibility questions for a pathway, from a clean slate. */
   const choosePath = (chosen: "bored" | "hobby") => {
@@ -719,6 +679,23 @@ export default function Home() {
               </div>
             ) : (
               <div className="space-y-5">
+                {/*
+                  ONE SHARED COUNTER for all three ranked cards. It exists
+                  because the reroll pool is usually smaller than five: the
+                  relaxation ladder stops at MIN_RESULTS (3) and never tries to
+                  reach the 8 survivors a full pool needs, so most answer sets
+                  start with one or two rerolls and many with none. Three
+                  buttons and no number was a promise the state could not keep.
+                */}
+                {rerollsLeft > 0 && (
+                  <p className="text-center text-sm font-semibold text-slate-500">
+                    {rerollsLeft} reroll{rerollsLeft === 1 ? "" : "s"} remaining
+                    <span className="font-normal text-slate-400">
+                      {" "}— shared across the three matches
+                    </span>
+                  </p>
+                )}
+
                 {shownActivities.length === 0 && (
                   <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 shadow-sm">
                     <p className="text-slate-800 font-bold text-lg mb-2">Nothing fits, even after bending what we could.</p>
@@ -764,19 +741,30 @@ export default function Home() {
                             {getMedalText(index, activity.isWildcard)}
                           </span>
                           
-                          {(activity.isWildcard ? wildcardRerollAvailable : rerollPool.length > 0) && (
+                          {/*
+                            REMOVED, not disabled, when the counter hits 0 --
+                            and all three go together, because they share one
+                            counter. The wildcard is not part of this system:
+                            it keeps its own independent refresh below, which
+                            costs no reroll.
+                          */}
+                          {!activity.isWildcard && rerollsLeft > 0 && (
                             <button
-                              onClick={() =>
-                                activity.isWildcard ? rerollWildcard() : rerollCard(index)
-                              }
-                              title={
-                                activity.isWildcard
-                                  ? "Draw another one at random. This one will not come back."
-                                  : "Swap this one out for good"
-                              }
+                              onClick={() => rerollCard(index)}
+                              title={`Swap this one out for good. ${rerollsLeft} reroll${rerollsLeft === 1 ? "" : "s"} left.`}
                               className="border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-900 text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap transition-colors"
                             >
                               ↻ Reroll
+                            </button>
+                          )}
+
+                          {activity.isWildcard && wildcardRefreshAvailable && (
+                            <button
+                              onClick={refreshWildcard}
+                              title="Draw another one at random. This one will not come back."
+                              className="border border-purple-200 bg-purple-50 text-purple-600 hover:bg-purple-100 hover:text-purple-900 text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap transition-colors"
+                            >
+                              ↻ Another
                             </button>
                           )}
 
