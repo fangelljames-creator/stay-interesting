@@ -116,6 +116,11 @@ export const personalityQuestions: QuizQuestion[] = [
         description: "Find whoever has dealt with exactly this before.",
         vector: [8, 2, 2, 5, 2, 3, 4],
       },
+      {
+        label: "Sketch your way in",
+        description: "Diagram it, mock it up, build a rough version — thinking with your hands until the shape of the answer appears.",
+        vector: [1, 3, 8, 6, 1, 3, 3],
+      },
     ],
   },
   {
