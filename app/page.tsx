@@ -7,27 +7,20 @@ import TasteRadar from "@/components/TasteRadar";
 import { determinePersonalityType } from "@/lib/personalityTypes";
 import { readQuizSession, clearQuizSession, sessionUserVector, type QuizSession } from "@/lib/quizSession";
 import { rankActivities } from "@/lib/matchActivities";
-import {
-  satisfiesFilter,
-  type FilterAction,
-  type PathwayTag,
-} from "@/lib/activityTags";
+import { type FilterAction, type PathwayTag } from "@/lib/activityTags";
 import { availableWildcards, drawRandom } from "@/lib/resultsSelection";
+import {
+  applyRotation,
+  constraintsFrom,
+  poolFor,
+  selectSurvivors,
+} from "@/lib/selectionPipeline";
 import {
   rerollReducer,
   rerollsRemaining,
   resultCardsOf,
   EMPTY_REROLL_STATE,
 } from "@/lib/rerollMachine";
-
-/**
- * Rotation penalty, expressed as a distance multiplier. Ranking is now by
- * Euclidean distance where LOWER is better, so pushing a recently-shown
- * activity down means multiplying its distance rather than shrinking a score.
- * Applied to a sort key only -- the matchPercent on the card stays the true
- * one, so the number shown never lies about the fit.
- */
-const ROTATION_DISTANCE_PENALTY = 1.35;
 
 /**
  * The funnel, in order. Every visit walks hero -> personality quiz ->
@@ -70,9 +63,7 @@ function decorateWildcard(activity: any, userVector: number[] | null) {
 import {
   QUICK_QUESTIONS,
   HOBBY_QUESTIONS,
-  RELAXATION_STEPS,
   MIN_RESULTS,
-  widenTime,
   type FeasibilityQuestion,
 } from "@/lib/feasibilityQuestions";
 
@@ -226,6 +217,12 @@ export default function Home() {
 
   const resultCards = resultCardsOf(results);
 
+  // The profile behind the ranking, for the card at the top of the results.
+  // Null when storage is blocked and there is no session — the same condition
+  // that leaves the results unranked, so the card and the ordering agree about
+  // whether a vector exists at all.
+  const profile = quizSession ? determinePersonalityType(quizSession.totals) : null;
+
   // Whether a FRESH wildcard could still be drawn -- the current one is
   // excluded because refreshing it discards it. False hides its control.
   const wildcardRefreshAvailable =
@@ -281,51 +278,16 @@ export default function Home() {
       return;
     }
 
-    const pool = activities.filter((a) => a.tags?.includes(pathwayTag));
-
-    // Pair every answer with the constraint its question governs, so
-    // relaxation knows what each one is.
-    let constraints = questions.map((question, index) => ({
-      kind: question.constraint,
-      action: answers[index] ?? ({ kind: "none" } as FilterAction),
-    }));
-
-    const applyAll = (candidates: any[]) =>
-      candidates.filter((a) =>
-        constraints.every((c) => satisfiesFilter(a.tags ?? [], c.action))
-      );
-
-    let survivors = applyAll(pool);
-
-    // GRACEFUL RELAXATION. Bend one thing at a time, in a fixed order, and
-    // only far enough to reach MIN_RESULTS. Cost and company are never in
-    // RELAXATION_STEPS, so they cannot be bent here however empty the pool is.
-    const bent: string[] = [];
-    for (const step of RELAXATION_STEPS) {
-      if (survivors.length >= MIN_RESULTS) break;
-
-      let changedSomething = false;
-      constraints = constraints.map((c) => {
-        // An answer that already filters nothing cannot be relaxed further,
-        // and must not be reported as though it had been.
-        if (!step.kinds.includes(c.kind) || c.action.kind === "none") return c;
-
-        if (c.kind === "time") {
-          const widened = widenTime(c.action, pathwayTag);
-          if (!widened) return c;
-          changedSomething = true;
-          return { ...c, action: widened };
-        }
-
-        changedSomething = true;
-        return { ...c, action: { kind: "none" } as FilterAction };
-      });
-
-      if (changedSomething) {
-        bent.push(step.label);
-        survivors = applyAll(pool);
-      }
-    }
+    // The pathway filter, the hard filters and the relaxation ladder all live
+    // in lib/selectionPipeline.ts now. They used to sit inline here, which meant
+    // no dev script could reach them — the ladder in particular had never been
+    // checked by anything. Behaviour is unchanged; this is the same code, moved.
+    const pool = poolFor(activities, pathwayTag);
+    const { survivors, bent } = selectSurvivors(
+      pool,
+      constraintsFrom(questions, answers),
+      pathwayTag
+    );
     setRelaxedConstraints(bent);
 
     // Rotation: remember what was shown last time so it can be pushed down.
@@ -342,12 +304,7 @@ export default function Home() {
 
     let ordered;
     if (userVector) {
-      const ranked = rankActivities(userVector, survivors);
-      // The penalty moves the SORT KEY only. matchPercent on the card stays
-      // the true distance, so the number never lies to make rotation work.
-      const sortKey = (a: (typeof ranked)[number]) =>
-        recentShownIds.includes(a.id) ? a.distance * ROTATION_DISTANCE_PENALTY : a.distance;
-      ordered = [...ranked].sort((a, b) => sortKey(a) - sortKey(b));
+      ordered = applyRotation(rankActivities(userVector, survivors), recentShownIds);
     } else {
       // No vector: sessionStorage is blocked, so writeQuizSession failed
       // silently. Nothing can rank, so show the feasible set unranked and let
@@ -761,6 +718,42 @@ export default function Home() {
         {stage === "results" && (
           <div className="space-y-6 text-left animate-in fade-in slide-in-from-bottom-4 duration-500">
             <h2 className="text-3xl font-bold text-slate-900 text-center">Your Curated Results</h2>
+
+            {/*
+              WHY THE PROFILE IS REPEATED HERE. The user met their type once, on
+              the card at the end of the personality quiz, and then answered
+              nine more questions and changed pathway at least once before
+              arriving. By the time the matches appear, the thing doing the
+              ranking has scrolled a long way out of sight — and every card
+              below carries a match percentage measured against exactly this
+              shape. Showing it beside the results is what makes those numbers
+              mean something.
+
+              Rendered only when there is a session: with storage blocked there
+              is no vector, nothing is ranked, and the banner below says so.
+              Claiming a personality type in that state would be inventing one.
+            */}
+            {quizSession && profile && (
+              <div className="flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-7 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
+                <div className="shrink-0 self-center">
+                  <TasteRadar
+                    mode="final"
+                    vector={sessionUserVector(quizSession)}
+                    highlightAxes={profile.axes}
+                    size={210}
+                  />
+                </div>
+                <div className="min-w-0 flex-1 text-center sm:text-left">
+                  <p className="text-xs font-bold uppercase tracking-wider text-indigo-500 mb-1">
+                    Ranked against
+                  </p>
+                  <h3 className="text-2xl font-extrabold text-slate-900 leading-tight mb-2">
+                    {profile.title}
+                  </h3>
+                  <p className="text-slate-600 leading-relaxed">{profile.description}</p>
+                </div>
+              </div>
+            )}
 
             {relaxedConstraints.length > 0 && shownActivities.length > 0 && (
               <p className="text-center text-sm text-sky-800 bg-sky-50 border border-sky-200 rounded-xl px-4 py-3">

@@ -35,13 +35,15 @@ up, log in, take a 7-axis personality quiz, and save activities to custom lists.
 - `lib/` — Supabase client, imported as `@/lib/supabaseClient` (the `@/*` → `./*` alias is in
   `tsconfig.json`) (verified). Also the pure logic modules: `matchActivities.ts` (ranking),
   `activityTags.ts` (the vocabulary), `feasibilityQuestions.ts`, `quizSession.ts`,
-  `resultsSelection.ts` (the wildcard draw), `rerollMachine.ts` (the results reducer: the
-  deterministic reroll queue, the shared counter, and the wildcard refresh), `radarGeometry.ts`
-  (vector → SVG coordinates) and `personalityTypes.ts` (the profile argmax). Sibling imports in
+  `resultsSelection.ts` (the wildcard draw), `selectionPipeline.ts` (the pathway filter, the
+  hard filters, the relaxation ladder and the rotation penalty), `rerollMachine.ts` (the results
+  reducer: the deterministic reroll queue, the shared counter, and the wildcard refresh),
+  `radarGeometry.ts` (vector → SVG coordinates) and `personalityTypes.ts` (the 15-type
+  classifier and its type table). Sibling imports in
   `lib/` use the explicit `./name.ts` extension so the dev scripts can import them under Node.
-- `scripts/` — dev-only analysis tools, not part of the build. Five of them:
+- `scripts/` — dev-only analysis tools, not part of the build. Six of them:
   `validate-activity-seed.mjs`, `verify-activity-matching.mjs`, `verify-results-selection.mjs`,
-  `verify-taste-radar.mjs`, `analyze-quiz-balance.mjs`
+  `verify-taste-radar.mjs`, `analyze-quiz-balance.mjs`, `audit-activity-reachability.mjs`
 - `supabase/` — SQL to paste into the Supabase SQL editor. Not run by any CLI or migration
   tool; these are hand-run scripts, written to be idempotent so re-running is safe.
 
@@ -373,12 +375,10 @@ which point starvation largely evaporates on its own.
   `react-hooks/purity`.
 - The CTA takes an optional `onContinue`; without one it routes to `/`. That keeps
   `app/quiz/page.tsx` a server component.
-- **The profile argmax now lives in `lib/personalityTypes.ts`**, moved verbatim out of the
-  component 2026-08-26 because the returning-visitor banner on `app/page.tsx` needs the title from a
-  stored session. Nothing about the judgement changed. ⚠️ Note the consequence for the balance
-  script: the reason it mirrors the argmax by hand is that the function used to sit inside a
-  `"use client"` component. **It no longer does, so the script could import the real one.** Left
-  alone on the `landing-flow` branch only because that script was out of its scope.
+- **The profile classifier lives in `lib/personalityTypes.ts`**, moved out of the component
+  2026-08-26 because the returning-visitor banner on `app/page.tsx` needs the title from a stored
+  session. It was a seven-way argmax then; it is the 15-type mechanism now — see **The 15
+  personality types**. The balance script **imports it**, and no longer mirrors anything.
 - **A `building`-mode `TasteRadar` sits beside the question**, redrawing after every answer. Its
   vector is derived from the existing `selectedVectors` state — `totalsFrom` then
   `userVectorFromQuizTotals`, the same two functions the session write uses — so a **skip** reshapes
@@ -396,9 +396,25 @@ implementation detail they never learn about.
 
 | Mode | Where | Treatment |
 |---|---|---|
-| `demo` | the hero | max 320px, labelled, autoplaying four example shapes on a 2.6s loop |
+| `demo` | the hero | max 320px, labelled, autoplaying **all 15 personality archetypes** on a 2s loop |
 | `building` | beside each quiz question; the returning banner | max 132px (72 in the banner), unlabelled, quiet |
-| `final` | the profile card | max 300px, labelled, vertex dots |
+| `final` | the profile card; the results type card | max 300px, labelled, vertex dots, optional axis highlight |
+
+⚠️ **The hero's shapes are MEASURED, not illustrative** (changed 2026-08-27). They used to be four
+hand-written vectors captioned with four of the seven real type names — shapes nobody could ever be
+given, standing in for a taxonomy both larger than the demo implied and unrelated to it. Every one
+is now a type's `archetypeTotals`: the most type-defining answer path the quiz can actually produce.
+A visitor watching the hero is watching real outputs of the thing they are about to do.
+
+⚠️ **No vector on the hero may be hand-tuned.** If two shapes read as near-twins, that is the
+taxonomy reporting a real resemblance and the remedy is the play order or the taxonomy — never an
+edited vector, which would put a polygon on the landing page the quiz behind it cannot produce.
+Section (g5) of `analyze-quiz-balance.mjs` measures every resemblance.
+
+⚠️ **The full cycle is 30 seconds**, so a typical visitor sees four or five of the 15. That is
+arithmetic rather than a defect: the hero's job is to show that the chart measures something about
+you, which one morph already does. Shortening the interval to fit all 15 into a glance makes each
+shape too brief to read.
 
 ⚠️ **`mode` controls PRESENTATION, not where the data comes from.** The returning banner passes a
 settled vector to `building` because it wants the small treatment, not because anything is still
@@ -544,6 +560,10 @@ Target: **~500 activities, 300 quick-fix and 200 long-term**, grown in reviewed 
    the survivors to `supabase/step1-schema-rls-seed.sql` and hand Owen **one idempotent SQL block**
    (`node scripts/build-wave.mjs N --sql`). Commit.
 5. **Never run two waves without a review in between.**
+6. **Run `node scripts/audit-activity-reachability.mjs` after the wave lands.** See
+   **Activity reachability** below. Starvation and darkness are both functions of pool size and
+   pool shape, so every wave moves them — and a row that goes dark does so silently: nothing
+   errors, nothing warns, the activity simply stops being recommended.
 
 ⚠️ **The review file and the SQL are rendered from the same JSON, deliberately.** There is no step
 where rows are retyped, so what Owen approves is byte-for-byte what reaches the database. Do not
@@ -626,10 +646,217 @@ from public.activities;
 Both `supabase/step1-schema-rls-seed.sql` and `supabase/wave-1-activities.sql` are idempotent, so
 re-running either is safe if the count comes back short.
 
+## The 15 personality types — `lib/personalityTypes.ts`
+
+Added 2026-08-27 (branch `personality-types`). Replaces the seven-way switch on the dominant axis.
+
+**Seven pure axes, seven named hybrids, one All-Rounder.** The old profile discarded the second
+axis entirely: someone at Analytical 52 / Novelty 50 got the same card as someone at Analytical 52 /
+Novelty 13, and the thing that actually distinguished them was thrown away.
+
+### The rule, in the order the cases are tested
+
+```
+1. top1 - min  <= F  ->  The All-Rounder
+2. top1 - top2 <= H  and the unordered {top1, top2} pair is NAMED  ->  that hybrid
+3. otherwise         ->  the pure dominant axis
+```
+
+**`H = 3`, `F = 8`, on the RAW SUM scale.** Both were measured, not chosen because they felt right —
+section (g) of `scripts/analyze-quiz-balance.mjs` sweeps every candidate across the full
+81,920-path walk and prints what each does to all 15 shares.
+
+⚠️ **THE THRESHOLDS LIVE ON THE RAW-SUM SCALE, WHICH IS A FUNCTION OF THE QUESTION COUNT.** Eight
+questions today. Adding a ninth silently changes what H and F mean — both have to be re-measured,
+not carried over.
+
+**Why H = 3.** H is the dial between mostly-pure and mostly-hybrid: 23.1% hybrid at H=2 up to 42.6%
+at H=5. Three keeps every type between 1.4% and 18% of paths, and it is the largest value at which
+pure Stimulation — already the thinnest axis in the catalogue at 3 rows of 134 — holds 3.79% rather
+than being swallowed by its own hybrids. At H=5 it falls to 2.20%.
+
+**Why F = 8.** F does one thing: it sets the All-Rounder's share, taking from everything else
+proportionally. 8 puts it at 1.40% (1,144 of 81,920) — rare enough to land as a real finding,
+common enough that the copy is not written for nobody. F=6 gives 0.32%, F=10 gives 3.77%.
+
+**The seven named pairs, in frequency order**, and ⚠️ **chosen by frequency, not by which sounded
+good** — they are simply the most common top-two pairings the quiz produces, which is what stops
+the taxonomy containing a type nobody can reach:
+
+| pair | title | share |
+|---|---|---|
+| Social + Novelty | The Group Chat Instigator | 6.62% |
+| Analytical + Novelty | The Rabbit-Holer | 5.35% |
+| Social + Stimulation | The Games Night Menace | 4.62% |
+| Novelty + Stimulation | The Say-Yes-First | 3.97% |
+| Social + Analytical | The League Secretary | 3.81% |
+| Energy + Stimulation | The Hard Session | 3.15% |
+| Outdoors + Novelty | The Detour-Taker | 3.06% |
+
+The seventh slot was a genuine tie — Outdoors + Novelty and Social + Energy sit 27 paths apart out
+of 81,920 — and went to Outdoors + Novelty on the grounds that it is the only candidate carrying
+Outdoors, so all seven axes appear somewhere in the hybrid set.
+
+⚠️ **ONLY THE TOP-TWO PAIR IS CONSULTED.** If `{top1, top2}` has no name but `{top1, top3}` does and
+is also within H, the answer is the pure type. That keeps "your close second" meaning the actual
+second. If a named hybrid ever becomes unreachable, widening to "the highest-scoring named partner
+within H" is the lever — but the gate will say so first.
+
+⚠️ **`classifyTotals` TAKES ITS CONFIG AS AN ARGUMENT, and that is load-bearing.** Choosing H and F
+is a measurement problem, so the sweep has to run the shipping rule against non-shipping
+thresholds. Parameterising it is what lets the script import the real classifier instead of
+mirroring it — see **Personality quiz scoring** for why a mirror was untenable here.
+
+### The archetypes — what the hero draws
+
+Every type carries `archetypeTotals`: the single most type-defining vector the quiz can produce for
+it, as **raw sums**. Section (g4b) of the balance script computes them and prints them paste-ready.
+
+⚠️ **THE SEARCH IS CONSTRAINED TO PATHS THAT ACTUALLY CLASSIFY AS THAT TYPE**, and leaving that
+constraint out is a live trap that was hit during the build. The unconstrained "largest margin"
+search knows nothing about H, so it can return a path whose top two are further apart than H
+allows — the Novelty + Stimulation winner was exactly that, top two 4 apart against H = 3, which
+the real classifier calls pure Novelty. On the hero that is a shape advertised under a name the
+quiz never produces it for.
+
+⚠️ **Raw sums, not averages, and that matters twice.** The radar normalises before drawing, so the
+scale is irrelevant to the picture — but the gate feeds these straight back through
+`determinePersonalityType`, and H and F live on the raw-sum scale. Averaged, that check would
+silently compare against the wrong thresholds.
+
+### ⚠️ The voice standard — the standing rule for all user-facing personality text
+
+- **2–3 sentences.**
+- **Exactly one** concrete, picturable scene.
+- **Exactly one** gentle cost or shadow clause.
+- **British-casual** register.
+- **Banned:** "thrive", "whether it's", "deep satisfaction", "unleash", "dive into", "passion for",
+  consecutive sentences opening with "You", and **any claim the type's own axes do not support**.
+
+That last clause does the real work, and it is the one no script can check. The Detour-Taker sits at
+Energy 18, so its copy cannot promise anything strenuous however well it would read; The League
+Secretary sits at Outdoors 11, so nothing outdoors. Section (h) of the balance script reports the
+mechanical checks — banned phrases, sentence count, consecutive "You" — as **non-fatal notes**,
+because the copy is Owen's and his edits are final. A gate that failed the build over his prose
+would be the wrong instrument.
+
+The two exemplars that set the bar, both of which became real types:
+
+> **The Rabbit-Holer** (Analytical + Novelty): "You don't have hobbies so much as current
+> investigations. One documentary and suddenly it's 1 a.m., you're fourteen tabs deep, and you could
+> give a short talk on Victorian canal law. The catch: last month's obsession is already gathering
+> dust behind you."
+
+> **The Games Night Menace** (Social + Stimulation): "You'd never miss a games night — mostly
+> because you intend to win it. You like your evenings loud, your scores kept properly, and your
+> friends slightly competitive-afraid. Losing gracefully is a skill you're still, technically,
+> developing."
+
+⚠️ Note the second exemplar opens two consecutive sentences with "You", which its own standard bans.
+It is Owen's copy, left exactly as written, and the script reports the clash rather than failing on
+it. Recorded here so nobody "fixes" it silently.
+
+### Where the type appears
+
+Three places, all reading the same table:
+
+- **The profile card** at the end of the quiz — `components/PersonalityQuiz.tsx`, large radar
+  beside title and copy.
+- **The results page** — a card above the matches, under the eyebrow "Ranked against". Deliberate
+  repetition: the user met their type, then answered nine more feasibility questions, and by the
+  time the matches appear the profile that produced every match percentage has scrolled out of
+  sight. Rendered **only when there is a session** — with storage blocked there is no vector,
+  nothing is ranked, and claiming a personality type would be inventing one.
+- **The returning-visitor banner** on the chooser — title only.
+
+`TasteRadar` gained `highlightAxes`, honoured in `final` mode only: the contributing axes get a
+heavier label in the accent colour and a slightly larger vertex dot. Two for a hybrid, one for a
+pure type, none for the All-Rounder. ⚠️ **Emphasis, never information** — no number appears, and the
+polygon is exactly the polygon it would be without it.
+
+## The selection pipeline — `lib/selectionPipeline.ts`
+
+Added 2026-08-27. The pathway filter, the hard filters, the **graceful relaxation ladder** and the
+rotation penalty, moved verbatim out of `findMatches` in `app/page.tsx`.
+
+⚠️ **A MOVE, NOT A REWRITE.** Nothing about the behaviour changed. `app/page.tsx` keeps the Supabase
+fetch and the `sessionStorage` reads and calls into this.
+
+**Why it moved.** `app/page.tsx` is `"use client"`, uses `@/` aliases and contains JSX, so no dev
+script can import a line of it — and the relaxation ladder lived in the middle of it. The one piece
+of logic deciding what a user is allowed to see had never been checked by anything, and
+`verify-results-selection.mjs` says so outright: it deliberately does not re-implement relaxation,
+so its pool sizes are pre-relaxation and pessimistic. The reachability audit cannot be written
+without the ladder at all, and hand-copying it would have produced an audit of a pipeline that is
+not the one that runs.
+
+⚠️ **Three details a well-meaning rewrite gets wrong**, all of which change the results:
+
+1. **Each pass re-filters `pool`, never the shrinking `survivors`.** Relaxing has to be able to
+   bring rows back; re-filtering survivors can only remove more.
+2. **Constraints mutate cumulatively** across ladder steps. Bending place and then energy leaves
+   both bent.
+3. **A `widenTime` returning `null` does not count as a change**, so the step pushes no label.
+   Relaxation is disclosed to the user by name, and claiming to have bent something already at the
+   top of the ladder is a lie in the copy.
+
+Side effect worth knowing: the pre-existing eslint error count in `app/page.tsx` fell **7 → 6**,
+because `applyAll(candidates: any[])` went with the move.
+
+## Activity reachability — `scripts/audit-activity-reachability.mjs`
+
+Added 2026-08-27. **Report only, always exits 0, proposes nothing.** Writes
+`data/activity-reachability.md`. **Run it after every content wave** — see the wave protocol.
+
+**The question nothing else asks.** Every other dev script checks that the machinery is correct.
+None asks whether there is any user at all for whom a given row comes out well enough to be shown.
+An activity can be perfectly tagged, perfectly scored, and sit permanently behind better-fitting
+neighbours for every possible person — and nothing notices, because nothing errors.
+
+- **Users:** all 81,920 achievable quiz answer paths. Every totals vector is distinct, so nothing
+  is sampled and there is nothing to dedupe.
+- **Earned:** inside the top 8 — the 3 ranked cards plus the 5 rerolls behind them.
+- **Baseline:** the whole pathway pool with no constraints. ⚠️ On the quick path that pool is
+  **synthetic** — its company question has no don't-mind option, so a fully unconstrained quick
+  cell is not reachable. That is the right baseline anyway, because MERIT-DARK is a question about
+  **fit alone**; feasibility is handled separately by the witness search over the 516 real cells.
+- **Bands:** EARNED-OFTEN (≥1% of users) / EARNED-RARELY / MERIT-DARK (no user at all).
+
+⚠️ **MERIT-DARK IS NOT INVISIBLE.** Everything stays wildcard-reachable **by construction** — the
+wildcard draws at random from the raw pathway pool and obeys no filter, no ranking and no budget
+answer. A dark row is one that never wins a slot *on fit*. That is a content observation, not a
+fault, and what to do about one is not the script's call.
+
+⚠️ **WHICH REGIME IT MEASURED.** The 2026-08-27 run is **fit-only, with no `diverseSelect`** —
+because there is none on `main`; the greedy diversity re-rank is unmerged on `result-diversity`.
+**Re-run when that merges:** a pass that skips near-duplicates pulls different rows into the
+earned-8, and some of what is dark may stop being dark. The generated report states its own regime
+in the header so a stale copy cannot be mistaken for a current one.
+
+**The witness search** is cheap for two reasons worth keeping: the relaxed survivor set depends on
+the **cell, not the user**, so it is computed once per cell; and **any cell with ≤ 8 survivors is
+an immediate witness** for everything in it, because there are not enough rows to fill the slots.
+Median relaxed pool is 6 (quick) and 7 (hobby), so most searches end on their first cell. Ties count
+in the row's favour, which can only ever find *more* witnesses — so anything still called fully dark
+really is.
+
+**First run, against the 134-row seed:** 24 MERIT-DARK rows (6 quick-fix, 18 long-term), of which
+**3 are fully dark** — no real cell and no achievable user places them in the earned 8:
+
+| activity | best placing ever | nearest competitor |
+|---|---|---|
+| Build a mechanical keyboard | rank 9, one short | 2.00 — Fermenting and kombucha brewing |
+| Sport lockpicking | rank 13 | — |
+| Build a cardboard automaton | rank 21 | — |
+
+All three are long-term, and the keyboard is one slot short. **Nothing has been done about them —
+that is Owen's decision.**
+
 ## Personality quiz scoring
 
-The dominant axis in `components/PersonalityQuiz.tsx` is determined from the **raw per-axis sums**,
-never the rounded averages. Rounding is display-only, for the vector tiles in the results card.
+The profile in `lib/personalityTypes.ts` is determined from the **raw per-axis sums**, never the
+rounded averages, and nothing in the path rounds at all — see the note below on the vector tiles
+that were the last consumer of rounding, and were deleted.
 
 Judging on the rounded averages collapsed distinct scores onto the same integer and left **58% of
 all answer paths tied** at the top. `determinePersonalityType` breaks ties with `indexOf`, so every
@@ -641,8 +868,12 @@ Two consequences to keep in mind:
 
 - Don't reintroduce rounding, bucketing, or any other precision loss upstream of the argmax. It
   silently re-creates the tie problem.
-- The `traits` array order is still a real tiebreaker for the remaining 10%. Reordering it changes
-  results without touching a vector.
+- Axis order is still a real tiebreaker, but it bites in fewer places since the 15-type
+  mechanism landed. **An exact tie between two axes whose pair is NAMED now resolves into that
+  hybrid** rather than being handed to whichever axis sits earlier in the list — a tie is a gap
+  of 0, which is inside H. Order still decides among **unnamed** tied pairs, and it still decides
+  which of two equal second-place axes becomes the partner. Reordering `AXES` in
+  `lib/matchActivities.ts` therefore still changes results without touching a vector.
 
 **There is now no rounding anywhere in this path — keep it that way.** The rule used to be
 "rounding is display-only"; as of 2026-08-25 the display that needed it is gone. The vector tiles
@@ -668,15 +899,34 @@ ceiling, discrimination, tie rate) are reported rather than fatal, so a run mid-
 useful while some are legitimately red.
 
 The script imports `personalityQuestions` directly rather than regex-parsing the file, so the
-questions cannot drift out of sync with it. **The argmax is still mirrored by hand** — it lives
-inside a `"use client"` component and cannot be imported — so a change to
-`determinePersonalityType` must be copied into the script. It is two lines and is quoted where it
-is used.
+questions cannot drift out of sync with it. **It now imports the classifier too** — that used to be
+mirrored by hand, because the argmax lived inside a `"use client"` component; it moved to
+`lib/personalityTypes.ts` in the landing-flow branch, and the 15-type mechanism made the copy
+untenable. A hand-mirrored rule carrying hybrid thresholds and a named-pair table would not fail
+loudly when it drifted, it would print confident, wrong share tables. **Nothing in that script
+mirrors production any more.**
+
+⚠️ Section (g) sweeps candidate thresholds that are *not* the shipping ones. It does that by
+passing a different `ClassificationConfig` to the same imported `classifyTotals` — never by
+reimplementing it. That is the whole reason the classifier takes its config as an argument.
+
+⚠️ **TYPE REACHABILITY IS THE SECOND STANDING GATE**, added with the 15 types. Section (h) of the
+same script fails the run if any of the 15 has no answer path that produces it, and again if any
+stored `archetypeTotals` classifies as a type other than its own. Both are hard: a taxonomy quietly
+containing a card nobody can be dealt gets copy written, reviewed and shipped with nothing behind
+it, and a mis-classified archetype puts a shape on the hero that the quiz cannot produce. Neither
+shows up on screen as an error.
+
+⚠️ **The purist test must keep judging the dominant AXIS, not the type.** It is tempting to point it
+at `determinePersonalityType` now that the type is the real output — don't. At H = 3 a purist path
+can legitimately be a hybrid (the Energy purist comes out Energy 55, Stimulation 50), so a
+type-based purist test would be testing the hybrid thresholds rather than guarding the vectors.
 
 ⚠️ **The walk shares are a smoke alarm, never an optimisation target.** An uneven split is evidence
 that something is mis-scored; it is not itself the defect, and flattening it by nudging scores is
 scoring the report instead of scoring the behaviour. Vectors are re-scored against the rubric,
-honestly, and the shares land where they land.
+honestly, and the shares land where they land. **The 15-type shares are the same kind of number** —
+diagnostic, never a target.
 
 ## Vector matching — `lib/matchActivities.ts`
 
@@ -844,6 +1094,46 @@ stays publicly readable with no write policy.
   correct.
 
 ## Recently completed
+
+**15 personality types, a 15-shape hero, and the reachability audit, 2026-08-27** (branch
+`personality-types`, **merge held for Owen's review and click-through**). Full design under **The
+15 personality types**, **The selection pipeline** and **Activity reachability** above.
+
+- **Measured before anything was built.** Section (g) of `analyze-quiz-balance.mjs` sweeps H, F and
+  all 21 candidate pairs across the 81,920-path walk, so H = 3 and F = 8 came off the tables rather
+  than out of the air. The 7 named pairs are simply the 7 most frequent.
+- **`classifyTotals` is parameterised over its config**, which is what lets the sweep run the
+  shipping rule against non-shipping thresholds instead of mirroring it. That closed the last
+  hand-mirror in the script — see **Personality quiz scoring**.
+- **Two new hard gates** in section (h): all 15 types reachable, and every stored archetype
+  classifies as its own type. Both pass. The purist test still judges the dominant AXIS, on purpose.
+- ⚠️ **The archetype search had to be constrained to correctly-classified paths**, and finding that
+  out was the one real trap in the build: the unconstrained Novelty + Stimulation winner has its
+  top two 4 apart against H = 3, so the real classifier calls it pure Novelty. Unconstrained, the
+  hero would have drawn it under the wrong name.
+- ⚠️ **Two archetypes that share no axis draw nearly the same polygon** — Social ↔ Stimulation at
+  0.540 and Energy ↔ Stimulation at 0.597, against a flag of 0.60 calibrated on the four shapes the
+  hero previously shipped. Both involve Stimulation, whose most dominant achievable path
+  `[36, 34, 17, 26, 18, 37, 53]` carries high Social, Energy and Novelty alongside it, so normalised
+  it reads as a Social shape. **Reported, not fixed** — this is the known Stimulation thinness
+  showing up in a new place, and no vector was touched. The other 20 flagged pairs all share an
+  axis, which is the chart being honest.
+- ⚠️ **A greedy re-ordering of the hero cycle was built and then removed.** Ordering the 15 shapes
+  farthest-next cut adjacent flagged pairs 2 → 1 but made the *minimum* adjacent gap worse
+  (0.552 → 0.448), because greedy saves the similar shapes for last. Fixing it properly is a max-min
+  Hamiltonian cycle, which is unrequested machinery for a problem the brief asked to have reported.
+  The cycle ships in table order; `shapeDistance` in `lib/radarGeometry.ts` survives as the
+  measurement. ⚠️ It is **not** `euclideanDistance` — that measures taste on raw magnitudes, this
+  measures appearance after normalisation has discarded them.
+- **The reachability audit found 3 fully dark rows**, all long-term, and the mechanical keyboard is
+  **one slot short** at rank 9. Confirmed by an independent brute force using the real
+  `rankActivities`. Nothing proposed about them.
+- `data/personality-types-review.md` is **rendered from `PERSONALITY_TYPES`**, so what Owen approves
+  is byte-for-byte what the lib holds — the wave protocol's no-retyping discipline.
+- eslint errors in `app/page.tsx` fell **7 → 6** with the pipeline extraction. `npx tsc --noEmit`
+  clean, `next build` clean, all four routes still statically prerendered, all six dev scripts pass.
+- **Untouched by instruction:** `data/personalityQuiz.ts`. No option vector moved, and the two
+  deliberately-red ceiling gates report exactly what they did before (Energy 6.88, Novelty 6.50).
 
 **Landing flow and visual identity, 2026-08-26** (branch `landing-flow`, **merge held for Owen's
 click-through**):

@@ -11,6 +11,7 @@ import {
   ringPoints,
 } from "../lib/radarGeometry";
 import { isValidVector } from "../lib/matchActivities";
+import { PERSONALITY_TYPES } from "../lib/personalityTypes";
 
 /**
  * The taste radar — the product's visual motif.
@@ -43,26 +44,44 @@ import { isValidVector } from "../lib/matchActivities";
  *  finish before an unhurried user clicks the next answer. */
 const MORPH_MS = 600;
 
-/** How long each hero shape holds before the next one. */
-const DEMO_INTERVAL_MS = 2600;
+/**
+ * How long each hero shape holds before the next one.
+ *
+ * ⚠️ THE FULL CYCLE IS 30 SECONDS at 15 shapes, so a typical visitor sees four
+ * or five of them rather than the whole taxonomy. That is arithmetic, not a
+ * bug — the hero's job is to show that the chart measures something about you,
+ * which one morph already does. Shortening this to fit all 15 into a glance
+ * would make each shape too brief to read.
+ */
+const DEMO_INTERVAL_MS = 2000;
 
 /**
- * The hero's example shapes. Hand-written, deliberately distinct: four people
- * whose polygons could not be mistaken for one another, so the morph reads as
- * "this measures something about you" rather than as decoration.
+ * The hero's shapes: ALL FIFTEEN personality types, each drawn as its own
+ * archetype and captioned with its own name.
  *
- * These are illustrative, NOT scored data — nothing ranks against them and no
- * user ever receives one. They do follow the 7-axis rubric's shape so the demo
- * does not teach a meaning the real chart contradicts. Axis order is the fixed
- * project-wide one: [Social, Energy, Creative, Analytical, Outdoors, Novelty,
- * Stimulation].
+ * ⚠️ THESE ARE MEASURED, NOT ILLUSTRATIVE, and that is the whole change. This
+ * used to be four hand-written vectors captioned with four of the seven real
+ * type names — shapes nobody could ever be given, standing in for a taxonomy
+ * that was both larger than the demo implied and unrelated to it. Every vector
+ * here is now archetypeTotals from lib/personalityTypes.ts: the single most
+ * type-defining answer path the quiz can actually produce for that type. A
+ * visitor watching the hero is watching real outputs of the thing they are
+ * about to do.
+ *
+ * ⚠️ NOTHING HERE MAY BE HAND-TUNED. If two shapes read as near-twins on
+ * screen, that is the taxonomy reporting a real resemblance — a pure type and a
+ * hybrid containing it genuinely are neighbours — and the fix is a decision
+ * about the taxonomy or the play order, never an edited vector. Editing one
+ * puts a polygon on the landing page that the quiz behind it cannot produce.
+ * scripts/analyze-quiz-balance.mjs section (g5) measures the resemblances.
+ *
+ * The raw sums are on a different scale from a user's 1-10 vector, and it does
+ * not matter: every polygon is display-normalised before it is plotted, so the
+ * chart draws ratios and never magnitudes. See normalizeForDisplay.
  */
-const DEMO_SHAPES: { label: string; vector: number[] }[] = [
-  { label: "The Meticulous Creator", vector: [2, 2, 9, 4, 2, 6, 3] },
-  { label: "The Strategic Architect", vector: [3, 1, 3, 10, 1, 4, 5] },
-  { label: "The Open-Air Explorer", vector: [4, 7, 2, 2, 10, 5, 4] },
-  { label: "The Thrill Seeker", vector: [7, 8, 2, 3, 6, 7, 10] },
-];
+const DEMO_SHAPES: { label: string; vector: number[] }[] = PERSONALITY_TYPES.map(
+  (type) => ({ label: type.title, vector: type.archetypeTotals })
+);
 
 export type RadarMode = "demo" | "building" | "final";
 
@@ -79,6 +98,17 @@ interface TasteRadarProps {
    * Null or absent draws the neutral shape — see NEUTRAL_VALUE.
    */
   vector?: number[] | null;
+  /**
+   * Axis INDICES to pick out — the axes a hybrid profile is built from, so the
+   * card and the chart agree about which two the copy is talking about.
+   *
+   * ⚠️ HONOURED IN "final" MODE ONLY, and deliberately quiet even there: a
+   * heavier label in the accent colour and a slightly larger vertex dot. It
+   * adds emphasis, never information — no number appears, no axis is redrawn,
+   * and the polygon is exactly the polygon it would be without this. A viewer
+   * who ignores it loses nothing.
+   */
+  highlightAxes?: number[];
   /** Overrides the per-mode default width/height in pixels. */
   size?: number;
   className?: string;
@@ -229,7 +259,13 @@ function useAnimatedVector(target: number[], duration = MORPH_MS): number[] {
   return reduced ? target : current;
 }
 
-export default function TasteRadar({ mode, vector, size, className }: TasteRadarProps) {
+export default function TasteRadar({
+  mode,
+  vector,
+  highlightAxes,
+  size,
+  className,
+}: TasteRadarProps) {
   const reduced = usePrefersReducedMotion();
   const [demoIndex, setDemoIndex] = useState(0);
 
@@ -269,6 +305,10 @@ export default function TasteRadar({ mode, vector, size, className }: TasteRadar
   const radius = RADIUS;
 
   const points = polygonPoints(shape, radius, center);
+
+  // Empty everywhere but the profile card, so the small quiet treatments and
+  // the hero cannot pick up an emphasis they were never designed around.
+  const highlighted = new Set(mode === "final" ? (highlightAxes ?? []) : []);
 
   return (
     <div className={className}>
@@ -329,7 +369,13 @@ export default function TasteRadar({ mode, vector, size, className }: TasteRadar
             polygon rather than floating off it at raw magnitudes. */}
         {mode === "final" &&
           radarVertices(shape, radius, center).map((point, index) => (
-            <circle key={AXES[index]} cx={point.x} cy={point.y} r={3} fill="#4f46e5" />
+            <circle
+              key={AXES[index]}
+              cx={point.x}
+              cy={point.y}
+              r={highlighted.has(index) ? 5 : 3}
+              fill="#4f46e5"
+            />
           ))}
 
         {presentation.labels &&
@@ -347,8 +393,8 @@ export default function TasteRadar({ mode, vector, size, className }: TasteRadar
                 textAnchor={anchor}
                 dominantBaseline="middle"
                 fontSize={LABEL_FONT_SIZE}
-                fontWeight={600}
-                fill="#64748b"
+                fontWeight={highlighted.has(index) ? 800 : 600}
+                fill={highlighted.has(index) ? "#4f46e5" : "#64748b"}
               >
                 {axis}
               </text>

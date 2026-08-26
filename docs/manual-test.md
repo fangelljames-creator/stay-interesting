@@ -190,8 +190,21 @@ Added by the `landing-flow` branch.
       exactly **one** CTA.
 - [ ] **Only one "Stay Interesting" heading is on screen.** The persistent wordmark
       heading is suppressed on the hero; the small header wordmark at the very top stays.
-- [ ] **The demo radar morphs** between four example shapes on a loop, and the label
-      beneath it changes with each one.
+- [ ] **The demo radar cycles all 15 personality types**, about 2 seconds each, and the
+      label beneath it names the type currently drawn. A full cycle takes ~30 seconds, so
+      sit with it — you should see the name and the shape change together every time.
+- [ ] **Every label is a real type name**, one of the 15 in `lib/personalityTypes.ts`.
+      These are no longer hand-drawn example shapes: each polygon is that type's measured
+      archetype, an answer path the quiz can genuinely produce.
+- [ ] **The cycle is the same every load** — same order, starting from The Social Catalyst.
+      There is no randomness in it.
+- [ ] **Consecutive shapes are visibly different.** Some pairs genuinely resemble each
+      other — a pure type and a hybrid built from it are near neighbours, and the chart is
+      being honest when it says so — but the animation should never look like it stalled.
+      ⚠️ If two adjacent shapes read as the same picture, say so. **Do not fix it by
+      editing a vector**: the archetypes are measured outputs of the quiz walk, and editing
+      one puts a shape on the landing page the quiz cannot produce. The remedy is the play
+      order or the taxonomy.
 - [ ] **The CTA does not navigate.** The URL stays `localhost:3000` — no `/quiz` — and the
       quiz animates in on the same page.
 - [ ] **A returning tab never sees the hero.** Complete the quiz, then reload: you get the
@@ -235,8 +248,9 @@ reaches the outer area, with the ratios between axes untouched.
       keyed wrapper so the in-flight morph survives.
 - [ ] **With reduced motion enabled** (Windows: Settings → Accessibility → Visual effects →
       Animation effects off; or DevTools → Rendering → Emulate `prefers-reduced-motion`),
-      the shape snaps instantly instead of morphing, and the hero demo holds one shape
-      instead of cycling. Nothing disappears.
+      the shape snaps instantly instead of morphing, and the hero demo holds ONE shape
+      instead of cycling — the first one, The Social Catalyst, with its name beneath it.
+      Nothing disappears and nothing is left unlabelled.
 
 ## J. Radar on the profile card
 
@@ -248,6 +262,11 @@ reaches the outer area, with the ratios between axes untouched.
 - [ ] **The profile title still follows the raw sums**, which normalization never touches.
       Take a run dominated by one axis and confirm you get that axis's profile.
 - [ ] There is **no numeric vector table** anywhere — the radar is the whole display.
+- [ ] **The contributing axes are picked out on the radar**: their labels are indigo and
+      bolder, and their vertex dots slightly larger. A hybrid highlights two, a pure type
+      one, The All-Rounder none at all.
+- [ ] **The highlight adds no information** — still no numbers, and the polygon is drawn
+      exactly where it would be without it.
 - [ ] **Vertex dots sit on the polygon's corners**, not floating off it.
 
 ## K. Returning-in-session banner
@@ -275,3 +294,36 @@ reaches the outer area, with the ratios between axes untouched.
 - [ ] No user-facing surface says "Boredom Buster".
       *`CLAUDE.md` and the `supabase/*.sql` comment headers keep their historical
       references on purpose; those are records, not UI.*
+
+## N. The 15 personality types
+
+The mechanism: flat profile (top axis within **8** raw-sum points of the bottom one) →
+The All-Rounder; else a second axis within **3** of the first *and* that pair named →
+that hybrid; else the pure dominant axis. Judged on raw sums, never averages.
+
+- [ ] **A purist run lands its pure type.** Answer all 8 personality questions with the
+      most obviously Creative option each time — you should get **The Meticulous Creator**,
+      not a hybrid. Same for Analytical → The Strategic Architect.
+- [ ] **A deliberately split run lands a hybrid.** Alternate between the most Analytical
+      and the most Novelty-seeking option through the 8 questions; the two axes should end
+      up close enough to give you **The Rabbit-Holer**. If you get a pure type instead, the
+      two axes were not within 3 of each other — try balancing the alternation more evenly.
+- [ ] **A flat run can land The All-Rounder.** Pick middling, unremarkable options all the
+      way through — nothing that maximises any one axis. This is genuinely rare (1.4% of
+      all answer paths), so it may take a few attempts. It is not broken if you miss it;
+      `node scripts/analyze-quiz-balance.mjs` proves it is reachable.
+- [ ] **The type name and copy appear on the profile card** at the end of the quiz, beside
+      the large radar.
+- [ ] **The same type appears again on the results page**, in a card above the matches,
+      under the eyebrow "Ranked against". This is deliberate repetition — by the time the
+      matches appear, the profile that produced every match percentage has scrolled well
+      out of sight.
+- [ ] **The returning-visitor banner shows the same title** as the profile card did. Take
+      the quiz, return to the chooser, and check the two agree.
+- [ ] **With storage blocked** (`sessionStorage.clear()` before the results load), the
+      results page shows **no** type card at all — and still shows the "not in any
+      particular order" banner. It must not invent a personality type it has no vector for.
+- [ ] **The copy matches the axes.** Read each type's description against the axes named in
+      `data/personality-types-review.md`. The Detour-Taker sits at Energy 18, so nothing in
+      its copy may promise anything strenuous; The League Secretary sits at Outdoors 11, so
+      nothing outdoors. This is the check no script can do.
