@@ -93,7 +93,8 @@ check `node_modules/next/dist/docs/` before relying on remembered App Router con
   source of truth for the schema — edit them alongside any DB change rather than making one-off
   changes in the dashboard.
   - `supabase/step1-schema-rls-seed.sql` — schema, RLS, and the seed data.
-    **Run 2026-08-25: 37 activities seeded, every one with tags and a vector.**
+    **Run 2026-08-25: 37 activities seeded, every one with tags and a vector. Wave 1 took it to
+    134 on 2026-08-26** (65 quick-fix, 76 long-term, 7 carrying both).
   - `supabase/cleanup-legacy-schema.sql` — one-off tidy-up of the original hand-written schema.
     **Run 2026-08-25: dropped `personality_scores`, removed 4 duplicate policies.**
 
@@ -124,7 +125,7 @@ enforces 7 elements, each 1–10.
 Note the decision was made believing pgvector was not installed. **It is** — the dropped
 `personality_scores` column was `vector(7)`, and the extension is deliberately left installed even
 though nothing uses it. So switching to pgvector is a column add, not a reinstall, and `<=>` cosine
-distance in SQL is available whenever ranking should move server-side. At 37 rows it wins nothing
+distance in SQL is available whenever ranking should move server-side. At 134 rows it still wins nothing
 measurable, and pgvector returns to JS as a string needing parsing, so `integer[]` stands — but
 revisit at the point the table grows or step 2 wants to filter and rank in one query.
 
@@ -343,10 +344,13 @@ happen inside one results view; that key is about what to push down on the user'
 results really can be reached with no vector. Nothing can rank then, so the survivors are shown
 unordered with no `matchPercent` and the page says why. Do not "tidy" this into an empty state.
 
-**Coverage today:** the quick path starts below 3 survivors on 44% of its 324 answer combinations,
-the hobby path on 43% of 192. That is a thin-catalogue measurement, not a tagging fault — five
-simultaneous hard filters over a 20-activity pool cannot do much better, and relaxation absorbs
-it (no combination ends up empty at runtime). `scripts/validate-activity-seed.mjs` reports it.
+**Coverage today (re-measured 2026-08-26, after wave 1):** the quick path starts below 3 survivors
+on **33%** of its 324 answer combinations (57 at zero), the hobby path on **34%** of 192 (31 at
+zero). Before wave 1 those were 44% and 43% over a 20-activity pool; the catalogue tripling to 134
+took roughly ten points off each, which is exactly the "it solves itself as the catalogue grows"
+prediction being borne out. Still not a tagging fault — five simultaneous hard filters cannot do
+much better — and relaxation absorbs it (no combination ends up empty at runtime).
+`scripts/validate-activity-seed.mjs` reports it.
 **Not being padded with hand-written activities**: the catalogue is heading for thousands, at
 which point starvation largely evaporates on its own.
 ### 2. Vector quiz — `components/PersonalityQuiz.tsx`
@@ -526,20 +530,101 @@ below went unnoticed.
 
 ## Content pipeline — catalogue growth
 
-Full pipeline doctrine (topic map, anti-clone rules, wave protocol) lands with wave 1. Recorded here
-now because it is a **rubric** obligation rather than a pipeline one:
+Target: **~500 activities, 300 quick-fix and 200 long-term**, grown in reviewed waves. Wave 1 landed
+2026-08-26 and took the canonical seed from 37 to 134.
 
-⚠️ **Wave 1 must audit the existing activity vectors against the rubric above and propose corrections
-in its review file** — as proposals for review, not as silent edits. Those vectors predate the rubric
-and were authored by Claude, so they are seed data to correct rather than user decisions to preserve.
-The catalogue side of the comparison is worth exactly as much as the quiz side, and the quiz side is
-being rebuilt on this rubric; leaving 37 activity vectors scored by an older, unwritten standard
-would put a corrected quiz and an uncorrected catalogue on opposite ends of the same distance
-calculation.
+### The wave protocol — every wave, in this order
 
-Note the count: the **canonical seed has 37 rows** (20 quick-fix, 21 long-term, 4 carrying both).
-The live database still holds 33 until `supabase/step1-schema-rls-seed.sql` is re-run — see the
-budget-filter entry under **Recently completed**. Audit all 37; the SQL is the source of truth.
+1. **Tooling first, if anything is missing.** A wave that cannot be measured should not be authored.
+2. **Author into `data/waves/wave-N.json`** — one row per activity: title, tags, vector, description.
+   This is the single source of truth for the wave.
+3. **`node scripts/build-wave.mjs N`** renders `data/waves/wave-N-review.md`. **Then STOP for Owen's
+   veto pass.** Nothing touches the seed SQL or the database before that.
+4. **On approval**, put the struck titles in the wave file's `vetoed` array, re-render, then append
+   the survivors to `supabase/step1-schema-rls-seed.sql` and hand Owen **one idempotent SQL block**
+   (`node scripts/build-wave.mjs N --sql`). Commit.
+5. **Never run two waves without a review in between.**
+
+⚠️ **The review file and the SQL are rendered from the same JSON, deliberately.** There is no step
+where rows are retyped, so what Owen approves is byte-for-byte what reaches the database. Do not
+hand-edit the wave rows in the seed SQL — edit the wave file and regenerate, or the two drift apart
+and the review stops meaning anything.
+
+⚠️ **The SQL block needs TWO statements to be idempotent.** The seed's `insert ... where not exists
+(a.title = w.title)` only ever inserts, so vector corrections to existing rows need a match-by-title
+`update` beside it. Both are re-runnable.
+
+### Waves 2+ — draw from the idea bank, do not invent
+
+**`data/activity-idea-bank.csv`** (395 rows, 250 quick-fix / 145 long-term, 20 topics) is the source
+of ideas. Expand a chosen row's `concept` into a house-voice description; **generate new ideas only
+if the bank runs dry of a needed pathway**. Every other wave rule is unchanged: fuzzy dedupe,
+closed-vocabulary tags with exactly one cost tier, rubric-scored vectors, review file, Owen's
+approval, one SQL block.
+
+Roughly **65 per wave**, weighted toward the remaining gap. After wave 1 that is **~237 quick-fix and
+~123 long-term**.
+
+**The topic map**, drawn from evenly:
+
+| Quick-fix | Long-term |
+|---|---|
+| kitchen quick-wins · move-your-body · tidy-and-sort · learn-or-drill · observe-and-identify · social micro-acts · repair-and-restore · make-something-small · plan-and-dream · calm-and-recover | crafts & making · food drink & fermenting · growing things · sport & training arcs · strategy & mind games · collecting & culture · tech & maker · music & performance · outdoor pursuits · clubs community & volunteering |
+
+### Anti-clone rules — hard
+
+- **Max 2 entries per template family per wave** ("polish X", "memorise X", "organise X"…).
+  `build-wave.mjs` counts these and flags any family over the cap. ⚠️ The detector reads the first
+  word of the title, **and the titles are ours** — renaming `Build a blanket fort` to `Blanket fort`
+  to get under the cap is gaming the check, not passing it.
+- **Fuzzy-dedupe every candidate** against the whole existing catalogue and all prior waves.
+  Reported, never auto-dropped: a high score can be a real duplicate or just a shared word.
+- **5–8 entries per wave must be delightfully specific** — the biro-sketching tier: quirky, but
+  startable this week by an ordinary person in the UK.
+- **Nothing needing rare gear, animals, or licences.** Anything with real physical risk gets
+  find-a-class framing or gets cut. (Wave 1 examples: Olympic lifting, parkour and kite surfing are
+  all framed as coached; scuba is a certification arc.)
+
+### What wave 1 learned, worth not relearning
+
+- **The catalogue carried the same side-effect inflation the quiz did.** 24 of the 37 seeded vectors
+  needed correcting. The clearest was `Blind taste test whatever is in the cupboard` at Stimulation
+  9 — a party game, not adrenaline — which was one of only two Stimulation-dominant rows.
+- ⚠️ **Stimulation is the real content gap: 3 rows out of 134.** Social is thin too at 9%. The
+  curated keep list was overwhelmingly solo and calm, and correcting the fictional Stimulation
+  scores made the gap visible rather than causing it. **Waves 2+ should weight hard toward social
+  and high-stakes content.**
+- **Analytical is not "this is an intellectual activity".** Wave 1's first pass had Analytical
+  dominant on 40% of the wave because observation, memorisation and recall were being scored as
+  problem-solving. The rubric asks whether strategy, systems or numbers are *at the core*. 79 rows
+  were re-scored; it landed at 28%.
+- **Vocabulary gap, unresolved:** there is no setting tag for "out in the town". `Sketch buildings
+  from a bench` is tagged `at-home` + `in-nature`, which is a fudge. Not adding a tag — the doctrine
+  is that a tag no filter reads must not exist — but if waves 2+ bring more urban-outdoor
+  activities, this becomes a real hole in the hobby path's setting question.
+
+### The live database — wave 1 confirmed present, 2026-08-26
+
+The **canonical seed SQL is the source of truth** and holds 134 rows, and `content-wave-1` was
+merged into `main` on 2026-08-26 so the repo now matches what is deployed. This section previously
+said the live database still held 33; that is out of date.
+
+**Verified**: the results page, which reads `activities` straight from Supabase, served
+`A round of disc golf` and `A blacksmithing taster day` — rows that exist only in wave 1. So wave 1
+has been run.
+
+⚠️ **Not verified: the exact row count, or whether the 24 vector corrections landed.** Only that
+wave-1 inserts are present. If it matters, this settles it in the Supabase SQL editor:
+
+```sql
+select count(*) as rows,
+       count(*) filter (where vector is null) as missing_vector
+from public.activities;
+-- expect 134 rows, 0 missing_vector
+```
+
+Both `supabase/step1-schema-rls-seed.sql` and `supabase/wave-1-activities.sql` are idempotent, so
+re-running either is safe if the count comes back short.
 
 ## Personality quiz scoring
 
@@ -767,14 +852,16 @@ was rebuilt: time and energy are now real filters, and the taste questions ("psy
 ## ⚠️ Scaling to a catalogue in the thousands
 
 Owen's stated direction (2026-08-25). Several current decisions were made explicitly for a
-37-row table and **should be revisited before the catalogue grows**, not after.
+37-row table and **should be revisited before the catalogue grows**, not after. Wave 1 took it to
+134 on 2026-08-26 — still comfortably inside stage (A), but the ladder is now a visible distance
+rather than a hypothetical one, and the target is ~500.
 
 **The scaling ladder.** Three stages, in order. **The metric never changes at any stage** — it is
 Euclidean distance throughout, in JavaScript and later in Postgres. Do not let a stage change
 introduce a change of meaning.
 
 **(A) Now — `select *` plus JavaScript filtering is correct.**
-`findMatches` fetches the table and filters in JS. At 37 rows that is the right answer: one round
+`findMatches` fetches the table and filters in JS. At 134 rows that is still the right answer: one round
 trip, no query complexity, and relaxation is a cheap in-memory re-filter. Do not optimise this
 before it hurts.
 
@@ -799,11 +886,12 @@ speed, which is a real decision of its own.
 pgvector is already installed (the dropped `personality_scores` column was `vector(7)`), so stage
 C is a column add plus a backfill, not a reinstall.
 
-**Coverage starvation mostly solves itself.**
-The 44% / 43% starvation rates are a function of a 20-activity pool, not of the tag design. They
-should fall away as the catalogue grows — which is exactly why the seed was not padded with
-hand-written filler. Keep running the coverage report; at scale it is the only way to see the
-sparse corners at all.
+**Coverage starvation mostly solves itself — and wave 1 is the evidence.**
+The starvation rates were a function of pool size, not of the tag design. Tripling the catalogue to
+134 took them from 44% / 43% down to **33% / 34%** without a single re-tag, which is the prediction
+confirmed rather than merely asserted. They should keep falling as the catalogue grows — which is
+exactly why the seed was never padded with hand-written filler. Keep running the coverage report;
+at scale it is the only way to see the sparse corners at all.
 
 **RLS and the anon key still hold.** Nothing above changes the security model: `activities`
 stays publicly readable with no write policy.
@@ -829,10 +917,14 @@ stays publicly readable with no write policy.
   Creative 1.13 for a Stimulation purist, so the uncorrected activity is pushed away by an axis
   that should never have separated them.
 
-  Note what did *not* move: 6 of 7 purists find their own axis in the top 3, exactly as before. The
-  headline count is flat while the underlying agreement got worse, which is the whole reason to
-  read `d=` and not just the pass count. The matcher is fine and the orderings are sensible.
-  **The fix is the wave 1 audit** — see **Content pipeline** — not another pass over the quiz.
+  **Corrected in the seed SQL by wave 1** (2026-08-26): 24 of the 37 rows were re-scored, including
+  skateboarding's phantom `Creative 5` → 1. ⚠️ **Still live in the database** until
+  `supabase/wave-1-activities.sql` is run — until then the deployed app is matching a corrected quiz
+  against an uncorrected catalogue.
+
+  Note what did *not* move: 6 of 7 purists find their own axis in the top 3, exactly as before, and
+  the Stimulation purist still sees none. That is now a **content** gap rather than a scoring one —
+  3 Stimulation-dominant rows out of 134 — and it belongs to waves 2+.
 - **Two ceiling gates are red, deliberately.** `Energy 6.88` and `Novelty 6.50` against a 7.0 gate.
   Not a scoring fault: a ceiling is the mean of the best option available per question, and Q3
   (spending £100) and Q4 (approaching a puzzle) contain no physical option, while Q1 (Saturday
