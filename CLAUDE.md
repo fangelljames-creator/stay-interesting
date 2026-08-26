@@ -93,7 +93,8 @@ check `node_modules/next/dist/docs/` before relying on remembered App Router con
   source of truth for the schema — edit them alongside any DB change rather than making one-off
   changes in the dashboard.
   - `supabase/step1-schema-rls-seed.sql` — schema, RLS, and the seed data.
-    **Run 2026-08-25: 37 activities seeded, every one with tags and a vector.**
+    **Run 2026-08-25: 37 activities seeded, every one with tags and a vector. Wave 1 took it to
+    134 on 2026-08-26** (65 quick-fix, 76 long-term, 7 carrying both).
   - `supabase/cleanup-legacy-schema.sql` — one-off tidy-up of the original hand-written schema.
     **Run 2026-08-25: dropped `personality_scores`, removed 4 duplicate policies.**
 
@@ -124,7 +125,7 @@ enforces 7 elements, each 1–10.
 Note the decision was made believing pgvector was not installed. **It is** — the dropped
 `personality_scores` column was `vector(7)`, and the extension is deliberately left installed even
 though nothing uses it. So switching to pgvector is a column add, not a reinstall, and `<=>` cosine
-distance in SQL is available whenever ranking should move server-side. At 37 rows it wins nothing
+distance in SQL is available whenever ranking should move server-side. At 134 rows it still wins nothing
 measurable, and pgvector returns to JS as a string needing parsing, so `integer[]` stands — but
 revisit at the point the table grows or step 2 wants to filter and rank in one query.
 
@@ -343,10 +344,13 @@ happen inside one results view; that key is about what to push down on the user'
 results really can be reached with no vector. Nothing can rank then, so the survivors are shown
 unordered with no `matchPercent` and the page says why. Do not "tidy" this into an empty state.
 
-**Coverage today:** the quick path starts below 3 survivors on 44% of its 324 answer combinations,
-the hobby path on 43% of 192. That is a thin-catalogue measurement, not a tagging fault — five
-simultaneous hard filters over a 20-activity pool cannot do much better, and relaxation absorbs
-it (no combination ends up empty at runtime). `scripts/validate-activity-seed.mjs` reports it.
+**Coverage today (re-measured 2026-08-26, after wave 1):** the quick path starts below 3 survivors
+on **33%** of its 324 answer combinations (57 at zero), the hobby path on **34%** of 192 (31 at
+zero). Before wave 1 those were 44% and 43% over a 20-activity pool; the catalogue tripling to 134
+took roughly ten points off each, which is exactly the "it solves itself as the catalogue grows"
+prediction being borne out. Still not a tagging fault — five simultaneous hard filters cannot do
+much better — and relaxation absorbs it (no combination ends up empty at runtime).
+`scripts/validate-activity-seed.mjs` reports it.
 **Not being padded with hand-written activities**: the catalogue is heading for thousands, at
 which point starvation largely evaporates on its own.
 ### 2. Vector quiz — `components/PersonalityQuiz.tsx`
@@ -599,12 +603,28 @@ Roughly **65 per wave**, weighted toward the remaining gap. After wave 1 that is
   is that a tag no filter reads must not exist — but if waves 2+ bring more urban-outdoor
   activities, this becomes a real hole in the hobby path's setting question.
 
-### The live database still lags
+### The live database — wave 1 confirmed present, 2026-08-26
 
-The **canonical seed SQL is the source of truth** and holds 134 rows. The live database holds 33
-until both `supabase/step1-schema-rls-seed.sql` (for the 4 budget-filter rows) and
-`supabase/wave-1-activities.sql` (for wave 1's 97 inserts and 24 vector corrections) are run in the
-Supabase SQL editor. Both are idempotent.
+The **canonical seed SQL is the source of truth** and holds 134 rows, and `content-wave-1` was
+merged into `main` on 2026-08-26 so the repo now matches what is deployed. This section previously
+said the live database still held 33; that is out of date.
+
+**Verified**: the results page, which reads `activities` straight from Supabase, served
+`A round of disc golf` and `A blacksmithing taster day` — rows that exist only in wave 1. So wave 1
+has been run.
+
+⚠️ **Not verified: the exact row count, or whether the 24 vector corrections landed.** Only that
+wave-1 inserts are present. If it matters, this settles it in the Supabase SQL editor:
+
+```sql
+select count(*) as rows,
+       count(*) filter (where vector is null) as missing_vector
+from public.activities;
+-- expect 134 rows, 0 missing_vector
+```
+
+Both `supabase/step1-schema-rls-seed.sql` and `supabase/wave-1-activities.sql` are idempotent, so
+re-running either is safe if the count comes back short.
 
 ## Personality quiz scoring
 
@@ -732,14 +752,16 @@ was rebuilt: time and energy are now real filters, and the taste questions ("psy
 ## ⚠️ Scaling to a catalogue in the thousands
 
 Owen's stated direction (2026-08-25). Several current decisions were made explicitly for a
-37-row table and **should be revisited before the catalogue grows**, not after.
+37-row table and **should be revisited before the catalogue grows**, not after. Wave 1 took it to
+134 on 2026-08-26 — still comfortably inside stage (A), but the ladder is now a visible distance
+rather than a hypothetical one, and the target is ~500.
 
 **The scaling ladder.** Three stages, in order. **The metric never changes at any stage** — it is
 Euclidean distance throughout, in JavaScript and later in Postgres. Do not let a stage change
 introduce a change of meaning.
 
 **(A) Now — `select *` plus JavaScript filtering is correct.**
-`findMatches` fetches the table and filters in JS. At 37 rows that is the right answer: one round
+`findMatches` fetches the table and filters in JS. At 134 rows that is still the right answer: one round
 trip, no query complexity, and relaxation is a cheap in-memory re-filter. Do not optimise this
 before it hurts.
 
@@ -764,11 +786,12 @@ speed, which is a real decision of its own.
 pgvector is already installed (the dropped `personality_scores` column was `vector(7)`), so stage
 C is a column add plus a backfill, not a reinstall.
 
-**Coverage starvation mostly solves itself.**
-The 44% / 43% starvation rates are a function of a 20-activity pool, not of the tag design. They
-should fall away as the catalogue grows — which is exactly why the seed was not padded with
-hand-written filler. Keep running the coverage report; at scale it is the only way to see the
-sparse corners at all.
+**Coverage starvation mostly solves itself — and wave 1 is the evidence.**
+The starvation rates were a function of pool size, not of the tag design. Tripling the catalogue to
+134 took them from 44% / 43% down to **33% / 34%** without a single re-tag, which is the prediction
+confirmed rather than merely asserted. They should keep falling as the catalogue grows — which is
+exactly why the seed was never padded with hand-written filler. Keep running the coverage report;
+at scale it is the only way to see the sparse corners at all.
 
 **RLS and the anon key still hold.** Nothing above changes the security model: `activities`
 stays publicly readable with no write policy.
