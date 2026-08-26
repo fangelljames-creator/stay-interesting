@@ -10,6 +10,11 @@ import {
   type FilterAction,
   type PathwayTag,
 } from "@/lib/activityTags";
+import {
+  availableWildcards,
+  drawRandom,
+  rerollPoolFrom,
+} from "@/lib/resultsSelection";
 
 /**
  * Rotation penalty, expressed as a distance multiplier. Ranking is now by
@@ -30,6 +35,24 @@ const ROTATION_DISTANCE_PENALTY = 1.35;
  * the meantime avoids a hydration mismatch.
  */
 type FunnelStage = "loading" | "quiz" | "chooser" | "questions" | "results";
+
+/**
+ * The wildcard is drawn from the raw pathway pool, so unlike a ranked card it
+ * arrives with no distance/matchPercent. Send that single row through the same
+ * rankActivities the ranked cards went through, so the percentage on a
+ * wildcard means exactly what it means on every other card.
+ *
+ * It is a TRUE number on a RANDOMLY DRAWN row: it says how well the draw
+ * happens to fit, not that fit had anything to do with the draw. The badge
+ * beside it says so out loud.
+ *
+ * No user vector (storage blocked) or a malformed row -> no badge, as before.
+ */
+function decorateWildcard(activity: any, userVector: number[] | null) {
+  if (!activity) return null;
+  if (!userVector) return activity;
+  return rankActivities(userVector, [activity])[0] ?? activity;
+}
 
 // --- QUIZ DEFINITIONS ---
 import {
@@ -57,7 +80,19 @@ export default function Home() {
   // Which constraints, if any, had to be bent to find anything. Surfaced on
   // the results so relaxation is never silent.
   const [relaxedConstraints, setRelaxedConstraints] = useState<string[]>([]);
-  const [recommendations, setRecommendations] = useState<any[]>([]);
+  // The results view, split into what each thing actually is. This used to be
+  // one `recommendations` array holding "the three, then the wildcard", which
+  // reroll would have had to mutate by position.
+  /** The ranked cards on screen now, at most MIN_RESULTS of them. */
+  const [shownActivities, setShownActivities] = useState<any[]>([]);
+  /** The wildcard row, decorated with its true match, or null if none is left. */
+  const [wildcard, setWildcard] = useState<any | null>(null);
+  /** Ranks 4-8, depleting as rerolls consume it. Shared by all three slots. */
+  const [rerollPool, setRerollPool] = useState<any[]>([]);
+  /** Pathway pool the budget answer permits. Fixed when the results are built. */
+  const [wildcardPool, setWildcardPool] = useState<any[]>([]);
+  /** Everything rerolled away. Nothing in here is ever shown again this run. */
+  const [discardedIds, setDiscardedIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   
   // Activity ids are uuid strings (activities.id defaults to gen_random_uuid()),
@@ -180,6 +215,21 @@ export default function Home() {
 
   const activeQuiz = path === "bored" ? QUICK_QUESTIONS : HOBBY_QUESTIONS;
   const progress = path ? Math.round((currentStep / activeQuiz.length) * 100) : 0;
+
+  // The cards to render: the ranked ones, then the wildcard if one is left.
+  const resultCards = wildcard
+    ? [...shownActivities, { ...wildcard, isWildcard: true }]
+    : shownActivities;
+
+  // Whether a FRESH wildcard could still be drawn -- the current one is
+  // excluded because rerolling it discards it. False hides its reroll control.
+  const wildcardRerollAvailable =
+    wildcard != null &&
+    availableWildcards(wildcardPool, [
+      ...shownActivities.map((a) => a.id),
+      ...discardedIds,
+      wildcard.id,
+    ]).length > 0;
 
   const handleAnswer = async (action: FilterAction) => {
     const newHistory = [...answerHistory, action];
@@ -309,20 +359,87 @@ export default function Home() {
       // Nothing to do; rotation just won't apply next run.
     }
 
-    // The wildcard may stretch TASTE, never FEASIBILITY: drawn from the same
-    // filtered survivors, so it can surprise on theme but can never suggest
-    // something ruled out on cost, company, or anything else asked.
-    const wildcardCandidates = ordered.filter((a) => !topMatchIds.includes(a.id));
-
-    const finalResults = [...topMatches];
-    if (wildcardCandidates.length > 0) {
-      const randomWildcard =
-        wildcardCandidates[Math.floor(Math.random() * wildcardCandidates.length)];
-      finalResults.push({ ...randomWildcard, isWildcard: true });
-    }
-
-    setRecommendations(finalResults);
+    // THE WILDCARD OBEYS NOTHING. Drawn at random from the whole PATHWAY --
+    // not the survivors, not by rank, and not within the budget answer either.
+    // The only rows it will not return are the cards already on screen and
+    // anything rerolled away. The card is labelled to say exactly this; if a
+    // filter is ever put back, the label has to change with it.
+    setShownActivities(topMatches);
+    setRerollPool(rerollPoolFrom(ordered));
+    setWildcardPool(pool);
+    setDiscardedIds([]);
+    setWildcard(
+      decorateWildcard(drawRandom(availableWildcards(pool, topMatchIds)), userVector)
+    );
     setIsLoading(false);
+  };
+
+  /** Everything the results view owns. Every way back out clears all of it. */
+  const resetResults = () => {
+    setShownActivities([]);
+    setWildcard(null);
+    setRerollPool([]);
+    setWildcardPool([]);
+    setDiscardedIds([]);
+    setRelaxedConstraints([]);
+  };
+
+  /** The vector the results were built against, or null if storage was blocked. */
+  const currentUserVector = () => (quizSession ? sessionUserVector(quizSession) : null);
+
+  /**
+   * Reroll one ranked card.
+   *
+   * PERMANENT for this run: the card is discarded and never comes back, as a
+   * ranked card or as a wildcard. The replacement comes out of a pool SHARED by
+   * all three slots (ranks 4-8), so a healthy pool gives about five rerolls in
+   * total and then the results settle. A thinner pool gives fewer, and the
+   * control disappears rather than sitting there dead.
+   */
+  const rerollCard = (index: number) => {
+    const outgoing = shownActivities[index];
+    if (!outgoing) return;
+
+    const replacement = drawRandom(rerollPool);
+    if (!replacement) return;
+
+    const nextShown = [...shownActivities];
+    nextShown[index] = replacement;
+    const nextDiscarded = [...discardedIds, outgoing.id];
+
+    setShownActivities(nextShown);
+    setRerollPool(rerollPool.filter((a) => a.id !== replacement.id));
+    setDiscardedIds(nextDiscarded);
+
+    // A rank 4-8 replacement can be the very row currently sitting as the
+    // wildcard. Redraw the wildcard rather than skipping that row in the pool:
+    // skipping it would quietly cost the user one of their five rerolls.
+    if (wildcard && wildcard.id === replacement.id) {
+      const excluded = [...nextShown.map((a) => a.id), ...nextDiscarded];
+      setWildcard(
+        decorateWildcard(
+          drawRandom(availableWildcards(wildcardPool, excluded)),
+          currentUserVector()
+        )
+      );
+    }
+  };
+
+  /**
+   * Draw a fresh wildcard under the same rule. The one on screen is discarded
+   * for good, so the wildcard's own pool shrinks with each roll; when nothing
+   * eligible is left the card stops rendering.
+   */
+  const rerollWildcard = () => {
+    if (!wildcard) return;
+
+    const nextDiscarded = [...discardedIds, wildcard.id];
+    setDiscardedIds(nextDiscarded);
+
+    const excluded = [...shownActivities.map((a) => a.id), ...nextDiscarded];
+    setWildcard(
+      decorateWildcard(drawRandom(availableWildcards(wildcardPool, excluded)), currentUserVector())
+    );
   };
 
   /** Enter the feasibility questions for a pathway, from a clean slate. */
@@ -330,8 +447,7 @@ export default function Home() {
     setPath(chosen);
     setCurrentStep(0);
     setAnswerHistory([]);
-    setRecommendations([]);
-    setRelaxedConstraints([]);
+    resetResults();
     setStage("questions");
   };
 
@@ -340,8 +456,7 @@ export default function Home() {
     setPath(null);
     setCurrentStep(0);
     setAnswerHistory([]);
-    setRecommendations([]);
-    setRelaxedConstraints([]);
+    resetResults();
     setStage("chooser");
   };
 
@@ -356,8 +471,7 @@ export default function Home() {
     setPath(null);
     setCurrentStep(0);
     setAnswerHistory([]);
-    setRecommendations([]);
-    setRelaxedConstraints([]);
+    resetResults();
     setStage("quiz");
   };
 
@@ -378,7 +492,11 @@ export default function Home() {
   };
 
   const getMedalText = (index: number, isWildcard: boolean) => {
-    if (isWildcard) return "✨ Wildcard";
+    // The label states the rule, because the card genuinely will not obey the
+    // answers the user just gave -- INCLUDING their budget. Unlabelled, it
+    // reads as a filtering bug, and on the budget answer it would read as a
+    // broken promise. Any filter put back on the wildcard changes this text.
+    if (isWildcard) return "✨ Wildcard — completely random, ignores everything you said";
     switch(index) {
       case 0: return "🥇 1st";
       case 1: return "🥈 2nd";
@@ -563,15 +681,16 @@ export default function Home() {
           <div className="space-y-6 text-left animate-in fade-in slide-in-from-bottom-4 duration-500">
             <h2 className="text-3xl font-bold text-slate-900 text-center">Your Curated Results</h2>
 
-            {relaxedConstraints.length > 0 && recommendations.length > 0 && (
+            {relaxedConstraints.length > 0 && shownActivities.length > 0 && (
               <p className="text-center text-sm text-sky-800 bg-sky-50 border border-sky-200 rounded-xl px-4 py-3">
                 Nothing matched everything you asked for, so we bent{" "}
                 <strong>{relaxedConstraints.join(", then ")}</strong> to find these. Your budget
                 and who you are with were left exactly as you set them.
+                {wildcard && " The wildcard is the exception — it ignores all of it, on purpose."}
               </p>
             )}
 
-            {!quizSession && recommendations.length > 0 && (
+            {!quizSession && shownActivities.length > 0 && (
               <p className="text-center text-sm text-slate-700 bg-slate-100 border border-slate-200 rounded-xl px-4 py-3">
                 These fit what you asked for, but they are not in any particular order — your
                 browser is blocking storage, so we could not keep your personality result to rank
@@ -600,61 +719,14 @@ export default function Home() {
               </div>
             ) : (
               <div className="space-y-5">
-                {recommendations.length > 0 ? (
-                  recommendations.map((activity, index) => {
-                    const isSaved = savedActivityIds.includes(activity.id);
-                    return (
-                      <div
-                        key={`${activity.id}-${index}`} 
-                        className={`p-6 rounded-2xl shadow-sm border transition-all transform hover:-translate-y-1 relative overflow-hidden
-                          ${activity.isWildcard ? 'bg-white border-purple-200' : 'bg-white border-slate-200 hover:shadow-md'}
-                        `}
-                      >
-                        <div className="flex justify-between items-center mb-4">
-                          <h3 className={`text-xl font-bold ${activity.isWildcard ? 'text-purple-900' : 'text-slate-900'}`}>
-                            {activity.title}
-                          </h3>
-                          
-                          <div className="flex items-center gap-2">
-                            {typeof activity.matchPercent === "number" && (
-                              <span
-                                title="How closely this matches your personality vector"
-                                className="border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap"
-                              >
-                                {Math.round(activity.matchPercent)}% match
-                              </span>
-                            )}
-                            <span className={`border text-xs font-bold px-4 py-1.5 rounded-full whitespace-nowrap ${getMedalStyles(index, activity.isWildcard)}`}>
-                              {getMedalText(index, activity.isWildcard)}
-                            </span>
-                            
-                            <button
-                              onClick={() => toggleSaveActivity(activity.id)}
-                              title={isSaved ? "Saved!" : "Save to list"}
-                              className={`p-2 rounded-full border transition-all ${
-                                isSaved 
-                                  ? 'bg-rose-50 border-rose-200 text-rose-600' 
-                                  : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-rose-500'
-                              }`}
-                            >
-                              {isSaved ? "♥" : "♡"}
-                            </button>
-                          </div>
-                        </div>
-                        
-                        <p className="text-slate-600 leading-relaxed text-sm md:text-base">
-                          {activity.description}
-                        </p>
-                      </div>
-                    );
-                  })
-                ) : (
+                {shownActivities.length === 0 && (
                   <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 shadow-sm">
                     <p className="text-slate-800 font-bold text-lg mb-2">Nothing fits, even after bending what we could.</p>
                     <p className="text-slate-500 text-sm mb-4">
                       We relaxed where you wanted to be, how active it should be, and how much time
-                      you have — and still found nothing. We will not suggest something that costs
-                      more than you said, or needs people you do not have.
+                      you have — and still found nothing. We will not rank something at you that
+                      costs more than you said, or needs people you do not have.
+                      {wildcard && " The wildcard below is not a recommendation — it is drawn at random and ignores everything you told us, budget included."}
                     </p>
                     <button
                       onClick={restart}
@@ -664,6 +736,70 @@ export default function Home() {
                     </button>
                   </div>
                 )}
+
+                {resultCards.map((activity, index) => {
+                  const isSaved = savedActivityIds.includes(activity.id);
+                  return (
+                    <div
+                      key={`${activity.id}-${index}`} 
+                      className={`p-6 rounded-2xl shadow-sm border transition-all transform hover:-translate-y-1 relative overflow-hidden
+                        ${activity.isWildcard ? 'bg-white border-purple-200' : 'bg-white border-slate-200 hover:shadow-md'}
+                      `}
+                    >
+                      <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
+                        <h3 className={`text-xl font-bold ${activity.isWildcard ? 'text-purple-900' : 'text-slate-900'}`}>
+                          {activity.title}
+                        </h3>
+                        
+                        <div className="flex flex-wrap items-center gap-2">
+                          {typeof activity.matchPercent === "number" && (
+                            <span
+                              title="How closely this matches your personality vector"
+                              className="border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap"
+                            >
+                              {Math.round(activity.matchPercent)}% match
+                            </span>
+                          )}
+                          <span className={`border text-xs font-bold px-4 py-1.5 rounded-full ${activity.isWildcard ? '' : 'whitespace-nowrap'} ${getMedalStyles(index, activity.isWildcard)}`}>
+                            {getMedalText(index, activity.isWildcard)}
+                          </span>
+                          
+                          {(activity.isWildcard ? wildcardRerollAvailable : rerollPool.length > 0) && (
+                            <button
+                              onClick={() =>
+                                activity.isWildcard ? rerollWildcard() : rerollCard(index)
+                              }
+                              title={
+                                activity.isWildcard
+                                  ? "Draw another one at random. This one will not come back."
+                                  : "Swap this one out for good"
+                              }
+                              className="border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-900 text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap transition-colors"
+                            >
+                              ↻ Reroll
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() => toggleSaveActivity(activity.id)}
+                            title={isSaved ? "Saved!" : "Save to list"}
+                            className={`p-2 rounded-full border transition-all ${
+                              isSaved 
+                                ? 'bg-rose-50 border-rose-200 text-rose-600' 
+                                : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-rose-500'
+                            }`}
+                          >
+                            {isSaved ? "♥" : "♡"}
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <p className="text-slate-600 leading-relaxed text-sm md:text-base">
+                        {activity.description}
+                      </p>
+                    </div>
+                  );
+                })}
 
                 <button onClick={restart} className="w-full bg-slate-900 text-white py-4 mt-8 rounded-xl font-bold hover:bg-slate-800 transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
                   Try a different path

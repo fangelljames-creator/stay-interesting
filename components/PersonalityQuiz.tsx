@@ -117,7 +117,7 @@ export default function PersonalityQuiz({ onContinue }: PersonalityQuizProps) {
       case "Stimulation":
         return {
           title: "The Thrill Seeker",
-          description: "You crave high arousal and excitement. Whether it's high-stakes gaming or intense activities, you want something that keeps you on the edge of your seat."
+          description: "You chase intensity and excitement. Whether it's high-stakes gaming or intense activities, you want something that keeps you on the edge of your seat."
         };
       default:
         return {
