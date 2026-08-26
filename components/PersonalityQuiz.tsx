@@ -4,6 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { personalityQuestions, type QuizOption } from "../data/personalityQuiz";
 import { writeQuizSession } from "../lib/quizSession";
+import { totalsFrom, userVectorFromQuizTotals } from "../lib/matchActivities";
+import { determinePersonalityType, type PersonalityType } from "../lib/personalityTypes";
+import TasteRadar from "./TasteRadar";
 
 /**
  * Module scope on purpose. Math.random() inside the component body trips the
@@ -34,8 +37,11 @@ export default function PersonalityQuiz({ onContinue }: PersonalityQuizProps) {
   // un-count a skip when the user goes back over one.
   const [skipFlags, setSkipFlags] = useState<boolean[]>([]);
   const [isFinished, setIsFinished] = useState(false);
+  // Which way the last move went, so a question slides in from the side the
+  // user came from. Purely cosmetic; nothing branches on it but a class name.
+  const [direction, setDirection] = useState<1 | -1>(1);
 
-  const [profileType, setProfileType] = useState<{title: string, description: string} | null>(null);
+  const [profileType, setProfileType] = useState<PersonalityType | null>(null);
 
   // Expecting exactly 7 numbers now
   const handleSelectOption = (
@@ -49,6 +55,7 @@ export default function PersonalityQuiz({ onContinue }: PersonalityQuizProps) {
     // previously were not, which left state missing the final answer.
     setSelectedVectors(newVectors);
     setSkipFlags(newSkips);
+    setDirection(1);
 
     if (currentStep < personalityQuestions.length - 1) {
       setCurrentStep(currentStep + 1);
@@ -70,73 +77,21 @@ export default function PersonalityQuiz({ onContinue }: PersonalityQuizProps) {
 
   const handleBack = () => {
     if (currentStep > 0) {
+      setDirection(-1);
       setCurrentStep(currentStep - 1);
+      // Dropping the last answer is all the radar needs to rewind: its vector
+      // is derived from selectedVectors, so the shape returns to exactly what
+      // it was before that answer. No separate history to keep in step.
       setSelectedVectors(selectedVectors.slice(0, -1));
       setSkipFlags(skipFlags.slice(0, -1));
     }
   };
 
-  // Takes the raw per-axis sums, not averages -- see calculateFinalProfile.
-  const determinePersonalityType = (vector: number[]) => {
-    const traits = ["Social", "Energy", "Creative", "Analytical", "Outdoors", "Novelty", "Stimulation"];
-    const maxScore = Math.max(...vector);
-    const dominantIndex = vector.indexOf(maxScore);
-    const dominantTrait = traits[dominantIndex];
-
-    switch (dominantTrait) {
-      case "Social":
-        return {
-          title: "The Social Catalyst",
-          description: "You thrive on connection. The best activities for you are those that bring people together, spark conversation, and create shared memories."
-        };
-      case "Energy":
-        return {
-          title: "The Dynamic Action-Taker",
-          description: "You have physical energy to burn. You prefer getting your heart rate up and challenging your body over sitting still."
-        };
-      case "Creative":
-        return {
-          title: "The Meticulous Creator",
-          description: "You find peace in expression and craftsmanship. You love the flow state that comes from bringing an idea into reality with precision."
-        };
-      case "Analytical":
-        return {
-          title: "The Strategic Architect",
-          description: "You see the world as a series of puzzles. You find deep satisfaction in untangling complex systems, optimizing outcomes, and mapping logical strategies."
-        };
-      case "Outdoors":
-        return {
-          title: "The Open-Air Explorer",
-          description: "You belong outside the four walls of a room. Your ideal state involves fresh air, changing landscapes, and interacting with nature."
-        };
-      case "Novelty":
-        return {
-          title: "The Spontaneous Pioneer",
-          description: "Routine bores you. You are heavily driven by the desire to try things you've never done before and break out of your comfort zone."
-        };
-      case "Stimulation":
-        return {
-          title: "The Thrill Seeker",
-          description: "You chase intensity and excitement. Whether it's high-stakes gaming or intense activities, you want something that keeps you on the edge of your seat."
-        };
-      default:
-        return {
-          title: "The Balanced Generalist",
-          description: "You are highly adaptable, finding joy across a wide spectrum of physical, mental, and social activities."
-        };
-    }
-  };
-
   const calculateFinalProfile = (allVectors: number[][], allSkips: boolean[]) => {
-    // We now have 7 zeroes
-    const totals = [0, 0, 0, 0, 0, 0, 0];
-
-    allVectors.forEach((vec) => {
-      // Loop counts up to 7
-      for (let i = 0; i < 7; i++) {
-        totals[i] += vec[i];
-      }
-    });
+    // The same summation the building-mode radar runs after every answer. It
+    // is shared rather than duplicated so the shape drawn WHILE answering
+    // cannot disagree with the vector the finished run actually produces.
+    const totals = totalsFrom(allVectors);
 
     // The dominant axis is judged on the RAW sums. Judging on rounded averages
     // collapsed distinct scores onto the same integer and left ~58% of answer
@@ -167,20 +122,59 @@ export default function PersonalityQuiz({ onContinue }: PersonalityQuizProps) {
     router.push("/");
   };
 
+  /**
+   * The vector as it stands right now — the running average of every answer
+   * given so far, and after the last question, the finished one.
+   *
+   * Derived from selectedVectors rather than tracked separately, which is what
+   * makes the radar behave correctly for free: a SKIP goes through
+   * handleSelectOption like a click so it lands here like any other answer,
+   * and BACK slices the array so the shape rewinds exactly. Null until the
+   * first answer, which the radar draws as its neutral shape.
+   *
+   * The same two functions the session write uses, in the same order, so the
+   * shape on screen can never disagree with the vector that ranks activities.
+   */
+  const answeredCount = selectedVectors.length;
+  const liveVector =
+    answeredCount > 0
+      ? userVectorFromQuizTotals(totalsFrom(selectedVectors), answeredCount)
+      : null;
+
   if (isFinished && profileType) {
     return (
       <div className="max-w-2xl mx-auto p-8 bg-white rounded-2xl shadow-xl border border-gray-100 text-center animate-in fade-in zoom-in duration-500">
         <div className="inline-block px-4 py-1.5 rounded-full bg-indigo-100 text-indigo-800 text-sm font-bold tracking-wider uppercase mb-6">
           Your Profile
         </div>
-        <h2 className="text-4xl font-extrabold text-gray-900 mb-4">{profileType.title}</h2>
-        <p className="text-lg text-gray-600 mb-8 leading-relaxed">
-          {profileType.description}
-        </p>
+
+        {/*
+          THE PAYOFF. The shape the user has been watching build, now at full
+          size and labelled. It replaces nothing — the numeric vector tiles
+          that used to sit here were deleted in the rebalance because they were
+          the last rounding in the scoring path, and the card has read as a
+          bare paragraph ever since.
+
+          The numbers beside the axes ARE rounded, by radarGeometry's
+          labelValue, and that is the only rounding involved: the profile title
+          above still comes from determinePersonalityType on the raw sums, and
+          the polygon itself is drawn from the unrounded vector.
+        */}
+        <div className="flex flex-col md:flex-row md:items-center md:text-left gap-6 md:gap-8">
+          <div className="shrink-0 self-center">
+            <TasteRadar mode="final" vector={liveVector} />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-4">{profileType.title}</h2>
+            <p className="text-lg text-gray-600 leading-relaxed">
+              {profileType.description}
+            </p>
+          </div>
+        </div>
 
         <button
           onClick={handleContinue}
-          className="w-full sm:w-auto px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-indigo-200"
+          className="w-full sm:w-auto mt-8 px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-indigo-200"
         >
           Find My Perfect Activities →
         </button>
@@ -223,12 +217,40 @@ export default function PersonalityQuiz({ onContinue }: PersonalityQuizProps) {
             </button>
           </div>
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mt-2 leading-snug">
-          {question.scenario}
-        </h2>
+        {/*
+          The radar sits OUTSIDE the keyed wrapper below on purpose. Keying it
+          to currentStep would remount it on every question, throwing away the
+          in-flight morph and making the shape jump instead of reshape.
+        */}
+        <div className="flex flex-col md:flex-row md:items-start gap-4 md:gap-6 mt-2">
+          <div className="flex-1 order-2 md:order-1">
+            <h2
+              key={currentStep}
+              className={`text-2xl font-bold text-gray-900 leading-snug animate-in fade-in duration-300 ${
+                direction === 1 ? "slide-in-from-right-4" : "slide-in-from-left-4"
+              }`}
+            >
+              {question.scenario}
+            </h2>
+            {currentStep === 0 && (
+              <p className="text-sm text-indigo-500 font-semibold mt-3">
+                Every answer reshapes your taste map.
+              </p>
+            )}
+          </div>
+
+          <div className="shrink-0 self-center order-1 md:order-2">
+            <TasteRadar mode="building" vector={liveVector} />
+          </div>
+        </div>
       </div>
 
-      <div className="space-y-4">
+      <div
+        key={currentStep}
+        className={`space-y-4 animate-in fade-in duration-300 ${
+          direction === 1 ? "slide-in-from-right-4" : "slide-in-from-left-4"
+        }`}
+      >
         {question.options.map((option, index) => (
           <button
             key={index}

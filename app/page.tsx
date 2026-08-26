@@ -3,6 +3,8 @@
 import { useState, useEffect, useReducer, SubmitEvent } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import PersonalityQuiz from "@/components/PersonalityQuiz";
+import TasteRadar from "@/components/TasteRadar";
+import { determinePersonalityType } from "@/lib/personalityTypes";
 import { readQuizSession, clearQuizSession, sessionUserVector, type QuizSession } from "@/lib/quizSession";
 import { rankActivities } from "@/lib/matchActivities";
 import {
@@ -28,15 +30,23 @@ import {
 const ROTATION_DISTANCE_PENALTY = 1.35;
 
 /**
- * The funnel, in order. Every visit walks personality quiz -> Bored/Hobby
- * chooser -> feasibility questions -> results.
+ * The funnel, in order. Every visit walks hero -> personality quiz ->
+ * Bored/Hobby chooser -> feasibility questions -> results.
  *
  * "loading" exists because this page is statically prerendered: sessionStorage
  * does not exist during that render, so which stage to show cannot be known
  * until after mount. Resolving it in useEffect and painting a placeholder in
  * the meantime avoids a hydration mismatch.
+ *
+ * "hero" is where a NEW visitor lands. The funnel used to open on question 1
+ * of the personality quiz, which asked eight abstract questions of someone who
+ * had not yet been told what the site does. Someone returning in the same tab
+ * skips it — they have a vector, so they get the banner and the chooser.
+ *
+ * The hero is a STAGE, not a route: its CTA sets stage to "quiz" and the quiz
+ * animates in on the same page. Nothing navigates.
  */
-type FunnelStage = "loading" | "quiz" | "chooser" | "questions" | "results";
+type FunnelStage = "loading" | "hero" | "quiz" | "chooser" | "questions" | "results";
 
 /**
  * The wildcard is drawn from the raw pathway pool, so unlike a ranked card it
@@ -121,7 +131,7 @@ export default function Home() {
   }, []);
 
   // Resolve the opening stage once the tab's storage is actually readable.
-  // A returning visitor lands on the chooser; a new one takes the quiz first.
+  // A returning visitor lands on the chooser; a new one gets the hero.
   //
   // eslint's react-hooks/set-state-in-effect fires here, and unavoidably so:
   // this page is prerendered, sessionStorage does not exist at that point, and
@@ -130,7 +140,7 @@ export default function Home() {
   useEffect(() => {
     const stored = readQuizSession();
     setQuizSession(stored);
-    setStage(stored ? "chooser" : "quiz");
+    setStage(stored ? "chooser" : "hero");
   }, []);
 
   const fetchSavedActivities = async (userId: string) => {
@@ -411,13 +421,20 @@ export default function Home() {
     setStage("questions");
   };
 
-  /** Back to the chooser, keeping the personality vector. */
+  /**
+   * Back to the chooser, keeping the personality vector.
+   *
+   * Falls back to the hero when there is no vector to keep. The wordmark at the
+   * top of the page calls this, and without the guard a visitor who has not
+   * taken the quiz could click it and land on a chooser that has nothing to
+   * rank their answers against.
+   */
   const restart = () => {
     setPath(null);
     setCurrentStep(0);
     setAnswerHistory([]);
     resetResults();
-    setStage("chooser");
+    setStage(quizSession ? "chooser" : "hero");
   };
 
   /**
@@ -563,13 +580,74 @@ export default function Home() {
       {authMessage && <p className="text-xs text-center text-amber-600 font-medium mb-2">{authMessage}</p>}
 
       <div className="max-w-2xl w-full text-center space-y-8 my-auto">
-        <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight mb-8 cursor-pointer hover:text-blue-600 transition-colors" onClick={restart}>
-          Stay Interesting
-        </h1>
+        {/*
+          Hidden on the hero, which sets the name itself and at hero scale.
+          Two "Stay Interesting" headings stacked on one screen reads as a bug
+          rather than as branding.
+        */}
+        {stage !== "hero" && (
+          <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight mb-8 cursor-pointer hover:text-blue-600 transition-colors" onClick={restart}>
+            Stay Interesting
+          </h1>
+        )}
 
         {stage === "loading" && (
           <div className="flex flex-col items-center justify-center py-16 space-y-4">
             <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin" />
+          </div>
+        )}
+
+        {stage === "hero" && (
+          <div className="animate-in fade-in duration-700 text-left">
+            <div className="flex flex-col md:flex-row md:items-center gap-8 md:gap-12">
+              <div className="flex-1">
+                <h1 className="text-5xl md:text-6xl font-extrabold text-slate-900 tracking-tight">
+                  Stay Interesting
+                </h1>
+
+                <p className="text-lg md:text-xl text-slate-700 font-medium mt-4 leading-snug">
+                  Beat the boredom you are in right now, or find a hobby that actually sticks.
+                </p>
+
+                <p className="text-slate-500 mt-3 leading-relaxed">
+                  A few quick scenarios learn what you are actually like, then we match that
+                  against what tonight will genuinely allow — your time, your energy, your budget.
+                </p>
+
+                <div className="flex flex-wrap gap-2 mt-6">
+                  {["~2 minutes", "no wrong answers", "skip anything"].map((chip) => (
+                    <span
+                      key={chip}
+                      className="text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-full px-3 py-1.5"
+                    >
+                      {chip}
+                    </span>
+                  ))}
+                </div>
+
+                {/*
+                  The single CTA. It changes STAGE, not route -- the quiz
+                  mounts into the same page underneath and animates in. A
+                  router.push here would cost a navigation and lose the
+                  entrance.
+                */}
+                <button
+                  onClick={() => setStage("quiz")}
+                  className="w-full sm:w-auto mt-8 px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-200 hover:-translate-y-0.5"
+                >
+                  Find out what suits you →
+                </button>
+              </div>
+
+              {/*
+                The motif, selling itself. Four example shapes on a loop: the
+                point being made is that this measures something specific about
+                a person, which a static chart cannot say.
+              */}
+              <div className="shrink-0 self-center">
+                <TasteRadar mode="demo" />
+              </div>
+            </div>
           </div>
         )}
 
@@ -581,6 +659,40 @@ export default function Home() {
 
         {stage === "chooser" && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/*
+              THE RETURNING-VISITOR BANNER. Someone reaching the chooser has
+              already earned a vector, so the hero's pitch is spent on them --
+              what they need instead is proof the tab still remembers who they
+              are, and a way out if it got them wrong.
+
+              Deliberately slim: this is a receipt, not the payoff. The full
+              labelled radar belongs on the profile card at the end of the
+              quiz. The retake link lives HERE rather than beneath the chooser
+              cards, where it used to sit -- one retake affordance, next to the
+              thing it would undo.
+            */}
+            {quizSession && (
+              <div className="flex items-center gap-4 text-left bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                <div className="shrink-0">
+                  <TasteRadar mode="building" vector={sessionUserVector(quizSession)} size={72} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    Your taste map
+                  </p>
+                  <p className="text-lg font-bold text-slate-900 leading-tight truncate">
+                    {determinePersonalityType(quizSession.totals).title}
+                  </p>
+                  <button
+                    onClick={retakePersonalityQuiz}
+                    className="text-xs font-semibold text-slate-400 hover:text-indigo-600 underline underline-offset-4 transition-colors mt-1"
+                  >
+                    Retake the quiz
+                  </button>
+                </div>
+              </div>
+            )}
+
             <h2 className="text-2xl font-bold text-slate-800 mb-8">What brings you here today?</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <button onClick={() => choosePath("bored")} className="bg-white p-8 rounded-2xl shadow-sm border-2 border-slate-100 hover:border-blue-500 hover:shadow-md transition-all text-left group">
@@ -594,12 +706,21 @@ export default function Home() {
               </button>
             </div>
 
-            <button
-              onClick={retakePersonalityQuiz}
-              className="text-sm font-semibold text-slate-400 hover:text-indigo-600 underline underline-offset-4 transition-colors"
-            >
-              Retake the personality quiz
-            </button>
+            {/*
+              The retake link normally lives in the banner above. This is the
+              storage-blocked path: writeQuizSession fails silently, so the
+              quiz can finish and still leave quizSession null, and the banner
+              -- which has no vector to draw -- does not render. Without this
+              there would be no way to retake from the chooser at all.
+            */}
+            {!quizSession && (
+              <button
+                onClick={retakePersonalityQuiz}
+                className="text-sm font-semibold text-slate-400 hover:text-indigo-600 underline underline-offset-4 transition-colors"
+              >
+                Retake the personality quiz
+              </button>
+            )}
           </div>
         )}
 

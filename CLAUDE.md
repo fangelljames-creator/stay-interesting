@@ -1,10 +1,15 @@
 @AGENTS.md
 
-# CLAUDE.md — Boredom Buster
+# CLAUDE.md — Stay Interesting
 
 Context for Claude Code sessions. Merged from Owen's project context file (2026-08-25).
 Items marked **verified** were checked against the code at that point; the rest are as-reviewed
 in chat and should be confirmed before you act on them.
+
+⚠️ **The product is called "Stay Interesting". "Boredom Buster" is the old name**, superseded
+2026-08-26 by the `landing-flow` branch. It survives in this file's history below and in the comment
+headers of `supabase/*.sql`, which are records rather than UI and are left alone deliberately. It
+must not appear on any user-facing surface — if you find one, that is a bug, not a leftover.
 
 ## What this project is
 
@@ -24,17 +29,19 @@ up, log in, take a 7-axis personality quiz, and save activities to custom lists.
   docs before wiring one up.
 - Supabase (Postgres + auth). Hosted on Vercel.
 - `app/` — routes (`page.tsx` home, `quiz/page.tsx`, `login/page.tsx`)
-- `components/` — UI components (`PersonalityQuiz.tsx`)
+- `components/` — UI components (`PersonalityQuiz.tsx`, `TasteRadar.tsx`)
 - `data/` — static data and logic (`personalityQuiz.ts`)
+- `docs/` — `manual-test.md`, the standing click-through checklist. See **Manual testing** below.
 - `lib/` — Supabase client, imported as `@/lib/supabaseClient` (the `@/*` → `./*` alias is in
   `tsconfig.json`) (verified). Also the pure logic modules: `matchActivities.ts` (ranking),
-  `activityTags.ts` (the vocabulary), `feasibilityQuestions.ts`, `quizSession.ts`, and
-  `resultsSelection.ts` (the wildcard draw) and `rerollMachine.ts` (the results reducer: the
-  deterministic reroll queue, the shared counter, and the wildcard refresh). Sibling imports in `lib/`
-  use the explicit `./name.ts` extension so the dev scripts can import them under Node.
-- `scripts/` — dev-only analysis tools, not part of the build. Four of them:
+  `activityTags.ts` (the vocabulary), `feasibilityQuestions.ts`, `quizSession.ts`,
+  `resultsSelection.ts` (the wildcard draw), `rerollMachine.ts` (the results reducer: the
+  deterministic reroll queue, the shared counter, and the wildcard refresh), `radarGeometry.ts`
+  (vector → SVG coordinates) and `personalityTypes.ts` (the profile argmax). Sibling imports in
+  `lib/` use the explicit `./name.ts` extension so the dev scripts can import them under Node.
+- `scripts/` — dev-only analysis tools, not part of the build. Five of them:
   `validate-activity-seed.mjs`, `verify-activity-matching.mjs`, `verify-results-selection.mjs`,
-  `analyze-quiz-balance.mjs`
+  `verify-taste-radar.mjs`, `analyze-quiz-balance.mjs`
 - `supabase/` — SQL to paste into the Supabase SQL editor. Not run by any CLI or migration
   tool; these are hand-run scripts, written to be idempotent so re-running is safe.
 
@@ -47,8 +54,10 @@ check `node_modules/next/dist/docs/` before relying on remembered App Router con
 2. Say which files you're creating or editing, and why, before you do it.
 3. Anything Owen must paste elsewhere (SQL for the Supabase SQL editor, env values) must be
    complete and self-contained — nothing left for him to guess.
-4. Check your own work: run the dev server and `npx tsc --noEmit` after changes. When something
-   breaks, diagnose step by step and explain the cause, not just the fix.
+4. Check your own work: run the dev server and `npx tsc --noEmit` after changes, plus the five
+   `scripts/*.mjs` checks. When something breaks, diagnose step by step and explain the cause, not
+   just the fix. Anything a script cannot see belongs in `docs/manual-test.md` — **extend it in the
+   final stage of every feature branch**, see **Manual testing** below.
    (Heads-up: `next dev` rewrites the agent-rules block into `AGENTS.md`, so running it can leave
    an uncommitted change in the tree. See `@AGENTS.md` — glance at the diff first, only the
    managed `nextjs-agent-rules` block should ever change, then commit it alongside your work.)
@@ -164,15 +173,26 @@ for a big spender — the ceiling handles it.
 each fell into, which is exactly how tags came to do nothing without anyone noticing. Stating the
 action makes a no-op visible as a no-op. "Don't mind" answers are `none`.
 
-## One funnel (merged 2026-08-25, roadmap steps 3 + 4)
+## One funnel (merged 2026-08-25, roadmap steps 3 + 4; hero added 2026-08-26)
 
 Every visit walks the same path, in `app/page.tsx`:
 
 ```
-personality quiz -> Bored/Hobby chooser -> feasibility questions -> ranked results
+hero -> personality quiz -> Bored/Hobby chooser -> feasibility questions -> ranked results
 ```
 
-`FunnelStage` drives it: `"loading" | "quiz" | "chooser" | "questions" | "results"`.
+`FunnelStage` drives it:
+`"loading" | "hero" | "quiz" | "chooser" | "questions" | "results"`.
+
+**`"hero"` is a STAGE, not a route.** Its CTA sets `stage` to `"quiz"` and the quiz animates in
+underneath on the same page — a `router.push` there would cost a navigation and lose the entrance.
+Only a visitor with **no** session vector sees it; someone returning in the same tab opens on the
+chooser, where the banner (below) stands in for it. See **Visual identity** for what the hero holds.
+
+⚠️ **Two guards the hero depends on.** The persistent `<h1>Stay Interesting</h1>` is suppressed on
+`"hero"`, because the hero sets the name itself and two of them read as a bug. And `restart()` —
+which that `<h1>` invokes — falls back to `"hero"` when `quizSession` is null, so a visitor who has
+not taken the quiz cannot be dropped onto a chooser with nothing to rank against.
 
 **`"loading"` is load-bearing, not decoration.** The page is statically prerendered, so
 `sessionStorage` does not exist during that render and the opening stage cannot be known until
@@ -349,6 +369,80 @@ which point starvation largely evaporates on its own.
   `react-hooks/purity`.
 - The CTA takes an optional `onContinue`; without one it routes to `/`. That keeps
   `app/quiz/page.tsx` a server component.
+- **The profile argmax now lives in `lib/personalityTypes.ts`**, moved verbatim out of the
+  component 2026-08-26 because the returning-visitor banner on `app/page.tsx` needs the title from a
+  stored session. Nothing about the judgement changed. ⚠️ Note the consequence for the balance
+  script: the reason it mirrors the argmax by hand is that the function used to sit inside a
+  `"use client"` component. **It no longer does, so the script could import the real one.** Left
+  alone on the `landing-flow` branch only because that script was out of its scope.
+- **A `building`-mode `TasteRadar` sits beside the question**, redrawing after every answer. Its
+  vector is derived from the existing `selectedVectors` state — `totalsFrom` then
+  `userVectorFromQuizTotals`, the same two functions the session write uses — so a **skip** reshapes
+  it and **Back** rewinds it with no extra state and no special cases. `calculateFinalProfile` uses
+  the same `totalsFrom`, so the shape drawn while answering cannot disagree with the finished vector.
+
+## Visual identity — the radar is the product motif
+
+Added 2026-08-26 (branch `landing-flow`).
+
+**`components/TasteRadar.tsx` is the one visual idea this product has.** A 7-axis polygon, drawn
+straight into SVG with no chart library, appearing four times in the funnel — and it is the same
+component every time. It is what makes the 7-axis vector a *thing the user can see* rather than an
+implementation detail they never learn about.
+
+| Mode | Where | Treatment |
+|---|---|---|
+| `demo` | the hero | 280px, labelled, autoplaying four example shapes on a 2.6s loop |
+| `building` | beside each quiz question; the returning banner | 132px (72 in the banner), unlabelled, quiet |
+| `final` | the profile card | 260px, labelled, vertex dots, the axis value beside each label |
+
+⚠️ **`mode` controls PRESENTATION, not where the data comes from.** The returning banner passes a
+settled vector to `building` because it wants the small treatment, not because anything is still
+being built. Do not add a data path to a mode.
+
+⚠️ **All the maths is in `lib/radarGeometry.ts` and none of it is in the component.** `TasteRadar` is
+`"use client"`, which means no dev script can import it — the geometry lives outside so
+`scripts/verify-taste-radar.mjs` checks the real functions rather than a hand-copied mirror. Nothing
+in the component may compute a coordinate.
+
+⚠️ **`Math.round` appears exactly once in the whole radar: `labelValue`,** and only for the number
+printed beside an axis. The polygon is always drawn from the raw unrounded vector — the same vector
+that ranks activities. This is the same rule as everywhere else in the project; CHECK C of the verify
+script fails the run if a fractional vector ever draws the same shape as its rounded form.
+
+**Morphs are interpolated with `requestAnimationFrame`, not with CSS.** This is not a stylistic
+choice and should not be "simplified" back: **CSS cannot transition an SVG `<polygon>`'s `points`
+attribute at all**, and transitioning a `<path>`'s `d` works only in Chrome and Firefox, so Safari
+would hard-jump on every answer. `useAnimatedVector` eases the seven numbers directly.
+
+⚠️ **It eases from wherever the last morph reached, not from the last settled shape.** Someone
+clicking through the quiz faster than 600ms retargets mid-flight and the polygon changes course.
+Restarting from the previous target would snap backwards on every fast answer. The effect also
+depends on the target **serialised to a string**, because `target` is a fresh array every render and
+the hook re-renders every frame — an array dependency would restart the animation forever.
+
+**Reduced motion is honoured**, via `useSyncExternalStore` on `matchMedia`. That hook rather than
+`useState` + `useEffect` for two reasons: it is what an external, React-doesn't-own-it source is for,
+and its third argument supplies a server snapshot, so a statically prerendered page has an answer
+without a hydration mismatch. Under reduced motion the shape snaps and the hero demo holds one shape.
+
+**Palette: the radar is indigo** (`#6366f1` fill, `#4f46e5` stroke), the accent the personality quiz
+already owned. Blue and green stay the Bored/Hobby pathway colours and **purple stays the
+wildcard's** — the wildcard's "this card is deliberately different" signal is load-bearing, and the
+badge copy depends on it reading as an exception.
+
+## Manual testing — `docs/manual-test.md`
+
+⚠️ **`docs/manual-test.md` is the repo's ONE standing click-through checklist, and every feature
+branch extends it in its final stage.** It is not per-branch and it is not a landing-flow document:
+it is organised by feature area and accumulates.
+
+It exists because the `scripts/` suite deliberately stops at the maths. Those scripts import the real
+modules and check what can be checked without a browser — rankings, filters, the reroll reducer, the
+radar geometry. What they cannot check is whether the thing on screen matches the thing in state:
+whether a button appears, whether a shape moves, whether the copy states the rule that is actually in
+force. Splitting it that way is why `verify-taste-radar.mjs` checks vector→polygon mapping and the
+running average but says nothing about whether the morph looks smooth.
 
 ## The 7-axis rubric — every vector is a rubric application
 
@@ -611,6 +705,42 @@ stays publicly readable with no write policy.
   correct.
 
 ## Recently completed
+
+**Landing flow and visual identity, 2026-08-26** (branch `landing-flow`, **merge held for Owen's
+click-through**):
+
+- **The hero.** A new visitor used to land on question 1 of the personality quiz — eight abstract
+  scenarios asked of someone who had not been told what the site does. `"hero"` is now the opening
+  `FunnelStage`, holding the name, a promise naming both intents, the mechanism in one sentence,
+  three expectation chips, and one CTA that changes stage rather than route.
+- **`components/TasteRadar.tsx`** and **`lib/radarGeometry.ts`** — the motif and its maths, split so
+  a dev script can import the half worth checking. See **Visual identity** above for the three modes
+  and the rules that govern them.
+- **The quiz narrates itself.** A building radar reshapes on every answer, on skip, and rewinds on
+  Back — all of it derived from `selectedVectors`, so no new state and no special cases. Questions
+  slide in from the direction of travel.
+- **The profile card gained its payoff**: the large labelled radar beside the title, filling the hole
+  the rebalance left when it deleted the numeric vector tiles.
+- **The returning banner** replaces the hero for a visitor who already has a vector: mini radar,
+  profile title, one retake link. The standalone retake beneath the chooser cards is now the
+  storage-blocked fallback only — `writeQuizSession` fails silently, so the chooser really can be
+  reached with `quizSession` null and no banner to hold the link.
+- **`lib/personalityTypes.ts`** — `determinePersonalityType` extracted verbatim so `app/page.tsx`
+  can read a profile title from a stored session.
+- **`totalsFrom` added to `lib/matchActivities.ts`** and adopted by `calculateFinalProfile`, so the
+  running average the radar draws and the totals the session stores are literally one code path.
+- **`scripts/verify-taste-radar.mjs`** — 16 pass/fail checks over geometry, the running average
+  (including the rewind and the every-option-moves-the-shape property a skip depends on), and the
+  confinement of rounding to `labelValue`.
+- **`docs/manual-test.md`** — new, backfilled from this file's feature records and then extended
+  with the landing flow. See **Manual testing** above.
+- **Rename**: `app/layout.tsx` metadata went from "Create Next App" to "Stay Interesting" plus a real
+  description. That was the last user-facing trace of the old naming.
+- Lint held at the pre-existing 7 errors, all in `app/page.tsx`; `TasteRadar.tsx` adds none. The five
+  dev scripts and `next build` all pass, and every route is still statically prerendered.
+- Untouched by instruction: `data/personalityQuiz.ts` and `scripts/analyze-quiz-balance.mjs`. No
+  option vector moved, and the balance gate reports exactly what it did before (4/5, purist 7/7,
+  Energy 6.88 and Novelty 6.50 still red).
 
 **Reroll fix and respec, 2026-08-26** (branch `reroll-fix`, **merge held for Owen's click-through**):
 
