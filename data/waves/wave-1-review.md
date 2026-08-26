@@ -2,7 +2,7 @@
 
 Production only — no new ideas. Every row here is one of the 99 approved rows from the curated keep list, with its description rewritten in house voice, its tags assigned from scratch under the closed 20-tag vocabulary, and its vector scored against The 7-axis rubric in CLAUDE.md. The CSV's `tier` and `note` columns were veto metadata and do not survive into the seed. Titles are normalised to sentence case to match the existing catalogue.
 
-**99 activities for your veto pass**, plus **24 proposed vector corrections** to existing rows.
+**97 activities for your veto pass**, 2 already vetoed, plus **24 proposed vector corrections** to existing rows.
 
 Nothing here has been written to the seed SQL or the database. Strike anything by adding its
 exact title to the `vetoed` array in the wave JSON, or just tell me and I will.
@@ -50,7 +50,7 @@ The audit you asked for covers **vectors**. Two seeded rows also look wrong on *
 
 Both would need a separate change with its own review, since re-tagging alters which users can see a row at all.
 
-## Quick-fix — 46
+## Quick-fix — 45
 
 | # | Title | Pathway | Cost | Vector | Leans |
 |---|---|---|---|---|---|
@@ -68,40 +68,39 @@ Both would need a separate change with its own review, since re-tagging alters w
 | 12 | Learn three knots that matter | quick-fix | free | `1,2,2,4,1,5,2` | Novelty |
 | 13 | Find five constellations | quick-fix | free | `2,2,1,5,9,5,2` | Outdoors |
 | 14 | Fold an origami crane | quick-fix | free | `1,1,6,4,1,4,1` | Creative |
-| 15 | Fifteen-minute mobility flow | quick-fix | free | `1,4,1,1,1,2,1` | Energy |
-| 16 | Learn to moonwalk | quick-fix | free | `1,5,4,2,1,6,4` | Novelty |
-| 17 | Plan a trip you may never take | quick-fix | free | `2,1,3,6,2,6,2` | Analytical |
-| 18 | Build a blanket fort | quick-fix | free | `5,4,6,2,1,5,2` | Creative |
-| 19 | Two minutes of cold shower | quick-fix | free | `1,4,1,1,1,5,8` | Stimulation |
-| 20 | Write a review someone will actually read | quick-fix | free | `4,1,4,2,1,2,2` | Social |
-| 21 | Microwave mug cake | quick-fix | low-budget | `2,1,3,2,1,3,2` | Creative |
-| 22 | Ten minutes of guided breathing | quick-fix | free | `1,1,1,1,1,3,1` | Novelty |
-| 23 | A glassblowing taster class | quick-fix+long-term | investment-required | `5,6,8,4,1,9,6` | Novelty |
-| 24 | A blacksmithing taster day | quick-fix+long-term | investment-required | `5,9,7,4,3,9,7` | Energy |
-| 25 | Block out your week on one page | quick-fix | free | `1,1,2,6,1,3,2` | Analytical |
-| 26 | Bake rosemary sea salt crackers | quick-fix | low-budget | `2,3,5,3,1,4,2` | Creative |
-| 27 | Study old maps | quick-fix | free | `1,1,2,5,1,7,2` | Novelty |
-| 28 | Identify trees by their bark | quick-fix | free | `2,3,1,5,9,6,1` | Outdoors |
-| 29 | Watch a film like a cinematographer | quick-fix | free | `2,1,4,6,1,5,2` | Analytical |
-| 30 | Learn Morse code | quick-fix | free | `1,1,1,5,1,7,3` | Novelty |
-| 31 | Repair a broken book spine | quick-fix | low-budget | `1,2,4,4,1,5,1` | Novelty |
-| 32 | Sequence a playlist properly | quick-fix | free | `2,1,7,4,1,4,2` | Creative |
-| 33 | Plot a running route worth running | quick-fix | free | `1,1,2,5,3,4,2` | Analytical |
-| 34 | Write with your other hand | quick-fix | free | `1,2,3,3,1,7,2` | Novelty |
-| 35 | Play through a famous chess game | quick-fix | free | `1,1,1,10,1,5,3` | Analytical |
-| 36 | Turn bottles into vases | quick-fix | free | `1,2,6,2,1,4,1` | Creative |
-| 37 | Clear out the camera roll | quick-fix | free | `1,1,1,2,1,1,1` | Analytical |
-| 38 | Put the radio on | quick-fix | free | `1,1,1,2,1,4,2` | Novelty |
-| 39 | Write a quiz for the house | quick-fix | free | `8,1,6,6,1,5,5` | Social |
-| 40 | Translate a news article line by line | quick-fix | free | `1,1,2,7,1,6,2` | Analytical |
-| 41 | Three bullets on today's markets | quick-fix | free | `1,1,2,9,1,4,3` | Analytical |
-| 42 | Check the car's fluids | quick-fix | free | `1,3,1,4,4,3,1` | Analytical |
-| 43 | Sort the spice drawer | quick-fix | free | `1,2,1,2,1,1,1` | Energy |
-| 44 | Learn the NATO alphabet | quick-fix | free | `2,1,1,3,1,4,2` | Novelty |
-| 45 | Foam roll everything that hurts | quick-fix | low-budget | `1,4,1,2,1,2,3` | Energy |
-| 46 | Tie a half-Windsor | quick-fix | free | `1,2,2,3,1,4,2` | Novelty |
+| 15 | Learn to moonwalk | quick-fix | free | `1,5,4,2,1,6,4` | Novelty |
+| 16 | Plan a trip you may never take | quick-fix | free | `2,1,3,6,2,6,2` | Analytical |
+| 17 | Build a blanket fort | quick-fix | free | `5,4,6,2,1,5,2` | Creative |
+| 18 | Two minutes of cold shower | quick-fix | free | `1,4,1,1,1,5,8` | Stimulation |
+| 19 | Write a review someone will actually read | quick-fix | free | `4,1,4,2,1,2,2` | Social |
+| 20 | Microwave mug cake | quick-fix | low-budget | `2,1,3,2,1,3,2` | Creative |
+| 21 | Ten minutes of guided breathing | quick-fix | free | `1,1,1,1,1,3,1` | Novelty |
+| 22 | A glassblowing taster class | quick-fix+long-term | investment-required | `5,6,8,4,1,9,6` | Novelty |
+| 23 | A blacksmithing taster day | quick-fix+long-term | investment-required | `5,9,7,4,3,9,7` | Energy |
+| 24 | Block out your week on one page | quick-fix | free | `1,1,2,6,1,3,2` | Analytical |
+| 25 | Bake rosemary sea salt crackers | quick-fix | low-budget | `2,3,5,3,1,4,2` | Creative |
+| 26 | Study old maps | quick-fix | free | `1,1,2,5,1,7,2` | Novelty |
+| 27 | Identify trees by their bark | quick-fix | free | `2,3,1,5,9,6,1` | Outdoors |
+| 28 | Watch a film like a cinematographer | quick-fix | free | `2,1,4,6,1,5,2` | Analytical |
+| 29 | Learn Morse code | quick-fix | free | `1,1,1,5,1,7,3` | Novelty |
+| 30 | Repair a broken book spine | quick-fix | low-budget | `1,2,4,4,1,5,1` | Novelty |
+| 31 | Sequence a playlist properly | quick-fix | free | `2,1,7,4,1,4,2` | Creative |
+| 32 | Plot a running route worth running | quick-fix | free | `1,1,2,5,3,4,2` | Analytical |
+| 33 | Write with your other hand | quick-fix | free | `1,2,3,3,1,7,2` | Novelty |
+| 34 | Play through a famous chess game | quick-fix | free | `1,1,1,10,1,5,3` | Analytical |
+| 35 | Turn bottles into vases | quick-fix | free | `1,2,6,2,1,4,1` | Creative |
+| 36 | Clear out the camera roll | quick-fix | free | `1,1,1,2,1,1,1` | Analytical |
+| 37 | Put the radio on | quick-fix | free | `1,1,1,2,1,4,2` | Novelty |
+| 38 | Write a quiz for the house | quick-fix | free | `8,1,6,6,1,5,5` | Social |
+| 39 | Translate a news article line by line | quick-fix | free | `1,1,2,7,1,6,2` | Analytical |
+| 40 | Three bullets on today's markets | quick-fix | free | `1,1,2,9,1,4,3` | Analytical |
+| 41 | Check the car's fluids | quick-fix | free | `1,3,1,4,4,3,1` | Analytical |
+| 42 | Sort the spice drawer | quick-fix | free | `1,2,1,2,1,1,1` | Energy |
+| 43 | Learn the NATO alphabet | quick-fix | free | `2,1,1,3,1,4,2` | Novelty |
+| 44 | Foam roll everything that hurts | quick-fix | low-budget | `1,4,1,2,1,2,3` | Energy |
+| 45 | Tie a half-Windsor | quick-fix | free | `1,2,2,3,1,4,2` | Novelty |
 
-## Long-term — 56
+## Long-term — 55
 
 | # | Title | Pathway | Cost | Vector | Leans |
 |---|---|---|---|---|---|
@@ -117,50 +116,49 @@ Both would need a separate change with its own review, since re-tagging alters w
 | 10 | Shadowboxing rounds | long-term | free | `1,9,2,3,1,4,5` | Energy |
 | 11 | Chess study and correspondence games | long-term | free | `3,1,1,10,1,4,5` | Analytical |
 | 12 | Close-up card and coin magic | long-term | low-budget | `4,2,7,4,1,7,4` | Creative |
-| 13 | Indoor bouldering | long-term | low-budget | `5,9,1,5,1,6,6` | Energy |
-| 14 | Hiking and hillwalking | long-term | low-budget | `4,8,1,3,10,5,3` | Outdoors |
-| 15 | Foraging for wild plants | long-term | low-budget | `2,4,2,7,10,8,3` | Outdoors |
-| 16 | Web design and front-end coding | long-term | free | `1,1,7,9,1,6,3` | Analytical |
-| 17 | The big books project | long-term | free | `1,1,1,3,1,5,2` | Novelty |
-| 18 | Fermenting and kombucha brewing | long-term | low-budget | `2,2,5,6,1,7,2` | Novelty |
-| 19 | Bonsai cultivation | long-term | low-budget | `1,2,7,5,4,7,1` | Creative |
-| 20 | Moroccan tagine cooking | long-term | low-budget | `5,3,6,4,1,7,2` | Novelty |
-| 21 | Amateur astronomy | long-term | investment-required | `2,2,3,8,9,8,3` | Outdoors |
-| 22 | Tabletop roleplaying | long-term | low-budget | `10,1,8,5,1,7,5` | Social |
-| 23 | Make a zine | long-term | low-budget | `3,2,9,2,1,7,3` | Creative |
-| 24 | 3D printing and CAD | long-term | investment-required | `1,2,7,9,1,7,3` | Analytical |
-| 25 | Build and paint a scale model | long-term | low-budget | `1,2,7,4,1,5,2` | Creative |
-| 26 | Olympic lifting, properly coached | long-term | investment-required | `6,10,1,6,1,7,7` | Energy |
-| 27 | Build a mechanical keyboard | long-term | investment-required | `1,2,6,7,1,7,3` | Analytical |
-| 28 | Restore a cast iron skillet | long-term | low-budget | `1,4,4,5,1,6,2` | Novelty |
-| 29 | Build an Arduino weather station | long-term | low-budget | `1,2,5,10,2,7,3` | Analytical |
-| 30 | Rowing at a river club | long-term | investment-required | `9,10,1,5,8,7,6` | Energy |
-| 31 | Hill sprint intervals | long-term | free | `1,10,1,3,7,3,7` | Energy |
-| 32 | Design an icon set | long-term | free | `1,1,8,6,1,5,2` | Creative |
-| 33 | Wall-supported handstands | long-term | free | `1,8,1,3,1,5,5` | Energy |
-| 34 | Orienteering in the park | long-term | low-budget | `5,7,1,9,9,7,5` | Analytical |
-| 35 | Speed cup stacking | long-term | low-budget | `2,4,1,4,1,8,6` | Novelty |
-| 36 | Cold brew coffee | long-term | low-budget | `2,1,3,5,1,4,1` | Analytical |
-| 37 | Read military history properly | long-term | free | `1,1,1,8,1,5,2` | Analytical |
-| 38 | Sketch buildings from a bench | long-term | low-budget | `1,3,9,3,6,5,2` | Creative |
-| 39 | Hand-stitch a felt wallet | long-term | low-budget | `1,2,7,3,1,6,1` | Creative |
-| 40 | Build a cardboard automaton | long-term | low-budget | `2,2,9,8,1,8,3` | Creative |
-| 41 | Small engine repair | long-term | low-budget | `1,5,2,9,4,7,3` | Analytical |
-| 42 | Classic car market research | long-term | free | `2,1,1,10,1,6,4` | Analytical |
-| 43 | Antiquarian book collecting | long-term | investment-required | `3,2,2,7,1,7,3` | Analytical |
-| 44 | Sport lockpicking | long-term | low-budget | `1,2,2,9,1,9,4` | Analytical |
-| 45 | Amateur radio | long-term | investment-required | `6,2,3,9,3,9,4` | Analytical |
-| 46 | Kite surfing lessons | long-term | investment-required | `5,9,2,5,10,9,10` | Outdoors |
-| 47 | A glassblowing taster class | quick-fix+long-term | investment-required | `5,6,8,4,1,9,6` | Novelty |
-| 48 | Orchid cultivation | long-term | low-budget | `1,2,3,6,2,6,1` | Analytical |
-| 49 | Historical European martial arts | long-term | investment-required | `8,8,2,7,1,10,8` | Novelty |
-| 50 | Watchmaking and horology | long-term | investment-required | `1,1,4,10,1,9,3` | Analytical |
-| 51 | A blacksmithing taster day | quick-fix+long-term | investment-required | `5,9,7,4,3,9,7` | Energy |
-| 52 | Stand-up paddleboarding | long-term | investment-required | `4,7,1,3,10,7,5` | Outdoors |
-| 53 | Parkour, at a class | long-term | low-budget | `7,10,3,5,2,9,9` | Energy |
-| 54 | Restore a vintage typewriter | long-term | low-budget | `1,3,4,7,1,7,2` | Analytical |
-| 55 | Urban beekeeping | long-term | investment-required | `4,5,2,7,8,9,5` | Novelty |
-| 56 | Scuba certification | long-term | investment-required | `8,7,1,7,9,10,8` | Novelty |
+| 13 | Hiking and hillwalking | long-term | low-budget | `4,8,1,3,10,5,3` | Outdoors |
+| 14 | Foraging for wild plants | long-term | low-budget | `2,4,2,7,10,8,3` | Outdoors |
+| 15 | Web design and front-end coding | long-term | free | `1,1,7,9,1,6,3` | Analytical |
+| 16 | The big books project | long-term | free | `1,1,1,3,1,5,2` | Novelty |
+| 17 | Fermenting and kombucha brewing | long-term | low-budget | `2,2,5,6,1,7,2` | Novelty |
+| 18 | Bonsai cultivation | long-term | low-budget | `1,2,7,5,4,7,1` | Creative |
+| 19 | Moroccan tagine cooking | long-term | low-budget | `5,3,6,4,1,7,2` | Novelty |
+| 20 | Amateur astronomy | long-term | investment-required | `2,2,3,8,9,8,3` | Outdoors |
+| 21 | Tabletop roleplaying | long-term | low-budget | `10,1,8,5,1,7,5` | Social |
+| 22 | Make a zine | long-term | low-budget | `3,2,9,2,1,7,3` | Creative |
+| 23 | 3D printing and CAD | long-term | investment-required | `1,2,7,9,1,7,3` | Analytical |
+| 24 | Build and paint a scale model | long-term | low-budget | `1,2,7,4,1,5,2` | Creative |
+| 25 | Olympic lifting, properly coached | long-term | investment-required | `6,10,1,6,1,7,7` | Energy |
+| 26 | Build a mechanical keyboard | long-term | investment-required | `1,2,6,7,1,7,3` | Analytical |
+| 27 | Restore a cast iron skillet | long-term | low-budget | `1,4,4,5,1,6,2` | Novelty |
+| 28 | Build an Arduino weather station | long-term | low-budget | `1,2,5,10,2,7,3` | Analytical |
+| 29 | Rowing at a river club | long-term | investment-required | `9,10,1,5,8,7,6` | Energy |
+| 30 | Hill sprint intervals | long-term | free | `1,10,1,3,7,3,7` | Energy |
+| 31 | Design an icon set | long-term | free | `1,1,8,6,1,5,2` | Creative |
+| 32 | Wall-supported handstands | long-term | free | `1,8,1,3,1,5,5` | Energy |
+| 33 | Orienteering in the park | long-term | low-budget | `5,7,1,9,9,7,5` | Analytical |
+| 34 | Speed cup stacking | long-term | low-budget | `2,4,1,4,1,8,6` | Novelty |
+| 35 | Cold brew coffee | long-term | low-budget | `2,1,3,5,1,4,1` | Analytical |
+| 36 | Read military history properly | long-term | free | `1,1,1,8,1,5,2` | Analytical |
+| 37 | Sketch buildings from a bench | long-term | low-budget | `1,3,9,3,6,5,2` | Creative |
+| 38 | Hand-stitch a felt wallet | long-term | low-budget | `1,2,7,3,1,6,1` | Creative |
+| 39 | Build a cardboard automaton | long-term | low-budget | `2,2,9,8,1,8,3` | Creative |
+| 40 | Small engine repair | long-term | low-budget | `1,5,2,9,4,7,3` | Analytical |
+| 41 | Classic car market research | long-term | free | `2,1,1,10,1,6,4` | Analytical |
+| 42 | Antiquarian book collecting | long-term | investment-required | `3,2,2,7,1,7,3` | Analytical |
+| 43 | Sport lockpicking | long-term | low-budget | `1,2,2,9,1,9,4` | Analytical |
+| 44 | Amateur radio | long-term | investment-required | `6,2,3,9,3,9,4` | Analytical |
+| 45 | Kite surfing lessons | long-term | investment-required | `5,9,2,5,10,9,10` | Outdoors |
+| 46 | A glassblowing taster class | quick-fix+long-term | investment-required | `5,6,8,4,1,9,6` | Novelty |
+| 47 | Orchid cultivation | long-term | low-budget | `1,2,3,6,2,6,1` | Analytical |
+| 48 | Historical European martial arts | long-term | investment-required | `8,8,2,7,1,10,8` | Novelty |
+| 49 | Watchmaking and horology | long-term | investment-required | `1,1,4,10,1,9,3` | Analytical |
+| 50 | A blacksmithing taster day | quick-fix+long-term | investment-required | `5,9,7,4,3,9,7` | Energy |
+| 51 | Stand-up paddleboarding | long-term | investment-required | `4,7,1,3,10,7,5` | Outdoors |
+| 52 | Parkour, at a class | long-term | low-budget | `7,10,3,5,2,9,9` | Energy |
+| 53 | Restore a vintage typewriter | long-term | low-budget | `1,3,4,7,1,7,2` | Analytical |
+| 54 | Urban beekeeping | long-term | investment-required | `4,5,2,7,8,9,5` | Novelty |
+| 55 | Scuba certification | long-term | investment-required | `8,7,1,7,9,10,8` | Novelty |
 
 ## Descriptions and tags
 
@@ -223,11 +221,6 @@ Learn one opening properly rather than five badly, and play correspondence games
 Card controls, a coin vanish, and the discipline of practising one move until it stops looking like a move. A deck of cards is the entire budget and the mirror does the rest.  
 `long-term · 1-2-hours-week · inside · at-home · solo · social · low-budget`  
 `[4, 2, 7, 4, 1, 7, 4]` leans **Creative**
-
-**Indoor bouldering**  
-Short problems, thick mats, no ropes — just you working out where to put your feet. A session with shoe hire is about a tenner, and your forearms will tell you when to stop.  
-`long-term · 1-2-hours-week · exertion · inside · facility · solo · social · low-budget`  
-`[5, 9, 1, 5, 1, 6, 6]` leans **Energy** — EXACT title collision with the seeded 'Indoor bouldering'. See the dedupe section.
 
 **Hiking and hillwalking**  
 Plan a ridge line or a stretch of a national trail and give a whole Saturday to it. Boots and a waterproof are the real cost; the walking is free and the weather is part of the deal.  
@@ -348,11 +341,6 @@ Step outside, hold up a star app, and learn five shapes well enough to find them
 One square of paper and about twenty folds, most of which you will get wrong the first time. The second one takes five minutes and the tenth takes two.  
 `quick-fix · 10-mins · inside · at-home · solo · free`  
 `[1, 1, 6, 4, 1, 4, 1]` leans **Creative**
-
-**Fifteen-minute mobility flow**  
-Follow a full-body stretch routine on the living room floor and discover which side is tighter. Free, and the difference shows up within a week rather than a month.  
-`quick-fix · 10-mins · inside · at-home · solo · free`  
-`[1, 4, 1, 1, 1, 2, 1]` leans **Energy**
 
 **Learn to moonwalk**  
 Smooth socks, a hard floor, and a tutorial you will re-watch about eight times. Completely useless and entirely worth the twenty minutes.  
@@ -693,14 +681,12 @@ re-read against The 7-axis rubric. Rows not listed were read and left alone.
 
 ## Fuzzy dedupe against the existing catalogue
 
-4 candidate(s) at or above 0.5. **Reported, not dropped** —
+2 candidate(s) at or above 0.5. **Reported, not dropped** —
 a high score can mean a genuine duplicate or just a shared word.
 
 | Score | Wave title | Existing seeded title |
 |---|---|---|
-| 1.00 | Indoor bouldering | Indoor bouldering |
 | 0.76 | Hiking and hillwalking | Trail running and hillwalking |
-| 0.62 | Fifteen-minute mobility flow | Ten minutes of mobility work |
 | 0.58 | Restore a vintage typewriter | Restoring a vintage bicycle |
 
 ## Template families
@@ -745,50 +731,50 @@ The anti-clone rule caps a wave at 2 entries per template family. Counted, not a
 ### This wave alone
 
 ```
-  DOMINANT AXIS — which axis each activity leans into (99 rows)
+  DOMINANT AXIS — which axis each activity leans into (97 rows)
 
-    Social          4    4.0%  ####
-    Energy         13   13.1%  #############
-    Creative       23   23.2%  #######################
-    Analytical     28   28.3%  ############################
-    Outdoors        9    9.1%  #########
-    Novelty        20   20.2%  ####################
-    Stimulation     2    2.0%  ##
+    Social          4    4.1%  ####
+    Energy         11   11.3%  ###########
+    Creative       23   23.7%  #######################
+    Analytical     28   28.9%  ############################
+    Outdoors        9    9.3%  #########
+    Novelty        20   20.6%  ####################
+    Stimulation     2    2.1%  ##
 
   PER-AXIS RANGE — is the axis a real dimension, or stuck near one value?
 
     Axis          min   mean  max  spread  stdev
-    Social          1   2.42   10       9   2.17
-    Energy          1   3.14   10       9   2.66
-    Creative        1   3.46   10       9   2.62
-    Analytical      1   4.84   10       9   2.43
-    Outdoors        1   2.58   10       9   2.84
-    Novelty         1   5.55   10       9   2.05
-    Stimulation     1   3.09   10       9   2.01
+    Social          1   2.41   10       9   2.17
+    Energy          1   3.07   10       9   2.61
+    Creative        1   3.52   10       9   2.62
+    Analytical      1   4.88   10       9   2.42
+    Outdoors        1   2.61   10       9   2.86
+    Novelty         1   5.58   10       9   2.04
+    Stimulation     1   3.08   10       9   1.99
 ```
 
 ### Combined, if every survivor lands (audit corrections applied)
 
 ```
-  DOMINANT AXIS — which axis each activity leans into (136 rows)
+  DOMINANT AXIS — which axis each activity leans into (134 rows)
 
-    Social         12    8.8%  ##########
-    Energy         19   14.0%  ################
-    Creative       30   22.1%  #########################
-    Analytical     33   24.3%  ############################
-    Outdoors       16   11.8%  ##############
-    Novelty        23   16.9%  ####################
+    Social         12    9.0%  ##########
+    Energy         17   12.7%  ##############
+    Creative       30   22.4%  #########################
+    Analytical     33   24.6%  ############################
+    Outdoors       16   11.9%  ##############
+    Novelty        23   17.2%  ####################
     Stimulation     3    2.2%  ###
 
   PER-AXIS RANGE — is the axis a real dimension, or stuck near one value?
 
     Axis          min   mean  max  spread  stdev
     Social          1   3.00   10       9   2.53
-    Energy          1   3.54   10       9   2.70
-    Creative        1   3.41   10       9   2.66
-    Analytical      1   4.85   10       9   2.37
-    Outdoors        1   2.95   10       9   3.09
-    Novelty         1   5.40   10       9   2.03
-    Stimulation     1   3.43   10       9   2.11
+    Energy          1   3.50   10       9   2.68
+    Creative        1   3.45   10       9   2.66
+    Analytical      1   4.88   10       9   2.36
+    Outdoors        1   2.98   10       9   3.11
+    Novelty         1   5.42   10       9   2.03
+    Stimulation     1   3.43   10       9   2.10
 ```
 

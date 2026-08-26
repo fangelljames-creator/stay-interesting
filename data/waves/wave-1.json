@@ -28,7 +28,7 @@
       "body": "The audit you asked for covers **vectors**. Two seeded rows also look wrong on **tags**, which I have not touched:\n\n- `Ten minutes of mobility work` carries `exertion`, but the tag doctrine defines that as demanding real effort. Gentle mobility work does not, and the tag currently hides it from anyone who answers \"something low-key\".\n- `A walk with no destination` carries `exertion` for the same reason.\n\nBoth would need a separate change with its own review, since re-tagging alters which users can see a row at all."
     }
   ],
-  "vetoed": [],
+  "vetoed": ["Indoor bouldering", "Fifteen-minute mobility flow"],
   "activities": [
     {
       "title": "Train for a half-marathon",
