@@ -14,7 +14,6 @@ import {
   availableWildcards,
   drawRandom,
   rerollPoolFrom,
-  wildcardEligible,
 } from "@/lib/resultsSelection";
 
 /**
@@ -286,13 +285,6 @@ export default function Home() {
       action: answers[index] ?? ({ kind: "none" } as FilterAction),
     }));
 
-    // The budget answer, captured BEFORE relaxation runs. Cost is never in
-    // RELAXATION_STEPS so it cannot change, but taking it now makes the
-    // wildcard's budget guarantee independent of that fact rather than
-    // quietly dependent on it.
-    const costAction: FilterAction =
-      constraints.find((c) => c.kind === "cost")?.action ?? { kind: "none" };
-
     const applyAll = (candidates: any[]) =>
       candidates.filter((a) =>
         constraints.every((c) => satisfiesFilter(a.tags ?? [], c.action))
@@ -367,21 +359,17 @@ export default function Home() {
       // Nothing to do; rotation just won't apply next run.
     }
 
-    // THE WILDCARD IGNORES YOUR FILTERS ON PURPOSE. It is drawn at random from
-    // the whole PATHWAY -- not from the survivors, and not by rank -- so it can
-    // suggest the thing you ruled out on time, energy, place or company.
-    //
-    // BUDGET IS THE ONE THING IT NEVER VIOLATES. Someone who said "keep it
-    // free" cannot act on a paid suggestion, so that is not a surprise, it is a
-    // dead card. Same argument that keeps cost out of RELAXATION_STEPS.
-    const eligible = wildcardEligible(pool, costAction);
-
+    // THE WILDCARD OBEYS NOTHING. Drawn at random from the whole PATHWAY --
+    // not the survivors, not by rank, and not within the budget answer either.
+    // The only rows it will not return are the cards already on screen and
+    // anything rerolled away. The card is labelled to say exactly this; if a
+    // filter is ever put back, the label has to change with it.
     setShownActivities(topMatches);
     setRerollPool(rerollPoolFrom(ordered));
-    setWildcardPool(eligible);
+    setWildcardPool(pool);
     setDiscardedIds([]);
     setWildcard(
-      decorateWildcard(drawRandom(availableWildcards(eligible, topMatchIds)), userVector)
+      decorateWildcard(drawRandom(availableWildcards(pool, topMatchIds)), userVector)
     );
     setIsLoading(false);
   };
@@ -505,8 +493,10 @@ export default function Home() {
 
   const getMedalText = (index: number, isWildcard: boolean) => {
     // The label states the rule, because the card genuinely will not obey the
-    // answers the user just gave. Unlabelled, it reads as a filtering bug.
-    if (isWildcard) return "✨ Wildcard — ignores your filters on purpose";
+    // answers the user just gave -- INCLUDING their budget. Unlabelled, it
+    // reads as a filtering bug, and on the budget answer it would read as a
+    // broken promise. Any filter put back on the wildcard changes this text.
+    if (isWildcard) return "✨ Wildcard — completely random, ignores everything you said";
     switch(index) {
       case 0: return "🥇 1st";
       case 1: return "🥈 2nd";
@@ -696,6 +686,7 @@ export default function Home() {
                 Nothing matched everything you asked for, so we bent{" "}
                 <strong>{relaxedConstraints.join(", then ")}</strong> to find these. Your budget
                 and who you are with were left exactly as you set them.
+                {wildcard && " The wildcard is the exception — it ignores all of it, on purpose."}
               </p>
             )}
 
@@ -733,9 +724,9 @@ export default function Home() {
                     <p className="text-slate-800 font-bold text-lg mb-2">Nothing fits, even after bending what we could.</p>
                     <p className="text-slate-500 text-sm mb-4">
                       We relaxed where you wanted to be, how active it should be, and how much time
-                      you have — and still found nothing. We will not suggest something that costs
-                      more than you said, or needs people you do not have.
-                      {wildcard && " The wildcard below ignores your filters on purpose — but never your budget."}
+                      you have — and still found nothing. We will not rank something at you that
+                      costs more than you said, or needs people you do not have.
+                      {wildcard && " The wildcard below is not a recommendation — it is drawn at random and ignores everything you told us, budget included."}
                     </p>
                     <button
                       onClick={restart}
@@ -780,7 +771,7 @@ export default function Home() {
                               }
                               title={
                                 activity.isWildcard
-                                  ? "Draw a different wildcard. This one will not come back."
+                                  ? "Draw another one at random. This one will not come back."
                                   : "Swap this one out for good"
                               }
                               className="border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-900 text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap transition-colors"

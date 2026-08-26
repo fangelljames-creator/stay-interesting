@@ -235,22 +235,33 @@ cannot act on a paid suggestion, and someone on their own cannot act on one need
 Those are facts about their situation, not preferences to nudge. Bending either produces a
 recommendation the user physically cannot take.
 
-**The wildcard ignores your filters on purpose — except budget.** *Changed 2026-08-26 (Owen's
-decision). This supersedes the previous rule, "the wildcard may stretch taste, never feasibility",
-which drew it from the filtered survivors.* It is now drawn **at random from the user's whole
-pathway**, ignoring both the taste ranking and the practical filters, so it really can offer the
-thing they ruled out on time, energy, place or company. The card says so: the badge reads
-"✨ Wildcard — ignores your filters on purpose". Unlabelled it would read as a filtering bug.
+**The wildcard obeys nothing — "full chaos".** *Changed 2026-08-26 (Owen's decision). This
+supersedes the 2026-08-25 rule, "the wildcard may stretch taste, never feasibility", which drew it
+from the filtered survivors.* It is drawn **at random from the user's pathway** and respects
+**none** of the answers: not the taste ranking, not time, energy, place, company — **and not
+budget**. The only rows it will not return are **the cards already on screen and anything rerolled
+away**, because a duplicate is not a surprise, it is a bug.
 
-⚠️ **Budget is the one filter it never breaks**, for exactly the reason `cost` is absent from
-`RELAXATION_STEPS`: someone who said "keep it free" cannot act on a paid suggestion, so that is not
-a surprise, it is a dead card. In `lib/resultsSelection.ts` this is a single filter inside
-`wildcardEligible` — deleting that line is the whole of "full chaos", should it ever be wanted.
+The badge reads **"✨ Wildcard — completely random, ignores everything you said"**. Unlabelled it
+would read as a filtering bug, and on the budget answer it would read as a broken promise.
 
-The wildcard **excludes the three cards on screen and everything rerolled away**, and renders
-whenever any eligible activity is left beyond them. It shows its real `matchPercent`: a true number
-on a randomly drawn row, saying how well the draw happens to fit — not that fit had anything to do
-with the draw. Same rule as the rotation penalty below; the number never lies, the label explains it.
+⚠️ **There was a budget exception for about an hour, and it is gone.** The argument for it was that
+a suggestion you cannot afford is a dead card rather than a surprise. Owen's call was that the
+wildcard is the one place the answers do not apply, and half a rule is harder to explain than none.
+Do not reinstate it on the reasoning above — it was considered and rejected.
+
+⚠️ **This licenses nothing outside the wildcard.** `cost` and `company` stay out of
+`RELAXATION_STEPS`, so the three ranked cards still honour a budget answer absolutely. One
+deliberately labelled random card is a different object from a ranked recommendation the user cannot
+act on. Two pieces of results copy depend on that distinction and were reworded when the exception
+went: the relaxation banner now names the wildcard as the exception to "your budget was left exactly
+as you set them", and the empty state says "we will not **rank** something at you that costs more
+than you said" rather than "we will not suggest".
+
+The wildcard renders whenever any activity is left beyond the shown cards, and shows its real
+`matchPercent`: a true number on a randomly drawn row, saying how well the draw happens to fit — not
+that fit had anything to do with the draw. Same rule as the rotation penalty below; the number never
+lies, the label explains it.
 
 **Reroll — added 2026-08-26.** Each of the three ranked cards carries a `↻ Reroll` control that
 **permanently** (for this run) drops it and replaces it with a random pick from **ranks 4–8 of the
@@ -387,9 +398,9 @@ Two consequences of that switch worth knowing:
   stays the true one. Never let the penalty reach the displayed number; it would make the card
   lie about the fit in order to make rotation work.
 
-⚠️ The wildcard no longer follows from this. As of 2026-08-26 it is drawn from the pathway, not from
-the filtered survivors — see **The wildcard ignores your filters on purpose** above. Anything in this
-file dated 2026-08-25 that says the wildcard obeys the hard filters is describing the old rule.
+⚠️ The wildcard no longer follows from this. As of 2026-08-26 it is drawn at random from the
+pathway and obeys no filter at all — see **The wildcard obeys nothing** above. Anything in this file
+dated 2026-08-25 that says the wildcard respects the hard filters is describing the old rule.
 
 ## Tag scoring — retired 2026-08-25
 
@@ -484,12 +495,18 @@ through — `main` auto-deploys**):
   `app/page.tsx` stopped holding results as one `recommendations` array ("the three, then the
   wildcard") and now names each part: `shownActivities`, `wildcard`, `rerollPool`, `wildcardPool`,
   `discardedIds`. Reroll would otherwise have had to mutate that array by position.
+- **The budget exception was built, then dropped the same day** at Owen's instruction, along with
+  the free-user guarantee in the test script. `wildcardEligible` was deleted rather than left as a
+  pass-through: a filter function that filters nothing is exactly the dead code this project's tag
+  doctrine exists to prevent.
 - `scripts/verify-results-selection.mjs` — new. Imports the real functions and real questions.
-  Checks budget (a strictly-free user's wildcard pool is checked **exhaustively**, not sampled),
-  that the new rule is genuinely in force (100% of quick and 98% of hobby combinations can draw a
-  wildcard their own filters ruled out — otherwise it would be silently equivalent to the old rule),
-  exclusion over 7,747 draws, pool sizing, and 516 reroll runs. It deliberately does **not**
-  re-implement relaxation; its pool-size histogram is therefore pre-relaxation and pessimistic.
+  **CHECK A was inverted, not deleted, when the guarantee went**: it now asserts the candidate set
+  IS the whole pathway pool and that a strictly-free user really *can* be handed a paid wildcard.
+  "No filter" is invisible on a pool that happens to be all free, so without that second half a cost
+  ceiling could creep back in and the run would still pass. Plus: the rule is in force (100% of
+  quick and 99% of hobby combinations can draw a wildcard their own filters ruled out), exclusion
+  over 9,459 draws, pool sizing, and 516 reroll runs. It deliberately does **not** re-implement
+  relaxation; its pool-size histogram is therefore pre-relaxation and pessimistic.
 
 **Feasibility redesign, 2026-08-25** (branch `funnel-integration`):
 

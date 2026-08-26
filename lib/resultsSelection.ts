@@ -9,15 +9,23 @@
  * mirroring them by hand. Mirroring is exactly how analyze-quiz-balance.mjs
  * became something that goes stale in lockstep with the code it checks.
  *
- * THE WILDCARD RULE (supersedes "the wildcard may stretch taste, never
- * feasibility"). The wildcard is drawn at random from the user's PATHWAY and
- * deliberately ignores both the taste ranking and the practical filters — that
- * is the whole point of it. BUDGET IS THE ONE EXCEPTION and is never violated:
- * someone who said "keep it free" cannot act on a paid suggestion, so offering
- * one is not a surprise, it is a dead card. This is the same argument that
- * keeps `cost` out of RELAXATION_STEPS in lib/feasibilityQuestions.ts.
+ * THE WILDCARD RULE (2026-08-26, "full chaos" — Owen's decision). The wildcard
+ * is drawn at random from the user's PATHWAY and obeys NOTHING ELSE. Not the
+ * taste ranking, not the practical filters, and NOT BUDGET. The only things it
+ * will not hand back are the cards already on screen and anything rerolled
+ * away, because showing a duplicate is not a surprise, it is a bug.
+ *
+ * There was briefly a budget exception, on the argument that a suggestion you
+ * cannot afford is a dead card rather than a surprise. Owen dropped it: the
+ * wildcard is meant to be the one place the answers do not apply, and half a
+ * rule is harder to explain than none. The card is labelled to say so.
+ *
+ * ⚠️ This is the WILDCARD ONLY. It is not licence to relax cost anywhere else:
+ * `cost` and `company` stay out of RELAXATION_STEPS in
+ * lib/feasibilityQuestions.ts, so the three ranked cards still respect a
+ * budget answer absolutely. One deliberately labelled random card is a
+ * different thing from a ranked recommendation the user cannot act on.
  */
-import { satisfiesFilter, type FilterAction } from "./activityTags.ts";
 
 /**
  * The reroll pool is ranks 4-8 of the ranked survivors, zero-indexed here as
@@ -31,11 +39,6 @@ export const REROLL_POOL_END = 8;
 /** Rows arrive from Supabase untyped; all this module needs is the uuid. */
 export interface HasId {
   id: string;
-}
-
-/** Anything carrying tags. Nullable because a DB row's array can be null. */
-export interface HasTags {
-  tags?: readonly string[] | null;
 }
 
 /**
@@ -57,30 +60,21 @@ export function drawRandom<T>(candidates: readonly T[], rng: Rng = Math.random):
 }
 
 /**
- * The wildcard's candidate set: everything on the pathway that the user's
- * budget answer permits, and NOTHING else filtered out.
+ * The wildcard's candidate set: the pathway pool minus everything the user has
+ * already seen — the cards on screen now, and everything rerolled away. A
+ * rerolled card never comes back, as a ranked card or as a wildcard.
  *
- * This single filter IS the budget exception. Dropping it — returning the pool
- * untouched — is the whole of "full chaos", should that ever be wanted.
- */
-export function wildcardEligible<T extends HasTags>(
-  pathwayPool: readonly T[],
-  costAction: FilterAction
-): T[] {
-  return pathwayPool.filter((activity) => satisfiesFilter(activity.tags ?? [], costAction));
-}
-
-/**
- * Eligible wildcards minus everything the user has already seen: the cards on
- * screen now, and everything rerolled away. A rerolled card never comes back,
- * as a ranked card or as a wildcard.
+ * THIS IS THE WHOLE OF THE WILDCARD RULE. There is deliberately no filtering
+ * step above it: no cost ceiling, no time, no company, nothing. If a filter is
+ * ever added here again, the label on the card has to change in the same
+ * commit, because the card currently promises the user that none applies.
  */
 export function availableWildcards<T extends HasId>(
-  eligible: readonly T[],
+  pathwayPool: readonly T[],
   excludedIds: readonly string[]
 ): T[] {
   const excluded = new Set(excludedIds);
-  return eligible.filter((activity) => !excluded.has(activity.id));
+  return pathwayPool.filter((activity) => !excluded.has(activity.id));
 }
 
 /**

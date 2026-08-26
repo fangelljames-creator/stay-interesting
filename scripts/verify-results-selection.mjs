@@ -10,10 +10,16 @@
  * TypeScript on the fly), so it cannot drift out of sync with the code it is
  * checking.
  *
- * THE RULE UNDER TEST (2026-08-26, supersedes "the wildcard may stretch taste,
- * never feasibility"): the wildcard is drawn at random from the user's PATHWAY,
- * deliberately ignoring the taste ranking AND the practical filters — except
- * BUDGET, which is never violated.
+ * THE RULE UNDER TEST (2026-08-26, "full chaos"): the wildcard is drawn at
+ * random from the user's PATHWAY and obeys NOTHING else — not the taste
+ * ranking, not the practical filters, NOT BUDGET. The only rows it will not
+ * return are the cards already on screen and anything rerolled away.
+ *
+ * NOTE ON CHECK A. An earlier version of this script asserted the opposite:
+ * that a strictly-free user's wildcard is always free. That guarantee was
+ * dropped along with the budget exception, so the check was INVERTED rather
+ * than deleted — a rule this permissive still has to be shown to be in effect,
+ * or a filter creeping back in would pass silently.
  *
  * WHAT IS DELIBERATELY NOT SIMULATED: graceful relaxation. Filters are applied
  * with the real satisfiesFilter and the real questions, but the relaxation
@@ -23,10 +29,10 @@
  * reroll pool is arithmetic on the ranked list however that list was produced.
  *
  * CHECKS
- *   A. Budget       — pass/fail. A strictly-free user's wildcard is free.
- *                     Checked exhaustively over the eligible set, not sampled.
+ *   A. No filter    — pass/fail. The candidate set IS the pathway pool, and a
+ *                     strictly-free user really can be handed a paid wildcard.
  *   B. In force     — pass/fail. The wildcard really can break the practical
- *                     filters, so the new rule is not silently the old one.
+ *                     filters too, so the rule is not silently an older one.
  *   C. Exclusion    — pass/fail. A draw is never a shown card and never a
  *                     discarded one; one is produced whenever any remains.
  *   D. Pool size    — pass/fail. min(5, survivors - 3), every combination.
@@ -37,7 +43,6 @@ import {
   availableWildcards,
   drawRandom,
   rerollPoolFrom,
-  wildcardEligible,
   REROLL_POOL_START,
   REROLL_POOL_END,
 } from "../lib/resultsSelection.ts";
@@ -46,7 +51,7 @@ import {
   HOBBY_QUESTIONS,
   MIN_RESULTS,
 } from "../lib/feasibilityQuestions.ts";
-import { satisfiesFilter, costCeiling } from "../lib/activityTags.ts";
+import { satisfiesFilter, COST_TAGS } from "../lib/activityTags.ts";
 import {
   rankActivities,
   userVectorFromQuizTotals,
@@ -99,14 +104,7 @@ function* everyCombination(questions) {
       rem = Math.floor(rem / size);
       return pick;
     });
-    const costIndex = questions.findIndex((q) => q.constraint === "cost");
-    yield {
-      actions: questions.map((q, i) => q.options[choice[i]].action),
-      costAction:
-        costIndex === -1
-          ? { kind: "none" }
-          : questions[costIndex].options[choice[costIndex]].action,
-    };
+    yield { actions: questions.map((q, i) => q.options[choice[i]].action) };
   }
 }
 
@@ -121,61 +119,61 @@ console.log(
 );
 
 // ---------------------------------------------------------------------------
-// CHECK A — Budget is never violated
+// CHECK A — No filter at all, budget included
 //
-// The one promise the wildcard makes. Checked over the WHOLE eligible set
-// rather than by sampling draws: a sampled check passes by luck on a pool that
-// is 90% free, and this must hold for every possible draw, not most of them.
+// The candidate set must be the pathway pool itself, minus only what is on
+// screen. Checked over the WHOLE pool rather than by sampling draws: a sampled
+// check passes by luck, and this has to hold for every possible draw.
+//
+// The second half is the one that would catch a regression. "No filter" is
+// invisible when the pool happens to be all free anyway, so this asserts that
+// a strictly-free user CAN be handed a paid wildcard. If a cost ceiling ever
+// creeps back in, this fails.
 // ---------------------------------------------------------------------------
-console.log("CHECK A — Budget: the one filter the wildcard never breaks\n");
+console.log("CHECK A \u2014 No filter: the wildcard obeys nothing, budget included\n");
+
+const costTierOf = (activity) =>
+  COST_TAGS.find((tier) => activity.tags.includes(tier)) ?? "none";
 
 for (const { tag, label } of PATHWAYS) {
   const pool = poolFor(tag);
 
-  const strictlyFree = wildcardEligible(pool, costCeiling("free"));
-  const notFree = strictlyFree.filter((a) => !a.tags.includes("free"));
-  if (notFree.length) {
+  // Nothing on screen -> every row on the pathway is a candidate.
+  const candidates = availableWildcards(pool, []);
+  if (candidates.length !== pool.length) {
     failures.push(
-      `${label}: a strictly-free user's wildcard pool contains ${notFree.length} row(s) that are not free — ` +
-        notFree.map((a) => `"${a.title}"`).join(", ")
+      `${label}: the wildcard pool dropped ${pool.length - candidates.length} row(s) with nothing ` +
+        `excluded \u2014 something is filtering the wildcard again`
     );
   }
 
-  const lowBudget = wildcardEligible(pool, costCeiling("low-budget"));
-  const overCeiling = lowBudget.filter(
-    (a) => !a.tags.includes("free") && !a.tags.includes("low-budget")
-  );
-  if (overCeiling.length) {
+  // A user who said "keep it free" must still be reachable by a paid draw.
+  const paid = candidates.filter((a) => !a.tags.includes("free"));
+  if (paid.length === 0) {
     failures.push(
-      `${label}: a low-budget user's wildcard pool contains ${overCeiling.length} row(s) above the ceiling`
+      `${label}: no paid row is reachable as a wildcard, so "ignores your budget" cannot be observed`
     );
   }
 
-  // "Money's no object" filters nothing, so free rows must stay visible.
-  const noLimit = wildcardEligible(pool, costCeiling("investment-required"));
-  if (noLimit.length !== pool.length) {
-    failures.push(
-      `${label}: "not a concern" should filter nothing, but ${pool.length - noLimit.length} row(s) were dropped`
-    );
-  }
-
-  // And the draws themselves, seeded so a failure repeats.
+  // And the draws themselves, seeded so a result repeats. A strictly-free user
+  // is simulated by doing nothing at all, which is the entire point.
   const rng = makeRng(20260826);
-  let drawn = 0;
+  const drawnTiers = new Set();
   for (let i = 0; i < 500; i++) {
-    const pick = drawRandom(availableWildcards(strictlyFree, []), rng);
+    const pick = drawRandom(availableWildcards(pool, []), rng);
     if (!pick) break;
-    if (!pick.tags.includes("free")) {
-      failures.push(`${label}: drew a non-free wildcard for a strictly-free user — "${pick.title}"`);
-      break;
+    drawnTiers.add(costTierOf(pick));
+  }
+  for (const tier of new Set(pool.map(costTierOf))) {
+    if (!drawnTiers.has(tier)) {
+      failures.push(`${label}: 500 draws never produced a ${tier} activity, which the pool contains`);
     }
-    drawn++;
   }
 
   console.log(
-    `  ${label.padEnd(6)} free-only pool ${String(strictlyFree.length).padStart(2)}/${pool.length}` +
-      `   low-budget ${String(lowBudget.length).padStart(2)}/${pool.length}` +
-      `   no limit ${noLimit.length}/${pool.length}   ${drawn} draws all free`
+    `  ${label.padEnd(6)} candidates ${candidates.length}/${pool.length} (no filter)` +
+      `   ${paid.length} paid row(s) reachable` +
+      `   500 draws hit every cost tier: ${[...drawnTiers].sort().join(", ")}`
   );
 }
 
@@ -193,13 +191,12 @@ for (const { tag, questions, label } of PATHWAYS) {
   let canBreakOut = 0;
   let combinations = 0;
 
-  for (const { actions, costAction } of everyCombination(questions)) {
+  for (const { actions } of everyCombination(questions)) {
     combinations++;
-    const eligible = wildcardEligible(pool, costAction);
     const survivorIds = new Set(survivorsFor(pool, actions).map((a) => a.id));
 
-    // Eligible wildcards that the user's own answers would have ruled out.
-    if (eligible.some((a) => !survivorIds.has(a.id))) canBreakOut++;
+    // Candidate wildcards that the user's own answers would have ruled out.
+    if (pool.some((a) => !survivorIds.has(a.id))) canBreakOut++;
   }
 
   const pct = ((canBreakOut / combinations) * 100).toFixed(0);
@@ -228,16 +225,15 @@ console.log("\n\nCHECK C — Exclusion: never a shown card, never a discarded on
   for (const { tag, questions, label } of PATHWAYS) {
     const pool = poolFor(tag);
 
-    for (const { actions, costAction } of everyCombination(questions)) {
+    for (const { actions } of everyCombination(questions)) {
       const ordered = rankActivities(userVector, survivorsFor(pool, actions));
       const shownIds = ordered.slice(0, MIN_RESULTS).map((a) => a.id);
-      const eligible = wildcardEligible(pool, costAction);
 
       const discarded = [];
       // Reroll the wildcard until the pool runs dry, which is the condition
       // that hides the card.
       for (let roll = 0; roll < pool.length + 2; roll++) {
-        const available = availableWildcards(eligible, [...shownIds, ...discarded]);
+        const available = availableWildcards(pool, [...shownIds, ...discarded]);
         const pick = drawRandom(available, rng);
 
         if (available.length === 0) {
@@ -313,16 +309,15 @@ console.log("\n\nCHECK E — Reroll runs: exhaustion, permanence, and honest per
   for (const { tag, questions, label } of PATHWAYS) {
     const pool = poolFor(tag);
 
-    for (const { actions, costAction } of everyCombination(questions)) {
+    for (const { actions } of everyCombination(questions)) {
       const ordered = rankActivities(userVector, survivorsFor(pool, actions));
       let shown = ordered.slice(0, MIN_RESULTS);
       let poolLeft = rerollPoolFrom(ordered);
       const expectedRerolls = poolLeft.length;
       const discarded = [];
 
-      const eligible = wildcardEligible(pool, costAction);
       const wildcard = drawRandom(
-        availableWildcards(eligible, shown.map((a) => a.id)),
+        availableWildcards(pool, shown.map((a) => a.id)),
         rng
       );
 
