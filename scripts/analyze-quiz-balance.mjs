@@ -28,15 +28,36 @@
  *   SPREAD      an axis needs several questions that genuinely discriminate on
  *               it, or its score is decided by one or two options.
  *
- * SOURCE OF TRUTH. The questions are IMPORTED from data/personalityQuiz.ts
- * (Node strips the types on the fly), not regex-parsed out of it as they were
- * before — the old parse could silently miss a question if the file's shape
- * changed. The one thing still mirrored by hand is the argmax, because it lives
- * inside a "use client" React component and cannot be imported: see
- * determinePersonalityType in components/PersonalityQuiz.tsx. It is two lines,
- * and it is quoted where it is used below.
+ * SOURCE OF TRUTH. NOTHING IN THIS FILE MIRRORS PRODUCTION ANY MORE. The
+ * questions are imported from data/personalityQuiz.ts and the classifier is
+ * imported from lib/personalityTypes.ts (Node strips the types on the fly).
+ *
+ * Both of those used to be copies. The questions were regex-parsed, which could
+ * silently miss one if the file's shape changed; the argmax was hand-quoted,
+ * because it lived inside a "use client" React component and could not be
+ * imported. The argmax moved out to lib/personalityTypes.ts in the landing-flow
+ * branch, and the 15-type mechanism made the copy untenable: a hand-mirrored
+ * rule with hybrid thresholds and a named-pair table would go stale in a way
+ * that produces confident, wrong share tables rather than an obvious error.
+ *
+ * ⚠️ Section (g) sweeps candidate thresholds that are NOT the shipping ones, and
+ * it does that by passing a different config to the same imported classifier —
+ * never by reimplementing it.
  */
 import { personalityQuestions } from "../data/personalityQuiz.ts";
+import {
+  ALL_ROUNDER_ID,
+  axisId,
+  classifyTotals,
+  DEFAULT_CONFIG,
+  HYBRID_MAX_GAP,
+  ALL_ROUNDER_MAX_SPREAD,
+  NAMED_PAIR_IDS,
+  pairId,
+  PERSONALITY_TYPES,
+  determinePersonalityType,
+} from "../lib/personalityTypes.ts";
+import { normalizeForDisplay } from "../lib/radarGeometry.ts";
 
 const AXES = [
   "Social",
@@ -55,6 +76,27 @@ const CEILING_MIN = 7.0;
 const SPREAD_DISCRIMINATES = 3;
 const MIN_DISCRIMINATING_QUESTIONS = 4;
 const TIE_RATE_MAX = 10.0;
+
+// --- Section (g): 15-type design sweep -------------------------------------
+/** Candidate H — the largest top1 - top2 gap that still reads as a close second. */
+const CANDIDATE_H = [2, 3, 4, 5];
+/** Candidate F — the largest top1 - min spread that still reads as flat. */
+const CANDIDATE_F = [6, 8, 10];
+/** How many hybrid pairs get names. 7 pure + 7 hybrid + All-Rounder = 15. */
+const HYBRID_SLOTS = 7;
+/** Which F the full per-type tables are printed at; the others get a summary line. */
+const TABLE_F = 8;
+/**
+ * The near-twin flag, on normalised-polygon distance.
+ *
+ * MEASURED, NOT INVENTED. The four shapes the hero shipped with were written to
+ * be, in their own comment, four people "whose polygons could not be mistaken
+ * for one another". Their closest pair sits at 0.753. Anything under 0.60 is
+ * therefore comfortably tighter than a gap that has already been eyeballed and
+ * accepted, and is worth looking at before it goes on the hero.
+ */
+const NEAR_TWIN_FLAG = 0.6;
+const KNOWN_DISTINCT_FLOOR = 0.753;
 
 const pad = (s, w) => String(s).padEnd(w);
 const num = (s, w) => String(s).padStart(w);
@@ -289,6 +331,13 @@ let tiedPaths = 0;
 let roundedTiedPaths = 0;
 const choice = new Array(nQ).fill(0);
 
+/**
+ * Every path's raw sums, kept for section (g) so the 15-type sweep does not
+ * walk the tree a second time. Int16 because the largest reachable sum is
+ * questionCount * 10, and the whole table is about a megabyte.
+ */
+const allTotals = new Int16Array(totalPaths * AXIS_COUNT);
+
 for (let path = 0; path < totalPaths; path++) {
   let rem = path;
   for (let qi = 0; qi < nQ; qi++) {
@@ -298,6 +347,7 @@ for (let path = 0; path < totalPaths; path++) {
   }
 
   const totals = sumVectors(questions.map((q, qi) => q.vectors[choice[qi]]));
+  allTotals.set(totals, path * AXIS_COUNT);
   const top = Math.max(...totals);
   const winner = dominantAxisOf(totals);
   wins[winner]++;
@@ -350,6 +400,607 @@ if (unreachable.length) {
   failures.push(
     `UNREACHABLE: no answer path produces ${unreachable.map((r) => r.axis).join(", ")}`
   );
+}
+
+// ===========================================================================
+// (g) 15-TYPE DESIGN SWEEP — REPORT ONLY, no gate here
+//
+// Everything below reads the raw sums captured during the walk above, so the
+// tree is walked exactly once.
+//
+// ⚠️ THE RULE ITSELF IS NOT MIRRORED HERE. classifyTotals is imported from
+// lib/personalityTypes.ts and takes its thresholds as an argument, so every
+// share printed below is produced by the SAME function production runs. That is
+// deliberate: the whole point of a sweep is to choose H and F, and a sweep of a
+// hand-copied rule would be choosing them for a classifier that does not ship.
+// ===========================================================================
+const PAIR_COUNT = (AXIS_COUNT * (AXIS_COUNT - 1)) / 2;
+console.log(`\n\n(g) 15-TYPE DESIGN SWEEP — ⚠️  REPORT ONLY, nothing here is a gate\n`);
+console.log(
+  `    Judged on RAW SUMS across ${nQ} questions, the same scale classifyTotals uses.\n` +
+    `    H = the largest top1 - top2 gap that still counts as a close second.\n` +
+    `    F = the largest top1 - min spread that still counts as flat.\n`
+);
+
+const scratch = new Array(AXIS_COUNT).fill(0);
+const totalsAt = (path) => {
+  const base = path * AXIS_COUNT;
+  for (let i = 0; i < AXIS_COUNT; i++) scratch[i] = allTotals[base + i];
+  return scratch;
+};
+const titleCase = (slug) =>
+  // The All-Rounder is the one id that is not built out of axis names, so it is
+  // not a pair and must not be printed with the " + " a pair id gets.
+  slug === ALL_ROUNDER_ID
+    ? "The All-Rounder"
+    : slug
+        .split("-")
+        .map((w) => w[0].toUpperCase() + w.slice(1))
+        .join(" + ");
+
+// --- one pass: per-path order, and the archetype trackers ------------------
+//
+// An ARCHETYPE is the single most type-defining vector the quiz can actually
+// produce for a type: the walk path that wins it by the largest margin. These
+// are what the hero cycles, so they have to be real reachable answer paths and
+// not hand-drawn shapes — a hero showing a polygon the quiz cannot produce is
+// advertising a taxonomy the product does not have.
+//
+// Defined so it does NOT depend on H or F, which is what lets every candidate
+// be measured before the thresholds are chosen:
+//   pure A      margin = sum(A) - the best of the other six
+//   pair (A,B)  margin = min(sum(A), sum(B)) - the best of the other five
+//   All-Rounder flattest: smallest top1 - min, ties to the smallest sum of
+//               squared deviations from the mean
+const topOf = new Int8Array(totalPaths);
+const secondOf = new Int8Array(totalPaths);
+const gapOf = new Int16Array(totalPaths);
+const spreadOf = new Int16Array(totalPaths);
+
+const pureBest = AXES.map(() => ({ margin: -Infinity, totals: null }));
+const pairBest = new Map(); // pairId -> { margin, totals, a, b }
+for (let a = 0; a < AXIS_COUNT; a++) {
+  for (let b = a + 1; b < AXIS_COUNT; b++) {
+    pairBest.set(pairId(a, b), { margin: -Infinity, totals: null, a, b });
+  }
+}
+const flatBest = { spread: Infinity, deviation: Infinity, totals: null };
+
+/**
+ * The SHIPPING archetypes: same "largest margin" idea, but restricted to paths
+ * that classifyTotals actually assigns to that type under DEFAULT_CONFIG.
+ *
+ * ⚠️ THE CONSTRAINT IS THE WHOLE POINT, and leaving it out is a live trap. The
+ * unconstrained search above maximises a margin that knows nothing about H, so
+ * it can hand back a path whose top two are further apart than H allows — the
+ * Novelty + Stimulation winner is exactly that, top two 4 apart against H = 3,
+ * which the real classifier calls pure Novelty. Put that on the hero and the
+ * product is advertising a shape its own quiz never produces.
+ */
+const shippingBest = new Map();
+
+const order = [0, 1, 2, 3, 4, 5, 6];
+for (let path = 0; path < totalPaths; path++) {
+  const t = totalsAt(path);
+  order.sort((x, y) => t[y] - t[x] || x - y);
+
+  const top = order[0];
+  const low = t[order[AXIS_COUNT - 1]];
+  topOf[path] = top;
+  secondOf[path] = order[1];
+  gapOf[path] = t[top] - t[order[1]];
+  spreadOf[path] = t[top] - low;
+
+  for (let ax = 0; ax < AXIS_COUNT; ax++) {
+    const rival = t[order[0] === ax ? order[1] : order[0]];
+    const margin = t[ax] - rival;
+    if (margin > pureBest[ax].margin) {
+      pureBest[ax].margin = margin;
+      pureBest[ax].totals = Array.from(t);
+    }
+  }
+
+  for (const entry of pairBest.values()) {
+    // `order` is sorted descending, so the best axis outside the pair is the
+    // first entry that is neither of them — never further along than index 2.
+    let rival = 0;
+    for (let k = 0; k < 3; k++) {
+      if (order[k] !== entry.a && order[k] !== entry.b) {
+        rival = t[order[k]];
+        break;
+      }
+    }
+    const margin = Math.min(t[entry.a], t[entry.b]) - rival;
+    if (margin > entry.margin) {
+      entry.margin = margin;
+      entry.totals = Array.from(t);
+    }
+  }
+
+  const spread = t[top] - low;
+  if (spread <= flatBest.spread) {
+    const avg = t.reduce((a, b) => a + b, 0) / AXIS_COUNT;
+    const deviation = t.reduce((acc, v) => acc + (v - avg) * (v - avg), 0);
+    if (spread < flatBest.spread || deviation < flatBest.deviation) {
+      flatBest.spread = spread;
+      flatBest.deviation = deviation;
+      flatBest.totals = Array.from(t);
+    }
+  }
+
+  // The shipping archetype for whichever type this path really lands on.
+  const verdict = classifyTotals(t, DEFAULT_CONFIG);
+  let margin;
+  if (verdict.kind === "all-rounder") {
+    // Flatter is more archetypal, so the margin runs the other way.
+    margin = -spread;
+  } else if (verdict.kind === "pure") {
+    margin = t[verdict.axes[0]] - t[order[1]];
+  } else {
+    const [a, b] = verdict.axes;
+    let rival = 0;
+    for (let k = 0; k < 3; k++) {
+      if (order[k] !== a && order[k] !== b) {
+        rival = t[order[k]];
+        break;
+      }
+    }
+    margin = Math.min(t[a], t[b]) - rival;
+  }
+  const held = shippingBest.get(verdict.id);
+  if (!held || margin > held.margin) {
+    shippingBest.set(verdict.id, {
+      margin,
+      totals: Array.from(t),
+      kind: verdict.kind,
+      axes: verdict.axes,
+      paths: (held?.paths ?? 0) + 1,
+    });
+  } else {
+    held.paths++;
+  }
+}
+
+// --- (g1) top-two pair distribution, unconditional -------------------------
+const topTwoCounts = new Map();
+for (let path = 0; path < totalPaths; path++) {
+  const key = pairId(topOf[path], secondOf[path]);
+  topTwoCounts.set(key, (topTwoCounts.get(key) ?? 0) + 1);
+}
+const rankedPairs = [...topTwoCounts.entries()].sort(
+  (a, b) => b[1] - a[1] || a[0].localeCompare(b[0])
+);
+
+console.log(`    (g1) TOP-TWO AXIS PAIR — every path, no threshold applied\n`);
+console.log(`         ${pad("pair", 26)} ${num("paths", 9)} ${num("share", 7)}`);
+for (const [key, n] of rankedPairs) {
+  console.log(
+    `         ${pad(titleCase(key), 26)} ${num(n.toLocaleString(), 9)} ` +
+      `${num(((n / totalPaths) * 100).toFixed(2) + "%", 7)}  ` +
+      `${"#".repeat(Math.round((n / totalPaths) * 200))}`
+  );
+}
+console.log(
+  `\n         ${rankedPairs.length} of ${PAIR_COUNT} possible pairs occur at all.` +
+    (rankedPairs.length < PAIR_COUNT
+      ? `  ⚠️  ${PAIR_COUNT - rankedPairs.length} never do — those cannot be named.`
+      : "")
+);
+
+// --- (g2) close-second rate by H, with the pair table at each H ------------
+console.log(`\n\n    (g2) CLOSE-SECOND RATE — paths where top1 - top2 <= H\n`);
+const pairCountsByH = new Map();
+for (const H of CANDIDATE_H) {
+  const counts = new Map();
+  let close = 0;
+  for (let path = 0; path < totalPaths; path++) {
+    if (gapOf[path] > H) continue;
+    close++;
+    const key = pairId(topOf[path], secondOf[path]);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  pairCountsByH.set(H, counts);
+  console.log(
+    `         H = ${H}   ${num(close.toLocaleString(), 9)} paths  ` +
+      `${num(((close / totalPaths) * 100).toFixed(1) + "%", 7)}   ` +
+      `${counts.size} distinct pairs`
+  );
+}
+
+console.log(
+  `\n         Leading pairs at each H (the ${HYBRID_SLOTS} that would be named are marked *)\n`
+);
+const namedByH = new Map();
+for (const H of CANDIDATE_H) {
+  const ranked = [...pairCountsByH.get(H).entries()].sort(
+    (a, b) => b[1] - a[1] || a[0].localeCompare(b[0])
+  );
+  namedByH.set(H, new Set(ranked.slice(0, HYBRID_SLOTS).map(([key]) => key)));
+  console.log(`         H = ${H}`);
+  for (const [i, [key, n]] of ranked.slice(0, HYBRID_SLOTS + 3).entries()) {
+    console.log(
+      `           ${i < HYBRID_SLOTS ? "*" : " "} ${pad(titleCase(key), 26)} ` +
+        `${num(n.toLocaleString(), 8)} ${num(((n / totalPaths) * 100).toFixed(2) + "%", 7)}`
+    );
+  }
+  console.log("");
+}
+
+// --- (g3) flat-profile rate by F, plus the whole spread curve --------------
+console.log(`\n    (g3) FLAT-PROFILE RATE — paths where top1 - min <= F\n`);
+const spreadHistogram = new Map();
+for (let path = 0; path < totalPaths; path++) {
+  spreadHistogram.set(spreadOf[path], (spreadHistogram.get(spreadOf[path]) ?? 0) + 1);
+}
+const minSpread = Math.min(...spreadHistogram.keys());
+const maxSpread = Math.max(...spreadHistogram.keys());
+for (const F of CANDIDATE_F) {
+  let n = 0;
+  for (const [spread, count] of spreadHistogram) if (spread <= F) n += count;
+  console.log(
+    `         F = ${num(F, 2)}   ${num(n.toLocaleString(), 9)} paths  ` +
+      `${num(((n / totalPaths) * 100).toFixed(2) + "%", 8)}`
+  );
+}
+console.log(`\n         The whole curve, so a value outside the three candidates is visible:\n`);
+console.log(`         ${pad("F", 4)} ${num("cumulative paths", 17)} ${num("share", 8)}`);
+let running = 0;
+for (let f = minSpread; f <= Math.min(minSpread + 14, maxSpread); f++) {
+  running += spreadHistogram.get(f) ?? 0;
+  console.log(
+    `         ${pad(f, 4)} ${num(running.toLocaleString(), 17)} ` +
+      `${num(((running / totalPaths) * 100).toFixed(2) + "%", 8)}`
+  );
+}
+console.log(`\n         Smallest spread any path can reach: ${minSpread}.`);
+
+// --- (g4) archetypes -------------------------------------------------------
+console.log(`\n\n    (g4) MOST ARCHETYPAL ACHIEVABLE VECTOR — the hero shape candidates\n`);
+console.log(
+  `         Raw sums. "margin" is how decisively that path wins the type;\n` +
+    `         a negative pair margin means no path makes those two lead together.\n`
+);
+console.log(
+  `         ${pad("type", 26)} ${num("margin", 7)}   ` +
+    `${AXES.map((a) => num(a.slice(0, 4), 5)).join(" ")}`
+);
+
+const archetypes = new Map();
+const showArchetype = (label, id, margin, totals) => {
+  archetypes.set(id, { label, totals });
+  console.log(
+    `         ${pad(label, 26)} ${num(margin, 7)}   ${totals.map((v) => num(v, 5)).join(" ")}`
+  );
+};
+for (const [ax, axis] of AXES.entries()) {
+  showArchetype(axis, axisId(ax), pureBest[ax].margin, pureBest[ax].totals);
+}
+console.log("");
+for (const [key, entry] of [...pairBest.entries()].sort((a, b) => b[1].margin - a[1].margin)) {
+  showArchetype(titleCase(key), key, entry.margin, entry.totals);
+}
+console.log("");
+showArchetype("All-Rounder (flattest)", ALL_ROUNDER_ID, flatBest.spread, flatBest.totals);
+
+// --- (g4b) the shipping archetypes ----------------------------------------
+console.log(
+  `\n\n    (g4b) SHIPPING ARCHETYPES — the 15 chosen types at H = ${HYBRID_MAX_GAP}, ` +
+    `F = ${ALL_ROUNDER_MAX_SPREAD}\n`
+);
+console.log(
+  `         Restricted to paths the real classifier actually assigns to that type,\n` +
+    `         so every shape below is one the quiz can genuinely produce. These are\n` +
+    `         the vectors the hero cycles and the ones stored in lib/personalityTypes.\n`
+);
+console.log(
+  `         ${pad("type", 26)} ${num("paths", 8)} ${num("margin", 7)}   ` +
+    `${AXES.map((a) => num(a.slice(0, 4), 5)).join(" ")}`
+);
+
+const SHIPPING_IDS = [
+  ...AXES.map((_, ax) => axisId(ax)),
+  ...NAMED_PAIR_IDS,
+  ALL_ROUNDER_ID,
+];
+const shipping = new Map();
+for (const id of SHIPPING_IDS) {
+  const entry = shippingBest.get(id);
+  if (!entry) {
+    console.log(`         ${pad(titleCase(id), 26)}   ⚠️  UNREACHABLE — no path lands here`);
+    continue;
+  }
+  shipping.set(id, entry);
+  console.log(
+    `         ${pad(titleCase(id), 26)} ${num(entry.paths.toLocaleString(), 8)} ` +
+      `${num(entry.margin, 7)}   ${entry.totals.map((v) => num(v, 5)).join(" ")}`
+  );
+}
+
+console.log(`\n         Paste-ready, in SHIPPING_IDS order:\n`);
+for (const id of SHIPPING_IDS) {
+  const entry = shipping.get(id);
+  if (entry) console.log(`           ${pad(id + ":", 22)} [${entry.totals.join(", ")}],`);
+}
+
+// --- (g5) near-twin scan on the normalised polygons ------------------------
+//
+// The hero draws these DISPLAY-NORMALISED, so two archetypes with different raw
+// magnitudes but the same ratios between axes are literally the same polygon.
+// This measures the distance the viewer actually sees, not the distance the
+// matcher sees, by running the real normalizeForDisplay from lib/radarGeometry.
+console.log(`\n\n    (g5) NEAR-TWIN SCAN — distance between archetypes AS DRAWN\n`);
+console.log(
+  `         Normalised polygons, so this is what the eye gets. Flagged below ` +
+    `${NEAR_TWIN_FLAG.toFixed(2)};\n` +
+    `         for calibration, the closest pair among the four shapes the hero shipped\n` +
+    `         with — written to be unmistakable for one another — sits at ${KNOWN_DISTINCT_FLOOR}.\n`
+);
+const drawn = [...shipping.entries()].map(([id, entry]) => ({
+  id,
+  label: titleCase(id),
+  shape: normalizeForDisplay(entry.totals),
+}));
+const twinPairs = [];
+for (let i = 0; i < drawn.length; i++) {
+  for (let j = i + 1; j < drawn.length; j++) {
+    const d = Math.hypot(...drawn[i].shape.map((v, k) => v - drawn[j].shape[k]));
+    twinPairs.push({ a: drawn[i], b: drawn[j], d });
+  }
+}
+twinPairs.sort((x, y) => x.d - y.d);
+console.log(`         ${pad("closest pairs", 30)} ${pad("", 26)} ${num("distance", 9)}`);
+for (const pair of twinPairs.slice(0, 15)) {
+  console.log(
+    `         ${pad(pair.a.label, 30)} ${pad(pair.b.label, 26)} ${num(pair.d.toFixed(3), 9)}` +
+      (pair.d < NEAR_TWIN_FLAG ? "  ⚠️  NEAR-TWIN" : "")
+  );
+}
+const flagged = twinPairs.filter((pair) => pair.d < NEAR_TWIN_FLAG);
+console.log(
+  `\n         ${flagged.length} of ${twinPairs.length} archetype pairs sit below the flag.`
+);
+
+// Split the flagged pairs by whether the two types SHARE AN AXIS, because
+// the two halves mean opposite things. A pure type sitting close to a hybrid
+// that contains it — Stimulation beside Social + Stimulation — is the chart
+// telling the truth: those two really are near neighbours, and a reader who
+// cannot tell them apart at a glance has not been misled. Two types with NO
+// axis in common drawing the same polygon is the actual defect, because nothing
+// about the taxonomy says they should look alike.
+const axesOf = (id) => (id === ALL_ROUNDER_ID ? new Set() : new Set(id.split("-")));
+const sharesAnAxis = (pair) => {
+  const left = axesOf(pair.a.id);
+  return [...axesOf(pair.b.id)].some((axis) => left.has(axis));
+};
+const relatedTwins = flagged.filter(sharesAnAxis);
+const unrelatedTwins = flagged.filter((pair) => !sharesAnAxis(pair));
+
+console.log(
+  `\n         ${relatedTwins.length} of those share an axis; ` +
+    `${unrelatedTwins.length} do not.\n`
+);
+for (const pair of unrelatedTwins) {
+  console.log(
+    `           ⚠️  ${pad(pair.a.label, 25)} ${pad(pair.b.label, 26)} ` +
+      `${num(pair.d.toFixed(3), 8)}   NO SHARED AXIS`
+  );
+}
+if (!unrelatedTwins.length) {
+  console.log(`           No flagged pair is unrelated — every one shares an axis.`);
+}
+
+// --- (g6) projected shares under each candidate config ---------------------
+console.log(`\n\n    (g6) PROJECTED 15-TYPE SHARES — via the real classifyTotals\n`);
+console.log(
+  `         Named pairs at each H are that H's top ${HYBRID_SLOTS} by frequency, per the\n` +
+    `         "most frequent wins, no inventing rare ones" rule.\n`
+);
+console.log(
+  `         ${pad("config", 14)} ${num("all-rnd", 8)} ${num("hybrid", 8)} ${num("pure", 8)}   ` +
+    `${pad("smallest type", 22)} unreachable`
+);
+
+const shareRuns = new Map();
+for (const H of CANDIDATE_H) {
+  for (const F of CANDIDATE_F) {
+    const namedPairs = namedByH.get(H);
+    const config = { hybridMaxGap: H, allRounderMaxSpread: F, namedPairs };
+    const ids = [...AXES.map((_, ax) => axisId(ax)), ...namedPairs, ALL_ROUNDER_ID];
+    const tally = new Map(ids.map((id) => [id, 0]));
+    let allRounder = 0;
+    let hybrid = 0;
+    for (let path = 0; path < totalPaths; path++) {
+      const { id, kind } = classifyTotals(totalsAt(path), config);
+      tally.set(id, (tally.get(id) ?? 0) + 1);
+      if (kind === "all-rounder") allRounder++;
+      else if (kind === "hybrid") hybrid++;
+    }
+    shareRuns.set(`${H}/${F}`, { H, F, tally, ids });
+    const smallest = [...tally.entries()].sort((a, b) => a[1] - b[1])[0];
+    const unreachable = [...tally.entries()].filter(([, n]) => n === 0);
+    console.log(
+      `         H=${H} F=${num(F, 2)}      ` +
+        `${num(((allRounder / totalPaths) * 100).toFixed(2) + "%", 8)} ` +
+        `${num(((hybrid / totalPaths) * 100).toFixed(1) + "%", 8)} ` +
+        `${num((((totalPaths - allRounder - hybrid) / totalPaths) * 100).toFixed(1) + "%", 8)}   ` +
+        `${pad(`${titleCase(smallest[0])} ${((smallest[1] / totalPaths) * 100).toFixed(2)}%`, 22)} ` +
+        (unreachable.length
+          ? `⚠️  ${unreachable.length}: ${unreachable.map(([id]) => titleCase(id)).join(", ")}`
+          : "none")
+    );
+  }
+}
+
+console.log(
+  `\n         Full per-type tables at F = ${TABLE_F}. F moves only the All-Rounder row and\n` +
+    `         shaves the rest proportionally, so the H tables are the ones to read.\n`
+);
+for (const H of CANDIDATE_H) {
+  const run = shareRuns.get(`${H}/${TABLE_F}`);
+  console.log(`         H = ${H}, F = ${TABLE_F}`);
+  const rows = run.ids.map((id) => ({ id, n: run.tally.get(id) ?? 0 }));
+  for (const row of rows.sort((a, b) => b.n - a.n)) {
+    const share = (row.n / totalPaths) * 100;
+    console.log(
+      `           ${pad(titleCase(row.id), 26)} ${num(row.n.toLocaleString(), 9)} ` +
+        `${num(share.toFixed(2) + "%", 7)}  ` +
+        `${row.n === 0 ? "⚠️  UNREACHABLE" : "#".repeat(Math.round(share / 2))}`
+    );
+  }
+  console.log("");
+}
+
+// ===========================================================================
+// (h) TYPE REACHABILITY — HARD PASS/FAIL
+//
+// The standing gate for the 15-type mechanism, and the counterpart to the
+// purist test: that one asks whether every AXIS can win, this one asks whether
+// every TYPE can be reached. A taxonomy containing a card nobody can be dealt
+// is worse than a smaller taxonomy, because the copy gets written, reviewed and
+// shipped with nothing behind it.
+//
+// ⚠️ THIS RUNS THROUGH determinePersonalityType, the real production entry
+// point, not through classifyTotals with a hand-assembled config. That closes
+// the last gap between what the script measures and what a user gets.
+//
+// ⚠️ THE PURIST TEST ABOVE DELIBERATELY DOES NOT USE THIS. It still judges the
+// dominant AXIS, and it must keep doing so. At H = 3 a purist path can be a
+// legitimate hybrid — the Energy purist comes out Energy 55, Stimulation 50 —
+// so re-pointing the purist test at the type would turn a working regression
+// guard into a test of the hybrid thresholds instead.
+// ===========================================================================
+console.log(`\n\n(h) TYPE REACHABILITY — HARD PASS/FAIL, via determinePersonalityType\n`);
+console.log(
+  `    H = ${HYBRID_MAX_GAP}, F = ${ALL_ROUNDER_MAX_SPREAD}, ` +
+    `${NAMED_PAIR_IDS.length} named hybrid pairs.\n`
+);
+
+const typeCounts = new Map(PERSONALITY_TYPES.map((type) => [type.id, 0]));
+for (let path = 0; path < totalPaths; path++) {
+  const { id } = determinePersonalityType(totalsAt(path));
+  typeCounts.set(id, (typeCounts.get(id) ?? 0) + 1);
+}
+
+console.log(
+  `    ${pad("type", 28)} ${pad("kind", 12)} ${num("paths", 9)} ${num("share", 7)}`
+);
+for (const type of [...PERSONALITY_TYPES].sort(
+  (a, b) => typeCounts.get(b.id) - typeCounts.get(a.id)
+)) {
+  const n = typeCounts.get(type.id);
+  const share = (n / totalPaths) * 100;
+  console.log(
+    `    ${pad(type.title, 28)} ${pad(type.kind, 12)} ${num(n.toLocaleString(), 9)} ` +
+      `${num(share.toFixed(2) + "%", 7)}  ` +
+      `${n === 0 ? "⚠️  UNREACHABLE" : "#".repeat(Math.round(share / 2))}`
+  );
+}
+
+const unreachableTypes = PERSONALITY_TYPES.filter((type) => typeCounts.get(type.id) === 0);
+if (unreachableTypes.length) {
+  failures.push(
+    `UNREACHABLE TYPE: no answer path produces ` +
+      unreachableTypes.map((type) => `${type.title} (${type.id})`).join(", ")
+  );
+}
+gates.push({
+  name: `All ${PERSONALITY_TYPES.length} personality types reachable`,
+  ok: unreachableTypes.length === 0,
+  detail: unreachableTypes.length
+    ? unreachableTypes.map((type) => type.id).join(", ")
+    : `smallest is ${Math.min(...typeCounts.values()).toLocaleString()} paths`,
+});
+
+// --- each stored archetype must land on its own type -----------------------
+//
+// This is what keeps the hero honest. archetypeTotals is drawn on the landing
+// page under its type's name, so if the stored vector classifies as something
+// else the product is showing a shape its own quiz never produces under that
+// label. A HARD failure, because it is invisible on screen — a wrong polygon
+// still looks like a polygon.
+console.log(`\n    Stored archetypes — each must classify as its own type\n`);
+let archetypeFailures = 0;
+let archetypeDrift = 0;
+for (const type of PERSONALITY_TYPES) {
+  const landed = determinePersonalityType(type.archetypeTotals);
+  const ok = landed.id === type.id;
+  if (!ok) {
+    archetypeFailures++;
+    failures.push(
+      `ARCHETYPE: ${type.title}'s stored vector classifies as ${landed.title} ` +
+        `(${landed.id}), so the hero would draw it under the wrong name`
+    );
+  }
+  // Separately: is it still the MOST archetypal path available? A quiz vector
+  // change moves this without breaking anything, so it is reported with the
+  // replacement rather than failing the run.
+  const best = shippingBest.get(type.id);
+  const drifted = best && best.totals.join(",") !== type.archetypeTotals.join(",");
+  if (drifted) archetypeDrift++;
+  console.log(
+    `    ${ok ? "ok  " : "FAIL"}  ${pad(type.title, 28)} -> ${pad(landed.title, 28)}` +
+      (drifted ? `   ⚠️  no longer the strongest path` : "")
+  );
+  if (drifted) {
+    console.log(`            stored:  [${type.archetypeTotals.join(", ")}]`);
+    console.log(`            strongest now: [${best.totals.join(", ")}]   <- paste this in`);
+  }
+}
+gates.push({
+  name: `Every archetype classifies as its own type`,
+  ok: archetypeFailures === 0,
+  detail: archetypeFailures ? `${archetypeFailures} mismatched` : "all 15 land correctly",
+});
+if (archetypeDrift) {
+  console.log(
+    `\n    ⚠️  ${archetypeDrift} archetype(s) are no longer the strongest available path.\n` +
+      `        Not a failure — a quiz vector moved. Paste the replacements above into\n` +
+      `        PERSONALITY_TYPES so the hero keeps showing the most defining shapes.`
+  );
+}
+
+// --- the voice standard, reported not enforced -----------------------------
+//
+// ⚠️ NON-FATAL ON PURPOSE. The copy is Owen's, reviewed and edited by hand, and
+// his edits are final — a gate that failed the build over his prose would be
+// the wrong instrument pointed at the wrong thing. This is a reminder of the
+// standard in CLAUDE.md, not a judge of whether the writing is any good.
+const BANNED_PHRASES = [
+  "thrive",
+  "whether it's",
+  "whether its",
+  "deep satisfaction",
+  "unleash",
+  "dive into",
+  "passion for",
+];
+console.log(`\n    Voice standard — ⚠️  REPORTED, NEVER FATAL. See CLAUDE.md.\n`);
+const copyNotes = [];
+for (const type of PERSONALITY_TYPES) {
+  const lower = type.description.toLowerCase();
+  for (const phrase of BANNED_PHRASES) {
+    if (lower.includes(phrase)) copyNotes.push(`${type.title}: banned phrase "${phrase}"`);
+  }
+  // Sentence splitting is deliberately crude — it only has to be good enough to
+  // raise a hand, and every false positive is read by a human anyway.
+  const sentences = type.description
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+  if (sentences.length < 2 || sentences.length > 3) {
+    copyNotes.push(`${type.title}: ${sentences.length} sentences, standard asks for 2-3`);
+  }
+  for (let i = 1; i < sentences.length; i++) {
+    if (/^You\b/.test(sentences[i]) && /^You\b/.test(sentences[i - 1])) {
+      copyNotes.push(`${type.title}: consecutive sentences both open with "You"`);
+    }
+  }
+}
+if (copyNotes.length) {
+  for (const note of copyNotes) console.log(`      - ${note}`);
+  console.log(`\n      ${copyNotes.length} note(s). None of these fail the run.`);
+} else {
+  console.log(`      All 15 descriptions clear the mechanical checks.`);
 }
 
 // ===========================================================================

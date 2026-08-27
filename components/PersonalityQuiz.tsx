@@ -155,14 +155,23 @@ export default function PersonalityQuiz({ onContinue }: PersonalityQuizProps) {
           the last rounding in the scoring path, and the card has read as a
           bare paragraph ever since.
 
-          The numbers beside the axes ARE rounded, by radarGeometry's
-          labelValue, and that is the only rounding involved: the profile title
-          above still comes from determinePersonalityType on the raw sums, and
-          the polygon itself is drawn from the unrounded vector.
+          NO NUMBER APPEARS ANYWHERE ON THIS CARD, and none is rounded on the
+          way to it. The title comes from determinePersonalityType on the raw
+          sums; the polygon is drawn from the unrounded vector and normalised
+          for display. (An earlier version of this comment described numbers
+          beside the axes, rounded by a radarGeometry helper called labelValue.
+          Both the numbers and the helper were removed in the same review that
+          normalised the chart — a value printed against a normalised polygon
+          does not mean what it looks like it means.)
+
+          highlightAxes picks out the axes the profile is actually built from:
+          two for a hybrid, one for a pure type, none for the All-Rounder. It is
+          emphasis only, so the card and the copy agree about which axes are
+          being talked about.
         */}
         <div className="flex flex-col md:flex-row md:items-center md:text-left gap-6 md:gap-8">
           <div className="shrink-0 self-center">
-            <TasteRadar mode="final" vector={liveVector} />
+            <TasteRadar mode="final" vector={liveVector} highlightAxes={profileType.axes} />
           </div>
           <div className="flex-1">
             <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-4">{profileType.title}</h2>

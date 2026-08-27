@@ -127,6 +127,30 @@ export function normalizeForDisplay(vector: number[]): number[] {
   return floored.map((value) => value * scale);
 }
 
+/**
+ * How far apart two vectors look ONCE DRAWN — the straight-line distance
+ * between their normalised polygons.
+ *
+ * ⚠️ THIS IS NOT euclideanDistance FROM lib/matchActivities.ts, and the two must
+ * not be swapped for one another. That one measures taste, on raw magnitudes,
+ * and it is what ranks activities. This one measures APPEARANCE, after the
+ * display normalisation has thrown those magnitudes away, and it is only ever
+ * used to answer "would a viewer mistake these two shapes for each other".
+ * A gentle user and an intense one with the same ratios are far apart by the
+ * first measure and identical by this one — which is the whole point of the
+ * normalisation, and exactly why appearance needs its own function.
+ */
+export function shapeDistance(a: number[], b: number[]): number {
+  const left = normalizeForDisplay(a);
+  const right = normalizeForDisplay(b);
+  let sum = 0;
+  for (let i = 0; i < AXIS_COUNT; i++) {
+    const delta = left[i] - right[i];
+    sum += delta * delta;
+  }
+  return Math.sqrt(sum);
+}
+
 /** The SVG coordinate at `fraction` of the radius along axis `index`. */
 export function fractionPoint(
   fraction: number,
