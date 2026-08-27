@@ -131,6 +131,34 @@ node scripts/validate-activity-seed.mjs
 - [ ] **The wildcard has no Reroll button** — it has its own `↻ Another`, and using it does
       not decrease the shared counter.
 
+## D3. Result diversity
+
+The three ranked slots and the reroll queue come from one greedy pass: fit still ranks,
+but a candidate within **D = 3.0** of something already picked is skipped as a restatement
+of it.
+
+- [ ] **The three shown cards are three different ideas**, not three phrasings of one.
+- [ ] **Small `matchPercent` gaps between the three are correct, not a bug.** Two activities
+      within D of each other can differ by at most ~13 match points for anyone, so the card
+      diversity passed over was never much better than the one you got.
+- [ ] **Rerolls serve new ideas too.** Reroll all the way to 0 and check you are not handed
+      the near-duplicates that were skipped for the initial three.
+- [ ] **A high-Outdoors run.** Answer the personality quiz leaning hard outdoors, take the
+      quick path, and answer the feasibility questions permissively. Then reroll to
+      exhaustion and look at the whole set.
+      ⚠️ **You should still expect to see several walks.** On the current catalogue the four
+      core walking activities sit 5.4–8.9 apart in taste space — they are genuinely different
+      profiles, and D correctly leaves them alone. What you should NOT see is a set that feels
+      interchangeable: `Find five constellations`, `Identify trees by their bark` and
+      `Identify garden birds` are 1.7–2.0 apart, and only one of the three may appear.
+      *This is the known limit: D catches taste-profile twins, not surface-category
+      monotony. See the diversity section of CLAUDE.md.*
+- [ ] **Skipped activities are not deleted.** The same run's wildcard can still hand you one
+      of them, and changing an answer brings them back into the ranked slots.
+- [ ] **A tight run still fills three slots.** Pick a narrow set of answers so relaxation
+      kicks in — all three cards must still appear, even if two of them are similar. Fit
+      wins at the margin; a slot is never left empty to protect the rule.
+
 ## D2. Results card layout
 
 - [ ] **The badge cluster is top-right on every card**, in the same place regardless of how
