@@ -26,8 +26,7 @@ import {
 } from "../lib/activityTags.ts";
 import { parseSeedActivities } from "./lib/parse-seed.mjs";
 import { formatCatalogueStats } from "./lib/catalogue-stats.mjs";
-import { QUICK_QUESTIONS, HOBBY_QUESTIONS, MIN_RESULTS } from "../lib/feasibilityQuestions.ts";
-import { satisfiesFilter } from "../lib/activityTags.ts";
+import { PATHWAY_SPECS, starvationOf, blameHistogram, MIN_RESULTS } from "./lib/starvation.mjs";
 
 const rows = parseSeedActivities();
 const failures = [];
@@ -132,49 +131,25 @@ console.log(SEPARATOR);
 console.log("COVERAGE (diagnostic - relaxation absorbs these at runtime)");
 console.log("");
 
-for (const [questions, pathway, label] of [
-  [QUICK_QUESTIONS, "quick-fix", "quick"],
-  [HOBBY_QUESTIONS, "long-term", "hobby"],
-]) {
-  const pool = rows.filter((row) => row.tags.includes(pathway));
-  const sizes = questions.map((q) => q.options.length);
-  const total = sizes.reduce((a, b) => a * b, 1);
-
-  const blame = new Map();
-  let starved = 0;
-  let zero = 0;
-
-  for (let n = 0; n < total; n++) {
-    let rem = n;
-    const choice = sizes.map((size) => {
-      const pick = rem % size;
-      rem = Math.floor(rem / size);
-      return pick;
-    });
-    const actions = questions.map((q, i) => q.options[choice[i]].action);
-    const survivors = pool.filter((a) => actions.every((act) => satisfiesFilter(a.tags, act)));
-
-    if (survivors.length >= MIN_RESULTS) continue;
-    starved++;
-    if (survivors.length === 0) zero++;
-    choice.forEach((pick, i) => {
-      const text = questions[i].options[pick].text;
-      blame.set(text, (blame.get(text) ?? 0) + 1);
-    });
-  }
-
-  const pct = ((starved / total) * 100).toFixed(0);
+for (const spec of PATHWAY_SPECS) {
+  const map = starvationOf(rows, spec);
+  const pct = ((map.starvedCount / map.total) * 100).toFixed(0);
   console.log(
-    "  " + label.padEnd(7) + starved + " of " + total + " combinations start below " +
-    MIN_RESULTS + " (" + pct + "%), " + zero + " at zero"
+    "  " + spec.label.padEnd(7) + map.starvedCount + " of " + map.total +
+    " combinations start below " + MIN_RESULTS + " (" + pct + "%), " + map.zeroCount + " at zero"
   );
-  for (const [text, count] of [...blame.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4)) {
+  for (const [text, count] of blameHistogram(map.starved, spec).slice(0, 4)) {
     console.log("      " + String(count).padStart(3) + "x  " + text);
   }
   console.log("");
 }
 console.log("  Answers above appear most often in starved combinations - they are");
 console.log("  where new activities would do the most good.");
+console.log("");
+console.log("  ⚠️  That histogram is a WEAK signal: the cells nest, so a common answer can be");
+console.log("      common merely because it appears in more cells. Run");
+console.log("      `node scripts/report-starvation.mjs` for the per-cell map and the tag");
+console.log("      intersection grid, which is what a content wave should be authored from.");
 console.log("");
 
 if (failures.length) {

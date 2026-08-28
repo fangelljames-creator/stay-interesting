@@ -697,6 +697,68 @@ below went unnoticed.
 Target: **~500 activities, 300 quick-fix and 200 long-term**, grown in reviewed waves. Wave 1 landed
 2026-08-26 and took the canonical seed from 37 to 134.
 
+### The campaign — 134 → ~500, recorded 2026-08-28
+
+Owen's stated plan for getting there, written down before wave 2 was authored so it survives the
+fresh session each wave gets. **The target and the per-wave gates are the contract; the wave
+numbers below are a route, not a promise.**
+
+**Target: ~500 activities, ~300 quick-fix and ~200 long-term.** A row carrying **both** pathway
+tags counts toward **both** — so the two figures do not sum to the total, and never will.
+
+**Baseline, measured 2026-08-28 against the canonical seed:** **134 rows — 65 quick-fix, 76
+long-term, 7 carrying both.** Remaining from there: **+235 quick-fix and +124 long-term.**
+
+⚠️ **The catalogue is currently long-term-heavy and the target is quick-heavy.** 65/76 today
+against 300/200 wanted. That is why waves are weighted **~2:1 quick-fix to long-term after their
+gap fills** — the ratio is corrective, not decorative, and a wave that ignores it makes the gap
+worse rather than merely not better.
+
+**Cadence.**
+
+- **Wave 2 = starvation repair (~65)**, not even topic coverage. Aimed at the tag intersections
+  measured at or near zero rather than spread across the topic map.
+- **Waves 3+ = bank-drain (~85 each)** from `data/activity-idea-bank.csv` until the target.
+- ⚠️ **ONE WAVE PER SESSION, IN A FRESH SESSION, AND OWEN REVIEWS BETWEEN EVERY WAVE.** Never two
+  waves without a review in between — the existing wave protocol says this and the campaign does
+  not relax it. Authoring 85 rows consumes a session's attention; two waves in one is how the
+  second gets the thinner pass.
+- **Stop at ~500**: the last wave trims to land near target and reports the final composition.
+
+**Per-wave gates — every wave, no exceptions.** The first five are machine-checked by
+`scripts/build-wave.mjs` and `scripts/validate-activity-seed.mjs`; the rest are reported for a
+human call, deliberately, because a machine cannot tell a genuine duplicate from a shared word.
+
+1. Closed vocabulary, **exactly one cost tier** — hard failure.
+2. Completeness: a company tag, a place tag, a pathway, a time tag per pathway carried, and a
+   setting tag on anything long-term — hard failure.
+3. Rubric-scored vectors, 7 integers in 1–10 — the shape is a hard failure, the honesty is not
+   checkable and is the reviewer's job.
+4. Fuzzy title dedupe against the **whole** existing catalogue and all prior waves — reported.
+5. Anti-clone caps: max 2 per template family per wave, 5–8 delightfully-specific rows.
+6. Same-cell additions **≥ D apart** from each other.
+7. House-voice descriptions.
+
+⚠️ **D-AWARE AUTHORING — a gate wave 1 did not have, and the reason it is new.** Every new row
+within `DIVERSITY_MIN_DISTANCE` (**3.0**) of any existing catalogue row **in the same pathway** is
+reported by `build-wave.mjs`. **It stays only if it fills a starved cell its neighbour does not.**
+
+The reasoning is `diverseSelect`, which landed after wave 1 was authored: the greedy re-rank skips
+a candidate that only restates one already picked, so a same-cell twin is a row **the results page
+will never show anybody**. Authoring one is not redundancy, it is wasted work that also makes the
+distance distribution worse — see **Why D = 3.0**, where the whole argument for the threshold is
+that it prunes a thin tail. A wave that fattens that tail is quietly moving D out from under
+itself.
+
+⚠️ **Never bend an activity's tags to fit a starved cell.** A candidate belongs in a cell because
+its honest tags already put it there. A cell that cannot be filled honestly is **reported as
+unfillable**, not papered over — the same doctrine that says a tag no filter reads must not exist.
+
+**After each wave's SQL is confirmed run against the live database**, re-run the starvation report,
+the axis histogram and `scripts/audit-activity-reachability.mjs`, and append the deltas to that
+wave's entry under **Recently completed**. Starvation and reachability are both functions of pool
+size and pool shape, so every wave moves them, and a row that goes dark does so silently.
+
 ### The wave protocol — every wave, in this order
 
 1. **Tooling first, if anything is missing.** A wave that cannot be measured should not be authored.
@@ -730,10 +792,19 @@ if the bank runs dry of a needed pathway**. Every other wave rule is unchanged: 
 closed-vocabulary tags with exactly one cost tier, rubric-scored vectors, review file, Owen's
 approval, one SQL block.
 
-Roughly **65 per wave**, weighted toward the remaining gap. After wave 1 that is **~237 quick-fix and
-~123 long-term**.
+Wave sizes and the remaining gap are set by **The campaign** above — ~65 for wave 2, ~85 for waves
+3+, against a remainder re-measured at **+235 quick-fix and +124 long-term** on 2026-08-28. The
+bank holds 250 quick-fix and 145 long-term, which is close enough to that remainder that **it will
+not stretch to cover careless drawing**: a wave that takes long-term rows it did not need spends
+supply the campaign has no slack in.
 
-**The topic map**, drawn from evenly:
+⚠️ **Each row records the bank title it came from**, in a `bank` field on the wave JSON
+(`"generated"` when it is not from the bank). `build-wave.mjs` cross-checks every prior wave and
+fails if a title is drawn twice — five waves across five fresh sessions, each re-reading the same
+395-row CSV, is exactly the situation where that happens unnoticed.
+
+**The topic map**, drawn from evenly — ⚠️ **except where a wave is repairing starvation**, in
+which case the starved cells choose the topics and the map is a tiebreaker, not the brief:
 
 | Quick-fix | Long-term |
 |---|---|

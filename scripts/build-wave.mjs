@@ -20,8 +20,26 @@
  * whether a vector is honest against the rubric, and whether an activity is a
  * near-clone of another are all human calls. The dedupe report SURFACES
  * candidates and never drops anything on its own.
+ *
+ * THE `audit` ARRAY carries corrections to rows that are ALREADY SEEDED, and it
+ * takes two kinds. `proposed` is a replacement vector, which changes how a row
+ * RANKS. `proposedTags` is a replacement tag set, which changes WHICH USERS CAN
+ * SEE THE ROW AT ALL — a much larger change, given its own reviewed table and
+ * its own before/after starvation figures. A proposed tag set clears exactly the
+ * structural bar a new row does.
+ *
+ * FOUR REPORTS were added with the campaign to ~500, all rendered from the same
+ * wave JSON and all computed against the real modules rather than restated here:
+ *   - starvation before/after, through scripts/lib/starvation.mjs;
+ *   - the D-aware authoring report, through euclideanDistance and
+ *     DIVERSITY_MIN_DISTANCE — a row inside D of an existing one is a row
+ *     diverseSelect will never show, so authoring it is wasted work;
+ *   - the same-cell distance report, for new rows filling one hole twice;
+ *   - the bank-consumption cross-check, because five waves across five fresh
+ *     sessions all re-read the same 395-row CSV and nothing else would notice a
+ *     second draw.
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
   isActivityTag,
@@ -32,8 +50,17 @@ import {
   COST_TAGS,
   TIME_LADDER,
 } from "../lib/activityTags.ts";
+import { euclideanDistance } from "../lib/matchActivities.ts";
+import { DIVERSITY_MIN_DISTANCE } from "../lib/resultsSelection.ts";
 import { parseSeedActivities, repoRoot, AXES, dominantAxis } from "./lib/parse-seed.mjs";
 import { formatCatalogueStats } from "./lib/catalogue-stats.mjs";
+import {
+  PATHWAY_SPECS,
+  starvationOf,
+  survivorsOf,
+  classifyCell,
+  MIN_RESULTS,
+} from "./lib/starvation.mjs";
 
 const waveNumber = process.argv[2];
 const wantSql = process.argv.includes("--sql");
@@ -60,35 +87,50 @@ const seededByTitle = new Map(seeded.map((r) => [r.title, r]));
 // ---------------------------------------------------------------------------
 const failures = [];
 
-for (const a of survivors) {
-  const where = `"${a.title}"`;
-  const tags = a.tags ?? [];
+/**
+ * Every structural rule a tag set must satisfy, as a list of complaints.
+ *
+ * Pulled out of the per-activity loop because the audit can now propose a
+ * REPLACEMENT tag set for an existing row, and a corrected row has to clear
+ * exactly the same bar as a new one. Two copies of these rules is how one of
+ * them quietly gets a fix the other does not.
+ */
+function tagFailures(where, tags) {
+  const out = [];
   const has = (t) => tags.includes(t);
 
   const unknown = tags.filter((t) => !isActivityTag(t));
-  if (unknown.length) failures.push(`${where}: tag(s) outside the vocabulary — ${unknown.join(", ")}`);
-  if (new Set(tags).size !== tags.length) failures.push(`${where}: duplicate tag`);
+  if (unknown.length) out.push(`${where}: tag(s) outside the vocabulary — ${unknown.join(", ")}`);
+  if (new Set(tags).size !== tags.length) out.push(`${where}: duplicate tag`);
 
   const costs = tags.filter((t) => COST_TAGS.includes(t));
   if (costs.length !== 1) {
-    failures.push(`${where}: ${costs.length} cost tiers (${costs.join(", ") || "none"}), needs exactly 1`);
+    out.push(`${where}: ${costs.length} cost tiers (${costs.join(", ") || "none"}), needs exactly 1`);
   }
 
-  if (!COMPANY_TAGS.some(has)) failures.push(`${where}: no company tag`);
-  if (!PLACE_TAGS.some(has)) failures.push(`${where}: no place tag`);
+  if (!COMPANY_TAGS.some(has)) out.push(`${where}: no company tag`);
+  if (!PLACE_TAGS.some(has)) out.push(`${where}: no place tag`);
 
   const pathways = PATHWAY_TAGS.filter(has);
-  if (!pathways.length) failures.push(`${where}: no pathway tag`);
+  if (!pathways.length) out.push(`${where}: no pathway tag`);
   for (const pathway of pathways) {
     if (!TIME_LADDER[pathway].some(has)) {
-      failures.push(`${where}: carries ${pathway} but no ${pathway} time tag`);
+      out.push(`${where}: carries ${pathway} but no ${pathway} time tag`);
     }
   }
   // Not enforced by the seed validator, but a long-term row with no setting is
   // invisible to three of the four answers to "where would it happen?".
   if (has("long-term") && !SETTING_TAGS.some(has)) {
-    failures.push(`${where}: long-term with no setting tag — only reachable via "Anywhere"`);
+    out.push(`${where}: long-term with no setting tag — only reachable via "Anywhere"`);
   }
+  return out;
+}
+
+for (const a of survivors) {
+  const where = `"${a.title}"`;
+  const tags = a.tags ?? [];
+
+  failures.push(...tagFailures(where, tags));
 
   const v = a.vector;
   if (!Array.isArray(v) || v.length !== 7 || v.some((n) => !Number.isInteger(n) || n < 1 || n > 10)) {
@@ -105,13 +147,111 @@ const titles = survivors.map((a) => a.title);
 const dupes = titles.filter((t, i) => titles.indexOf(t) !== i);
 if (dupes.length) failures.push(`duplicate titles within the wave: ${[...new Set(dupes)].join(", ")}`);
 
+// ---------------------------------------------------------------------------
+// THE AUDIT — corrections to rows that are already seeded.
+//
+// It carries TWO kinds of correction now, and they are not the same kind of
+// change. A vector correction alters how well a row RANKS for a given user; a
+// tag correction alters WHICH USERS CAN SEE IT AT ALL. The second is the more
+// consequential of the two and gets its own reviewed table, its own starvation
+// delta, and the same structural bar a new row has to clear.
+// ---------------------------------------------------------------------------
 for (const c of audit) {
   if (!seededByTitle.has(c.title)) failures.push(`audit target not in the seed: "${c.title}"`);
-  const v = c.proposed;
-  if (!Array.isArray(v) || v.length !== 7 || v.some((n) => !Number.isInteger(n) || n < 1 || n > 10)) {
-    failures.push(`audit "${c.title}": proposed vector must be 7 integers in 1-10`);
+
+  const hasVector = c.proposed !== undefined;
+  const hasTags = c.proposedTags !== undefined;
+  if (!hasVector && !hasTags) {
+    failures.push(`audit "${c.title}": neither a proposed vector nor proposedTags — nothing to apply`);
+  }
+
+  if (hasVector) {
+    const v = c.proposed;
+    if (!Array.isArray(v) || v.length !== 7 || v.some((n) => !Number.isInteger(n) || n < 1 || n > 10)) {
+      failures.push(`audit "${c.title}": proposed vector must be 7 integers in 1-10`);
+    }
+  }
+  if (hasTags) {
+    if (!Array.isArray(c.proposedTags) || !c.proposedTags.length) {
+      failures.push(`audit "${c.title}": proposedTags must be a non-empty array`);
+    } else {
+      failures.push(...tagFailures(`audit "${c.title}"`, c.proposedTags));
+    }
   }
   if (!c.reason) failures.push(`audit "${c.title}": no reason given`);
+}
+
+// ---------------------------------------------------------------------------
+// BANK CONSUMPTION — the campaign runs five waves across five fresh sessions,
+// each re-reading the same 395-row CSV. Nothing but this stops the same idea
+// being drawn twice, and a duplicate would not fail any other check: it would
+// arrive with a different title and a different vector and read as a new row.
+// ---------------------------------------------------------------------------
+const bankPath = join(repoRoot, "data", "activity-idea-bank.csv");
+
+/** Minimal CSV field split — the bank quotes any field containing a comma. */
+function csvFields(line) {
+  const out = [];
+  let field = "";
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (quoted) {
+      if (ch === '"' && line[i + 1] === '"') { field += '"'; i++; }
+      else if (ch === '"') quoted = false;
+      else field += ch;
+    } else if (ch === '"') quoted = true;
+    else if (ch === ",") { out.push(field); field = ""; }
+    else field += ch;
+  }
+  out.push(field);
+  return out;
+}
+
+const bankTitles = new Set(
+  readFileSync(bankPath, "utf8")
+    .split(/\r?\n/)
+    .slice(1)
+    .filter(Boolean)
+    .map((line) => csvFields(line)[0])
+);
+
+// What every EARLIER wave already consumed. Wave 1 predates the `bank` field —
+// it was produced from data/curated-activities.csv, not the bank — so its rows
+// contribute nothing here and their absence is not a fault.
+const claimedEarlier = new Map();
+for (const file of readdirSync(join(repoRoot, "data", "waves"))) {
+  const match = /^wave-(\d+)\.json$/.exec(file);
+  if (!match || Number(match[1]) >= Number(waveNumber)) continue;
+  const prior = JSON.parse(readFileSync(join(repoRoot, "data", "waves", file), "utf8"));
+  const priorVetoed = new Set(prior.vetoed ?? []);
+  for (const a of prior.activities ?? []) {
+    if (a.bank && a.bank !== "generated" && !priorVetoed.has(a.title)) {
+      claimedEarlier.set(a.bank, `wave ${match[1]}`);
+    }
+  }
+}
+
+// Wave 1 was produced from the curated list, before the bank was the source.
+const bankRequired = Number(waveNumber) >= 2;
+const claimedHere = new Map();
+for (const a of survivors) {
+  const where = `"${a.title}"`;
+  if (!a.bank) {
+    if (bankRequired) failures.push(`${where}: no \`bank\` field — name the idea-bank title, or "generated"`);
+    continue;
+  }
+  if (a.bank === "generated") continue;
+  if (!bankTitles.has(a.bank)) {
+    failures.push(`${where}: bank title not found in the idea bank — "${a.bank}"`);
+  }
+  if (claimedEarlier.has(a.bank)) {
+    failures.push(`${where}: bank title already drawn by ${claimedEarlier.get(a.bank)} — "${a.bank}"`);
+  }
+  if (claimedHere.has(a.bank)) {
+    failures.push(`${where}: bank title drawn twice in this wave — "${a.bank}"`);
+  }
+  claimedHere.set(a.bank, a.title);
 }
 
 if (failures.length) {
@@ -219,16 +359,31 @@ function buildSql() {
   lines.push("");
 
   if (audit.length) {
-    lines.push("-- 2. Vector corrections to existing rows, audited against The 7-axis rubric.");
+    const vectorCount = audit.filter((c) => c.proposed).length;
+    const tagCount = audit.filter((c) => c.proposedTags).length;
+    lines.push(`-- 2. Corrections to existing rows — ${vectorCount} vector, ${tagCount} tag.`);
     lines.push("--    The insert above only ever inserts, so corrections need their own");
     lines.push("--    statement. Assigning the same values again is harmless.");
+    lines.push("--");
+    lines.push("--    NULL means 'leave this column alone', which is what coalesce is doing.");
+    lines.push("--    Every value is cast explicitly because a values list with a NULL in the");
+    lines.push("--    first row has no type for Postgres to infer.");
     lines.push("update public.activities a");
-    lines.push("set vector = c.vector::integer[]");
+    lines.push("set vector = coalesce(c.vector, a.vector),");
+    lines.push("    tags   = coalesce(c.tags, a.tags)");
     lines.push("from (values");
     lines.push(
-      audit.map((c) => `  (${sqlLiteral(c.title)}, array[${c.proposed.join(",")}])`).join(",\n")
+      audit
+        .map((c) => {
+          const vector = c.proposed ? `array[${c.proposed.join(",")}]::integer[]` : "null::integer[]";
+          const tags = c.proposedTags
+            ? `array[${c.proposedTags.map((t) => `'${t}'`).join(",")}]::text[]`
+            : "null::text[]";
+          return `  (${sqlLiteral(c.title)}::text, ${vector}, ${tags})`;
+        })
+        .join(",\n")
     );
-    lines.push(") as c(title, vector)");
+    lines.push(") as c(title, vector, tags)");
     lines.push("where a.title = c.title;");
     lines.push("");
   }
@@ -245,6 +400,124 @@ if (wantSql) {
   process.stdout.write(buildSql());
   process.exit(0);
 }
+
+// ---------------------------------------------------------------------------
+// ANALYSIS — starvation, distance, and what the wave actually reaches
+//
+// All of it is computed against the REAL modules: the questions and filter
+// semantics through scripts/lib/starvation.mjs, the metric through
+// lib/matchActivities.ts, and D through lib/resultsSelection.ts. Nothing here
+// restates a rule the app owns.
+// ---------------------------------------------------------------------------
+const retagged = new Map(audit.filter((c) => c.proposedTags).map((c) => [c.title, c.proposedTags]));
+const seedAfterTags = seeded.map((r) =>
+  retagged.has(r.title) ? { ...r, tags: retagged.get(r.title) } : r
+);
+const projected = [...seedAfterTags, ...survivors];
+
+/** Starved cells split by band, so "plausible cells below 3" is a real figure. */
+function bandCounts(map) {
+  const starved = { plausible: 0, "low-frequency": 0, degenerate: 0 };
+  const zero = { plausible: 0, "low-frequency": 0, degenerate: 0 };
+  for (const cell of map.starved) {
+    const band = classifyCell(cell).band;
+    starved[band]++;
+    if (cell.count === 0) zero[band]++;
+  }
+  return { total: map.total, starved, zero, all: map.starvedCount, allZero: map.zeroCount };
+}
+
+const starvation = PATHWAY_SPECS.map((spec) => ({
+  spec,
+  before: bandCounts(starvationOf(seeded, spec)),
+  afterTagsOnly: bandCounts(starvationOf(seedAfterTags, spec)),
+  after: bandCounts(starvationOf(projected, spec)),
+  // The pre-wave starved cells are the target list, so they are what "fills a
+  // starved cell" is measured against — not the post-wave ones, which the wave
+  // has already changed.
+  targets: starvationOf(seeded, spec).starved,
+}));
+
+/** Which pre-wave starved cells one activity can answer, on one pathway. */
+function cellsFilledBy(activity, targets) {
+  return targets.filter((cell) => survivorsOf([activity], cell).length === 1);
+}
+
+const pathwaysOf = (a) => PATHWAY_TAGS.filter((p) => a.tags.includes(p));
+
+// --- D-aware authoring: nearest neighbour, per pathway the row carries -------
+const dReports = [];
+for (const a of survivors) {
+  for (const pathway of pathwaysOf(a)) {
+    const spec = PATHWAY_SPECS.find((s) => s.pathwayTag === pathway);
+    const targets = starvation.find((s) => s.spec === spec).targets;
+    const neighbours = [
+      ...seedAfterTags.filter((r) => r.tags.includes(pathway)).map((r) => ({ ...r, side: "seed" })),
+      ...survivors
+        .filter((r) => r !== a && r.tags.includes(pathway))
+        .map((r) => ({ ...r, side: "wave" })),
+    ];
+    if (!neighbours.length) continue;
+
+    let nearest = null;
+    for (const n of neighbours) {
+      const distance = euclideanDistance(a.vector, n.vector);
+      if (!nearest || distance < nearest.distance) nearest = { ...n, distance };
+    }
+
+    const mine = cellsFilledBy(a, targets);
+    const theirs = new Set(cellsFilledBy(nearest, targets).map((c) => c.index));
+    const unique = mine.filter((c) => !theirs.has(c.index));
+
+    dReports.push({
+      title: a.title,
+      pathway,
+      neighbour: nearest.title,
+      side: nearest.side,
+      distance: nearest.distance,
+      under: nearest.distance < DIVERSITY_MIN_DISTANCE,
+      fills: mine.length,
+      unique: unique.length,
+      sample: unique[0] ? unique[0].answers.join(" / ") : null,
+    });
+  }
+}
+const dFlagged = dReports.filter((r) => r.under).sort((a, b) => a.distance - b.distance);
+
+// --- Same-cell distances: wave rows that land in the same starved cell -------
+const sameCellPairs = [];
+for (const spec of PATHWAY_SPECS) {
+  const targets = starvation.find((s) => s.spec === spec).targets;
+  const pool = survivors.filter((a) => a.tags.includes(spec.pathwayTag));
+  const filled = new Map(pool.map((a) => [a, new Set(cellsFilledBy(a, targets).map((c) => c.index))]));
+
+  for (let i = 0; i < pool.length; i++) {
+    for (let j = i + 1; j < pool.length; j++) {
+      const distance = euclideanDistance(pool[i].vector, pool[j].vector);
+      if (distance >= DIVERSITY_MIN_DISTANCE) continue;
+      const shared = [...filled.get(pool[i])].filter((n) => filled.get(pool[j]).has(n)).length;
+      sameCellPairs.push({
+        pathway: spec.pathwayTag,
+        a: pool[i].title,
+        b: pool[j].title,
+        distance,
+        shared,
+      });
+    }
+  }
+}
+sameCellPairs.sort((x, y) => y.shared - x.shared || x.distance - y.distance);
+
+// --- Reach: which starved cells the wave actually clears ---------------------
+const reach = starvation.map(({ spec, targets }) => {
+  const after = starvationOf(projected, spec);
+  const stillStarved = new Set(after.starved.map((c) => c.index));
+  const cleared = targets.filter((c) => !stillStarved.has(c.index));
+  const untouched = targets.filter(
+    (c) => stillStarved.has(c.index) && after.cells[c.index].count === c.count
+  );
+  return { spec, targets, cleared, untouched };
+});
 
 // ---------------------------------------------------------------------------
 // REVIEW FILE
@@ -309,15 +582,21 @@ for (const a of survivors) {
 }
 
 // --- the audit
-if (audit.length) {
+const vectorAudit = audit.filter((c) => c.proposed);
+const tagAudit = audit.filter((c) => c.proposedTags);
+
+if (vectorAudit.length) {
   out.push("## Proposed vector corrections to existing rows");
   out.push("");
   out.push("⚠️ **Proposals only. Nothing is edited until you approve.** These are the existing seed rows");
   out.push("re-read against The 7-axis rubric. Rows not listed were read and left alone.");
   out.push("");
+  out.push("A vector correction changes how well a row RANKS for a given user. It cannot change who");
+  out.push("is allowed to see it — that is what the tag corrections below do.");
+  out.push("");
   out.push("| Title | Current | Proposed | Leans (was → now) | Why |");
   out.push("|---|---|---|---|---|");
-  for (const c of audit) {
+  for (const c of vectorAudit) {
     const cur = seededByTitle.get(c.title).vector;
     const wasLean = AXES[dominantAxis(cur)];
     const nowLean = AXES[dominantAxis(c.proposed)];
@@ -328,6 +607,174 @@ if (audit.length) {
   }
   out.push("");
 }
+
+if (tagAudit.length) {
+  out.push("## Proposed TAG corrections to existing rows");
+  out.push("");
+  out.push("⚠️ **This is the more consequential kind of correction, and it is the one to read");
+  out.push("hardest.** A tag correction changes **which users can see a row at all** — not how it");
+  out.push("ranks. Approving one hides an activity from people who see it today, or reveals it to");
+  out.push("people who cannot. Every proposed tag set has been through exactly the same structural");
+  out.push("checks a new row gets.");
+  out.push("");
+  out.push("| Title | Removed | Added | Why |");
+  out.push("|---|---|---|---|");
+  for (const c of tagAudit) {
+    const cur = seededByTitle.get(c.title).tags;
+    const removed = cur.filter((t) => !c.proposedTags.includes(t));
+    const added = c.proposedTags.filter((t) => !cur.includes(t));
+    out.push(
+      `| ${c.title} | ${removed.map((t) => `\`${t}\``).join(" ") || "—"} | ` +
+        `${added.map((t) => `\`${t}\``).join(" ") || "—"} | ${c.reason} |`
+    );
+  }
+  out.push("");
+  out.push("**What the tag corrections do on their own**, with no new activities added at all:");
+  out.push("");
+  out.push("| Path | Starved cells before | after re-tagging | Zero-cells before | after |");
+  out.push("|---|---|---|---|---|");
+  for (const s of starvation) {
+    out.push(
+      `| ${s.spec.label} | ${s.before.all} of ${s.before.total} | ${s.afterTagsOnly.all} | ` +
+        `${s.before.allZero} | ${s.afterTagsOnly.allZero} |`
+    );
+  }
+  out.push("");
+}
+
+// --- starvation, before and after
+out.push("## Starvation — before and after this wave");
+out.push("");
+out.push("Counts are **pre-relaxation**: how many activities survive an answer combination before");
+out.push("`lib/selectionPipeline.ts` bends anything. A cell at zero is never empty on screen — it is a");
+out.push("cell where something is ALWAYS bent. ⚠️ Cost and company never bend, so a cell starved on");
+out.push("either of those is starved permanently and only content can fix it.");
+out.push("");
+out.push(`"Plausible" excludes the low-frequency band — see \`CELL_RULES\` in`);
+out.push("`scripts/lib/starvation.mjs` for the named rules and why the degenerate band is empty.");
+out.push("");
+out.push("⚠️ **READ THE ZERO-CELL COLUMN FIRST, NOT THE STARVED COLUMN.** The two can move in");
+out.push("opposite directions and regularly do — a tag correction that takes a row out of one");
+out.push("intersection and puts it into another can tip several 3s down to 2s while emptying");
+out.push("far more cells of nothing at all. A cell at 1 or 2 gets a relaxed, honest answer; a cell");
+out.push("at 0 has nothing to relax from and always bends. **Zero-cells falling is the win.**");
+out.push("");
+out.push("| Path | Plausible cells < 3 | Zero-cells | All starved | Pool |");
+out.push("|---|---|---|---|---|");
+for (const s of starvation) {
+  const poolBefore = seeded.filter((r) => r.tags.includes(s.spec.pathwayTag)).length;
+  const poolAfter = projected.filter((r) => r.tags.includes(s.spec.pathwayTag)).length;
+  out.push(
+    `| ${s.spec.label} | ${s.before.starved.plausible} → **${s.after.starved.plausible}** | ` +
+      `${s.before.allZero} → **${s.after.allZero}** | ` +
+      `${s.before.all} of ${s.before.total} → **${s.after.all}** | ${poolBefore} → ${poolAfter} |`
+  );
+}
+out.push("");
+for (const r of reach) {
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  out.push(
+    `**${r.spec.label}** — of ${r.targets.length} cells starved before this wave, ` +
+      `**${plural(r.cleared.length, "is", "are")} cleared** (now at ${MIN_RESULTS} or more) and ` +
+      `**${plural(r.untouched.length, "gained", "gained")} nothing at all**.`
+  );
+  if (r.untouched.length) {
+    out.push("");
+    out.push("<details><summary>Cells this wave does not touch</summary>");
+    out.push("");
+    out.push("| n | " + r.spec.questions.map((q) => q.constraint).join(" | ") + " |");
+    out.push("|---|" + r.spec.questions.map(() => "---").join("|") + "|");
+    for (const c of r.untouched.slice(0, 40)) {
+      out.push(`| ${c.count} | ${c.answers.join(" | ")} |`);
+    }
+    if (r.untouched.length > 40) out.push(`| … | ${r.untouched.length - 40} more not listed |`);
+    out.push("");
+    out.push("</details>");
+  }
+  out.push("");
+}
+
+// --- D-aware authoring
+out.push("## D-aware authoring report");
+out.push("");
+out.push(
+  `Every new row's nearest neighbour **within each pathway it carries**, by the real ` +
+    `\`euclideanDistance\`. D is \`DIVERSITY_MIN_DISTANCE\` = **${DIVERSITY_MIN_DISTANCE}**, imported ` +
+    `from \`lib/resultsSelection.ts\`.`
+);
+out.push("");
+out.push("⚠️ **Why this gate exists.** `diverseSelect` skips a candidate that only restates one");
+out.push("already picked, so a row inside D of an existing one is a row **the results page will");
+out.push("never show anybody**. The rule: a flagged row stays only if it fills a starved cell its");
+out.push("neighbour does not. **Reported, never auto-dropped** — the same treatment the fuzzy");
+out.push("dedupe gets, for the same reason.");
+out.push("");
+out.push("A pair of NEW rows appears **twice, once from each side**. That is the useful form: the");
+out.push("side showing 0 unique cells is the one to cut, and its partner keeps everything the pair");
+out.push("was reaching between them.");
+out.push("");
+if (!dFlagged.length) {
+  out.push(`No new row sits within ${DIVERSITY_MIN_DISTANCE} of any catalogue or wave row on a shared pathway.`);
+  const closest = [...dReports].sort((a, b) => a.distance - b.distance)[0];
+  if (closest) {
+    out.push("");
+    out.push(
+      `Closest approach: **${closest.title}** ↔ ${closest.neighbour} (${closest.side}) at ` +
+        `${closest.distance.toFixed(2)} on the ${closest.pathway} path.`
+    );
+  }
+} else {
+  out.push(`${dFlagged.length} row/pathway pairing(s) under D.`);
+  out.push("");
+  out.push("| d | New row | Pathway | Nearest | Side | Starved cells it fills | …that the neighbour cannot | Verdict |");
+  out.push("|---|---|---|---|---|---|---|---|");
+  for (const r of dFlagged) {
+    const verdict = r.unique > 0 ? "**KEEP**" : "⚠️ **VETO CANDIDATE**";
+    out.push(
+      `| ${r.distance.toFixed(2)} | ${r.title} | ${r.pathway} | ${r.neighbour} | ${r.side} | ` +
+        `${r.fills} | ${r.unique} | ${verdict} |`
+    );
+  }
+  const vetoes = dFlagged.filter((r) => r.unique === 0);
+  if (vetoes.length) {
+    out.push("");
+    out.push(
+      `⚠️ **${vetoes.length} row(s) add no starved cell their neighbour does not already serve.** ` +
+        "Under the campaign's D-aware rule those should come out of the wave."
+    );
+  }
+  const kept = dFlagged.filter((r) => r.unique > 0);
+  if (kept.length) {
+    out.push("");
+    out.push("Kept rows, and the cell each one reaches that its neighbour cannot:");
+    out.push("");
+    for (const r of kept) out.push(`- **${r.title}** — ${r.sample}`);
+  }
+}
+out.push("");
+
+// --- same-cell distances
+out.push("## Same-cell distance report");
+out.push("");
+out.push("Pairs of NEW rows closer than D to each other. The `shared` column counts how many of the");
+out.push("pre-wave starved cells **both** rows answer — that is what makes a pair a same-cell pair.");
+out.push("");
+out.push("A close pair sharing no cell is two ideas that happen to score alike and land in different");
+out.push("parts of the funnel; a close pair sharing cells is the wave filling one hole twice with");
+out.push("the same idea, and `diverseSelect` will only ever show one of them.");
+out.push("");
+if (!sameCellPairs.length) {
+  out.push(`No two new rows on a shared pathway sit within ${DIVERSITY_MIN_DISTANCE} of each other.`);
+} else {
+  out.push("| d | shared cells | Pathway | A | B |");
+  out.push("|---|---|---|---|---|");
+  for (const p of sameCellPairs) {
+    out.push(
+      `| ${p.distance.toFixed(2)} | ${p.shared > 0 ? `⚠️ **${p.shared}**` : "0"} | ${p.pathway} | ${p.a} | ${p.b} |`
+    );
+  }
+}
+out.push("");
 
 // --- dedupe
 out.push("## Fuzzy dedupe against the existing catalogue");
@@ -390,7 +837,20 @@ out.push("");
 
 writeFileSync(reviewPath, out.join("\n").replace(/\n{3,}/g, "\n\n") + "\n", "utf8");
 console.log(`Wrote ${reviewPath}`);
-console.log(`  ${survivors.length} activities, ${audit.length} audit proposals, ${collisions.length} dedupe candidate(s)`);
+console.log(
+  `  ${survivors.length} activities, ${audit.length} audit proposal(s) ` +
+    `(${vectorAudit.length} vector, ${tagAudit.length} tag), ${collisions.length} dedupe candidate(s)`
+);
+for (const s of starvation) {
+  console.log(
+    `  ${s.spec.label.padEnd(6)} zero-cells ${s.before.allZero} -> ${s.after.allZero}, ` +
+      `starved ${s.before.all} -> ${s.after.all} of ${s.before.total}`
+  );
+}
 if (overFamilies.length) {
   console.log(`  ⚠️  ${overFamilies.length} template family(ies) over the cap of 2`);
+}
+const dVetoes = dFlagged.filter((r) => r.unique === 0);
+if (dVetoes.length) {
+  console.log(`  ⚠️  ${dVetoes.length} row(s) under D=${DIVERSITY_MIN_DISTANCE} adding no starved cell their neighbour lacks`);
 }
