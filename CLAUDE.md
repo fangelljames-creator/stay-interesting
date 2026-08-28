@@ -1371,9 +1371,18 @@ stays publicly readable with no write policy.
 
 ## Recently completed
 
-**Results-page amendment, 2026-08-28** (branch `results-amendments`, **merge held for Owen's
-click-through**). Two changes, both Owen's decisions, both reversals of things this file previously
-argued for - so the reasoning that is now superseded is recorded beside them rather than deleted.
+**Results-page amendment, 2026-08-28** (branch `results-amendments`, **merged into `main` and
+deployed 2026-08-28 on Owen's instruction — the click-through had NOT happened first**). Two
+changes, both Owen's decisions, both reversals of things this file previously argued for - so the
+reasoning that is now superseded is recorded beside them rather than deleted.
+
+⚠️ **THAT IS NOW THREE CONSECUTIVE BRANCHES SHIPPED WITHOUT THE CLICK-THROUGH** — `result-diversity`,
+`personality-types`, `viewport-fit` and this one. `docs/manual-test.md` describes itself as the
+thing every feature branch extends in its final stage, and it has been extended four times and run
+zero. The backlog it now represents is real and it is cumulative: the 15 type descriptions are still
+unreviewed first-pass copy, the whole viewport density pass has never been seen on a physical
+handset, and these two amendments change what the results page says at exactly the moment a user
+reads it. None of that is visible as an error anywhere.
 
 - **Type attribution is one line.** "Matched to <title>", centred, `text-sm`, slate-500, on every
   viewport. No description, no radar, no card. It was the full payoff repeated - eyebrow, title,
