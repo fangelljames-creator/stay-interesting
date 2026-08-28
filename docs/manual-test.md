@@ -129,7 +129,7 @@ node scripts/validate-activity-seed.mjs
 Added 2026-08-28 with content wave 2. **⚠️ Every check here needs
 `supabase/wave-2-activities.sql` to have been run against the live database.** Until then
 the deployed app has 134 rows and all of these will fail for a content reason rather than
-a code one — check `select count(*) from public.activities;` reads **190** before
+a code one — check `select count(*) from public.activities;` reads **191** before
 concluding anything is broken.
 
 These were all at **zero survivors** before wave 2, which means the relaxation ladder was

@@ -907,7 +907,7 @@ with seed (title, description, tags, vector) as (
    array['quick-fix','10-mins','inside','at-home','solo','free'],
    array[1,2,2,3,1,4,2]),
 
--- --- WAVE 2 (2026-08-28) --- starvation repair, 56 rows, all free.
+-- --- WAVE 2 (2026-08-28) --- starvation repair, 57 rows, all free.
 -- Rendered from data/waves/wave-2.json by scripts/build-wave.mjs. Do not hand-edit:
 -- edit the wave file and regenerate, or the review file stops describing the seed.
 
@@ -995,6 +995,11 @@ with seed (title, description, tags, vector) as (
    'Look up when the space station crosses your postcode, stand outside at the right minute, and wave. It takes about four minutes to go over and there are people on board.',
    array['quick-fix','10-mins','outside','in-nature','solo','couple','social','free'],
    array[5,2,1,5,9,8,3]),
+
+  ('Hunt for ghost signs',
+   'Faded painted adverts on old brick, for companies that stopped existing decades ago. Once you have spotted one on your own street you will never be able to stop seeing them.',
+   array['quick-fix','1-hour','half-day','outside','solo','couple','social','free'],
+   array[4,3,2,6,5,8,2]),
 
   ('Take a smell walk',
    'One lap of the block, cataloguing five distinct smells and noting where each one starts and stops. It is the sense nobody uses on purpose, and your street turns out to have a map of them.',

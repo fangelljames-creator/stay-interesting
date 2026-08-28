@@ -709,8 +709,8 @@ tags counts toward **both** — so the two figures do not sum to the total, and 
 **Baseline, measured 2026-08-28 against the canonical seed:** **134 rows — 65 quick-fix, 76
 long-term, 7 carrying both.** Remaining from there: **+235 quick-fix and +124 long-term.**
 
-**After wave 2, 2026-08-28: 190 rows — 99 quick-fix, 99 long-term, 8 carrying both.**
-Remaining: **+201 quick-fix and +101 long-term.** ⚠️ The two pathways are now level at 99 each
+**After wave 2, 2026-08-28: 191 rows — 100 quick-fix, 99 long-term, 8 carrying both.**
+Remaining: **+200 quick-fix and +101 long-term.** ⚠️ The two pathways are now level at 99 each
 against a 300/200 target, so waves 3+ must lean quick-fix harder than the nominal 2:1 to close it.
 
 ⚠️ **The catalogue is currently long-term-heavy and the target is quick-heavy.** 65/76 today
@@ -881,11 +881,11 @@ which case the starved cells choose the topics and the map is a tiebreaker, not 
 
 ### The live database — wave 1 confirmed present, 2026-08-26; ⚠️ wave 2 NOT yet run
 
-⚠️ **The seed SQL holds 190 rows as of wave 2 (2026-08-28) and the live database holds 134.** They
+⚠️ **The seed SQL holds 191 rows as of wave 2 (2026-08-28) and the live database holds 134.** They
 are out of step until `supabase/wave-2-activities.sql` is pasted into the Supabase SQL editor. That
-file is idempotent and carries both the 56 new rows and the two tag corrections in **one** block —
+file is idempotent and carries both the 57 new rows and the two tag corrections in **one** block —
 see the mobility-work warning in the wave-2 entry for why those must not be separated. The
-verification queries are at the bottom of the file: expect **190 rows, 0 missing_vector**.
+verification queries are at the bottom of the file: expect **191 rows, 0 missing_vector**.
 
 The **canonical seed SQL is the source of truth**, and `content-wave-1` was
 merged into `main` on 2026-08-26 so the repo matched what was deployed at that point. This section
@@ -1491,9 +1491,9 @@ stays publicly readable with no write policy.
 
 ## Recently completed
 
-**Content wave 2 — starvation repair, 2026-08-28** (branch `wave-2`). **56 new activities and 2 tag
-corrections, taking the canonical seed from 134 to 190 rows — 99 quick-fix, 99 long-term, 8 carrying
-both.** Approved by Owen at both gates. Full campaign context under **The campaign** above.
+**Content wave 2 — starvation repair, 2026-08-28** (branch `wave-2`). **57 new activities and 2 tag
+corrections, taking the canonical seed from 134 to 191 rows — 100 quick-fix, 99 long-term, 8
+carrying both.** Approved by Owen at both gates. Full campaign context under **The campaign** above.
 
 ⚠️ **NOT YET RUN AGAINST THE LIVE DATABASE.** `supabase/wave-2-activities.sql` is written and
 idempotent but has to be pasted into the Supabase SQL editor by hand. Until it is, the deployed app
@@ -1509,7 +1509,7 @@ in this entry once Owen confirms the run.
 - ⚠️ **EVERY P1 AND P2 CELL WAS A `free`-CEILING CELL, SO EVERY ROW IN THE WAVE IS `free`.** That
   was not a stylistic choice and it is not a precedent for waves 3+ — it fell out of the map. The
   paid bands are largely untouched and are where wave 3 has to spend.
-- **55 of 56 rows came from `data/activity-idea-bank.csv`**, each recording its source title in a
+- **56 of 57 rows came from `data/activity-idea-bank.csv`**, each recording its source title in a
   `bank` field that `build-wave.mjs` cross-checks against every prior wave. **One row was
   generated** — `An obstacle course built from the furniture` — because the bank has no honest free,
   indoor, hour-long, group physical activity and that cell was P1 at zero. The ~15-row generation
@@ -1529,16 +1529,30 @@ as a tidy-up on its own, they will regress the quick path and nothing will repor
   Energy 4, when every other tagged row is Energy 5+ and no row at Energy 7+ lacks the tag. Two
   further walks were proposed and **withdrawn** at Energy 5 and 6 — inside the convention, and
   cutting them would have been scoring the report rather than the behaviour. That cross-check is now
-  a permanent non-fatal section of the review file and reports clean over all 190 rows.
-- **Eight rows were vetoed by the D-aware gate before Owen saw them**, each within 3.0 of a
+  a permanent non-fatal section of the review file and reports clean over all 191 rows.
+- **Seven rows were vetoed by the D-aware gate before Owen saw them**, each within 3.0 of a
   neighbour and adding no starved cell that neighbour already served; two of them (`One full cuppa
   outside`, `Speed-walk the supermarket run`) filled zero starved cells at all. They are named with
   reasons in the wave file's `vetoed` array rather than deleted.
-- ⚠️ **`Age a hedge by counting its species` was un-vetoed by Owen and the gate still flags it.**
-  The arithmetic is right — all 6 of its cells sit inside the north-finding row's 16 — and the
-  override is on two grounds the gate cannot see: **spark-tier charm outranks D-economy, and the
-  rotation penalty gives same-cell twins repeat-visit value a single-run distance cannot measure.**
-  It will keep printing as a VETO CANDIDATE, which is correct. **Do not re-apply the gate to it.**
+- ⚠️ **Three of the seven are walking-family rows, and those vetoes are the load-bearing ones.**
+  `Walk a timed power mile`, `Speed-walk the supermarket run` and `Bag a local peak list`. D
+  measures the taste profile, not the surface category, so it does **not** catch a catalogue
+  drifting towards walk after walk — see **The known limit: taste twins, not category monotony**.
+  That has to be caught by hand, and this wave is where it was.
+- ⚠️ **TWO ROWS WERE UN-VETOED BY OWEN AND THE GATE STILL FLAGS BOTH.** `Age a hedge by counting
+  its species` (2.65 from the north-finding row, all 6 of its cells inside that row's 16) and
+  `Hunt for ghost signs` (2.65 from `Postbox spotting by royal cipher`, all 24 of its cells
+  covered). The arithmetic is right in both cases; the override is on three grounds the gate cannot
+  see: **spark-tier charm outranks D-economy; both sit at the borderline rather than deep inside it;
+  and the rotation penalty gives same-cell pairs repeat-visit value a single-run distance cannot
+  measure.** They will keep printing as VETO CANDIDATEs, which is correct. **Do not re-apply the
+  gate to either.**
+- ⚠️ **The asymmetry with the walking vetoes IS the judgement, and it is the thing to carry
+  forward.** A same-cell pair is worth keeping when the two rows are *different ideas that score
+  alike*, and worth cutting when they are the *same idea twice*. Ghost signs and postboxes are two
+  distinct things to look for on the same walk; three timed walks are one activity with three
+  names. No script can tell those apart — which is exactly why the D report reports and never
+  drops.
 - **Thirteen vectors were re-scored on a second rubric read** after the same-cell report caught
   eight pairs of genuinely different activities scored lazily alike on a fast first pass. Two were
   the side-effect error the rubric exists to catch (`Animal walks across the living room` at
@@ -1553,7 +1567,7 @@ as a tidy-up on its own, they will regress the quick path and nothing will repor
 
 Three things, and the first is the one that will not fix itself.
 
-1. **Stimulation is still 3 rows of 190 (1.6%), and wave 2 could not have moved it.** It is
+1. **Stimulation is still 3 rows of 191 (1.6%), and wave 2 could not have moved it.** It is
    relatively *worse* than before because the denominator grew. This is structural rather than an
    oversight: genuinely Stimulation-dominant activities — competition, stakes, adrenaline — are
    overwhelmingly **paid facility** activities (squash, padel, BJJ, fencing, karting, climbing

@@ -2,7 +2,7 @@
 
 Starvation repair, not topic coverage. Every row is drawn from the idea bank and chosen because its HONEST tags already sit in a confirmed-starved cell. Zero rows were generated - the ~15-row targeted-generation allowance was not needed. Every new row is `free`, because every P1 and P2 cell in Owen's ranking is a free-ceiling cell.
 
-**56 activities for your veto pass**, 8 already vetoed, plus **2 proposed vector corrections** to existing rows.
+**57 activities for your veto pass**, 7 already vetoed, plus **2 proposed vector corrections** to existing rows.
 
 Nothing here has been written to the seed SQL or the database. Strike anything by adding its
 exact title to the `vetoed` array in the wave JSON, or just tell me and I will.
@@ -33,20 +33,24 @@ So `Walk a street you have never walked down` (Energy 5) and `Walk somewhere wit
 
 **One sequencing trap worth knowing.** Un-tagging `Ten minutes of mobility work` on its own makes things *worse* - 57 zero-cells up to 65 - because it is the only ten-minute indoor exertion row in the catalogue and removing the tag empties that intersection outright. It is only safe shipped alongside the indoor-movement content, which is what this wave is. It must not be split out into its own change later.
 
-### Eight rows are vetoed by the D rule, and the ninth was overruled
+### Seven rows are vetoed by the D rule, and two were overruled
 
-The D-aware gate flagged 16 rows sitting within 3.0 of a neighbour and adding no starved cell that neighbour did not already serve. Under the campaign rule those come out, so they are in the wave's `vetoed` array with their reasoning rather than quietly deleted. Named, so the losses are visible:
+The D-aware gate flagged 16 rows sitting within 3.0 of a neighbour and adding no starved cell that neighbour did not already serve. Under the campaign rule those come out, so they are in the wave's `vetoed` array with their reasoning rather than quietly deleted. Named, so the losses stay visible:
 
 - **Cloud-watching, flat on your back** - 1.41 from `Watch a sunset start to finish`, which serves all 13 of its cells. Two people lying outside looking up.
 - **Learn a basic shuffle-dance step** - 1.73 from `Three salsa steps, solo`, and a third kitchen-dance row behind the seeded `Learn to moonwalk`.
-- **Hunt for ghost signs** - 2.83 from `Postbox spotting by royal cipher`, which covers all 24 of its cells. Both are urban historical spotting on a walk.
-- **Bag a local peak list** - 2.24 from `Section-hike a coastal path`, which serves all 9 of its cells, and it also crowded the seeded `Hiking and hillwalking`.
 - **A deep squat while the kettle boils** - 1.41 from `Follow a fifteen-minute beginner yoga flow`; identical cell set, and the yoga row is the more substantial ten minutes.
-- **Walk a timed power mile** - 1.73 from `First-touch drills against a wall`; identical cell set, and dropping it thins an already walk-heavy catalogue.
 - **One full cuppa outside** - filled **zero** starved cells. Ten calm free outdoor minutes is the one corner of the quick path that was never short.
-- **Speed-walk the supermarket run** - filled **zero** starved cells. `1-hour` outdoor exertion already had survivors.
 
-**Overruled by Owen, 2026-08-28: `Age a hedge by counting its species` stays.** The gate is right on the arithmetic - it fills 6 cells and all 6 sit inside the north-finding row's 16 - and it is still reported as a veto candidate below, which is correct and should stay that way. The override is on two grounds the gate cannot see: spark-tier charm outranks D-economy, and the rotation penalty gives same-cell twins repeat-visit value that a single-run distance measurement does not capture. **Do not re-apply the gate to this row in a later wave.**
+**The three walking-family vetoes stand emphatically** - see **The known limit: taste twins, not category monotony** in `CLAUDE.md`. D measures the taste profile rather than the surface category, so it does *not* catch a catalogue drifting towards walk after walk, and that has to be caught by hand:
+
+- **Walk a timed power mile** - 1.73 from `First-touch drills against a wall`; identical cell set.
+- **Speed-walk the supermarket run** - filled **zero** starved cells, and was a third timed-walk row.
+- **Bag a local peak list** - 2.24 from `Section-hike a coastal path`, which serves all 9 of its cells, and it crowded the seeded `Hiking and hillwalking` besides.
+
+**Overruled by Owen, 2026-08-28. Two rows stay: `Age a hedge by counting its species` and `Hunt for ghost signs`.** The gate is right on the arithmetic in both cases - the hedge fills 6 cells all sitting inside the north-finding row's 16, ghost signs fills 24 all covered by `Postbox spotting by royal cipher` - and **both are still reported as veto candidates below, which is correct and must stay that way.** The override is on three grounds the gate cannot see: spark-tier charm outranks D-economy; both sit at the borderline rather than deep inside it (2.65 and 2.83 against D = 3.0); and the rotation penalty gives same-cell pairs repeat-visit value that a single-run distance measurement cannot capture. **Do not re-apply the gate to either row in a later wave.**
+
+Note the asymmetry with the walking vetoes above, because it is the whole judgement: a same-cell pair is worth keeping when the two rows are *different ideas that score alike*, and worth cutting when they are the *same idea twice*. Ghost signs and postboxes are two distinct things to look for; three timed walks are one activity with three names.
 
 ### I re-scored thirteen vectors on a second read, and the first pass was the problem
 
@@ -72,7 +76,7 @@ All ten residual zero-cells are accounted for. Six are the low-frequency band - 
 
 **One row was generated**, against the ~15 you allowed: `An obstacle course built from the furniture`. The bank has no honest free, indoor, hour-long, group physical activity, and that cell was P1 sitting at zero. The other 54 rows all came out of the bank, and every drawn title is recorded in a `bank` field that `build-wave.mjs` cross-checks against every prior wave.
 
-## Quick-fix — 34
+## Quick-fix — 35
 
 | # | Title | Pathway | Cost | Vector | Leans |
 |---|---|---|---|---|---|
@@ -93,23 +97,24 @@ All ten residual zero-cells are accounted for. Six are the low-frequency band - 
 | 15 | How far can you walk in exactly fifteen minutes? | quick-fix | free | `4,5,1,5,7,6,3` | Outdoors |
 | 16 | Watch a sunset start to finish | quick-fix | free | `4,2,2,2,9,3,1` | Outdoors |
 | 17 | Catch tonight's ISS pass | quick-fix | free | `5,2,1,5,9,8,3` | Outdoors |
-| 18 | Take a smell walk | quick-fix | free | `3,3,4,3,7,8,2` | Novelty |
-| 19 | Find north four ways without a compass | quick-fix | free | `4,2,1,9,8,7,1` | Analytical |
-| 20 | Age a hedge by counting its species | quick-fix | free | `4,3,1,8,9,9,1` | Outdoors |
-| 21 | A phone-stays-home walk | quick-fix | free | `4,4,1,1,8,5,1` | Outdoors |
-| 22 | Storyboard last year's photo album | quick-fix | free | `3,1,6,5,1,3,2` | Creative |
-| 23 | Programme a themed trilogy night | quick-fix | free | `7,1,5,4,1,5,3` | Social |
-| 24 | The wardrobe truth audit | quick-fix | free | `2,3,2,6,1,3,2` | Analytical |
-| 25 | Plan next year's garden on paper | quick-fix | free | `2,2,7,8,2,5,2` | Analytical |
-| 26 | Take one inbox to zero | quick-fix | free | `1,1,1,6,1,1,2` | Analytical |
-| 27 | Rank your top ten films, definitively | quick-fix | free | `6,1,4,8,1,3,3` | Analytical |
-| 28 | Design a no-spend weekend worth having | quick-fix | free | `6,2,6,6,4,6,2` | Social |
-| 29 | Find your nearest trig point | quick-fix | free | `4,5,1,6,9,8,4` | Outdoors |
-| 30 | Postbox spotting by royal cipher | quick-fix | free | `5,4,1,7,6,9,1` | Novelty |
-| 31 | Beachcombing and sea glass | quick-fix+long-term | free | `3,4,3,5,10,6,2` | Outdoors |
-| 32 | Three card games you can teach anyone | quick-fix | free | `8,1,2,6,1,4,4` | Social |
-| 33 | Count to ten in three new languages | quick-fix | free | `4,1,1,6,1,8,2` | Novelty |
-| 34 | Finally understand the offside rule | quick-fix | free | `5,1,1,8,1,6,2` | Analytical |
+| 18 | Hunt for ghost signs | quick-fix | free | `4,3,2,6,5,8,2` | Novelty |
+| 19 | Take a smell walk | quick-fix | free | `3,3,4,3,7,8,2` | Novelty |
+| 20 | Find north four ways without a compass | quick-fix | free | `4,2,1,9,8,7,1` | Analytical |
+| 21 | Age a hedge by counting its species | quick-fix | free | `4,3,1,8,9,9,1` | Outdoors |
+| 22 | A phone-stays-home walk | quick-fix | free | `4,4,1,1,8,5,1` | Outdoors |
+| 23 | Storyboard last year's photo album | quick-fix | free | `3,1,6,5,1,3,2` | Creative |
+| 24 | Programme a themed trilogy night | quick-fix | free | `7,1,5,4,1,5,3` | Social |
+| 25 | The wardrobe truth audit | quick-fix | free | `2,3,2,6,1,3,2` | Analytical |
+| 26 | Plan next year's garden on paper | quick-fix | free | `2,2,7,8,2,5,2` | Analytical |
+| 27 | Take one inbox to zero | quick-fix | free | `1,1,1,6,1,1,2` | Analytical |
+| 28 | Rank your top ten films, definitively | quick-fix | free | `6,1,4,8,1,3,3` | Analytical |
+| 29 | Design a no-spend weekend worth having | quick-fix | free | `6,2,6,6,4,6,2` | Social |
+| 30 | Find your nearest trig point | quick-fix | free | `4,5,1,6,9,8,4` | Outdoors |
+| 31 | Postbox spotting by royal cipher | quick-fix | free | `5,4,1,7,6,9,1` | Novelty |
+| 32 | Beachcombing and sea glass | quick-fix+long-term | free | `3,4,3,5,10,6,2` | Outdoors |
+| 33 | Three card games you can teach anyone | quick-fix | free | `8,1,2,6,1,4,4` | Social |
+| 34 | Count to ten in three new languages | quick-fix | free | `4,1,1,6,1,8,2` | Novelty |
+| 35 | Finally understand the offside rule | quick-fix | free | `5,1,1,8,1,6,2` | Analytical |
 
 ## Long-term — 23
 
@@ -225,6 +230,11 @@ Phone in your pocket, from the first change of colour to the last. Nobody ever w
 Look up when the space station crosses your postcode, stand outside at the right minute, and wave. It takes about four minutes to go over and there are people on board.  
 `quick-fix · 10-mins · outside · in-nature · solo · couple · social · free`  
 `[5, 2, 1, 5, 9, 8, 3]` leans **Outdoors**
+
+**Hunt for ghost signs**  
+Faded painted adverts on old brick, for companies that stopped existing decades ago. Once you have spotted one on your own street you will never be able to stop seeing them.  
+`quick-fix · 1-hour · half-day · outside · solo · couple · social · free`  
+`[4, 3, 2, 6, 5, 8, 2]` leans **Novelty**
 
 **Take a smell walk**  
 One lap of the block, cataloguing five distinct smells and noting where each one starts and stops. It is the sense nobody uses on purpose, and your street turns out to have a map of them.  
@@ -451,7 +461,7 @@ with no tag, or the tag at Energy 4 or below. Energy 5-6 is a judgement and is l
 Measured over the seed **plus** this wave and its tag corrections, so a correction that
 fixes a clash shows up as the clash disappearing.
 
-No row disagrees with itself. All 190 rows are consistent.
+No row disagrees with itself. All 191 rows are consistent.
 
 ## Starvation — before and after this wave
 
@@ -471,7 +481,7 @@ at 0 has nothing to relax from and always bends. **Zero-cells falling is the win
 
 | Path | Plausible cells < 3 | Zero-cells | All starved | Pool |
 |---|---|---|---|---|
-| quick | 103 → **8** | 57 → **7** | 106 of 324 → **11** | 65 → 99 |
+| quick | 103 → **8** | 57 → **7** | 106 of 324 → **11** | 65 → 100 |
 | hobby | 63 → **11** | 31 → **3** | 66 of 192 → **14** | 76 → 99 |
 
 **quick** — of 106 cells starved before this wave, **97 are cleared** (now at 3 or more) and **9 gained nothing at all**.
@@ -518,7 +528,7 @@ A pair of NEW rows appears **twice, once from each side**. That is the useful fo
 side showing 0 unique cells is the one to cut, and its partner keeps everything the pair
 was reaching between them.
 
-19 row/pathway pairing(s) under D.
+21 row/pathway pairing(s) under D.
 
 | d | New row | Pathway | Nearest | Side | Starved cells it fills | …that the neighbour cannot | Verdict |
 |---|---|---|---|---|---|---|---|
@@ -535,14 +545,16 @@ was reaching between them.
 | 2.45 | Resurrect an old laptop with Linux | long-term | Watchmaking and horology | seed | 8 | 8 | **KEEP** |
 | 2.45 | Section-hike a coastal path | long-term | Stand-up paddleboarding | seed | 20 | 20 | **KEEP** |
 | 2.45 | Fossil hunting on the coast | long-term | Geocaching | seed | 20 | 11 | **KEEP** |
+| 2.65 | Hunt for ghost signs | quick-fix | Postbox spotting by royal cipher | wave | 24 | 0 | ⚠️ **VETO CANDIDATE** |
 | 2.65 | Find north four ways without a compass | quick-fix | Age a hedge by counting its species | wave | 16 | 10 | **KEEP** |
 | 2.65 | Age a hedge by counting its species | quick-fix | Find north four ways without a compass | wave | 6 | 0 | ⚠️ **VETO CANDIDATE** |
+| 2.65 | Postbox spotting by royal cipher | quick-fix | Hunt for ghost signs | wave | 24 | 0 | ⚠️ **VETO CANDIDATE** |
 | 2.65 | Video editing, properly, on free software | long-term | Design an icon set | seed | 17 | 17 | **KEEP** |
 | 2.83 | Full-commitment hopscotch | quick-fix | Knockabout on a public court | seed | 22 | 22 | **KEEP** |
 | 2.83 | Plan next year's garden on paper | quick-fix | Dial in one proper cup of coffee | seed | 17 | 17 | **KEEP** |
 | 2.83 | Beachcombing and sea glass | quick-fix | Identify trees by their bark | seed | 21 | 21 | **KEEP** |
 
-⚠️ **1 row(s) add no starved cell their neighbour does not already serve.** Under the campaign's D-aware rule those should come out of the wave.
+⚠️ **3 row(s) add no starved cell their neighbour does not already serve.** Under the campaign's D-aware rule those should come out of the wave.
 
 Kept rows, and the cell each one reaches that its neighbour cannot:
 
@@ -576,6 +588,7 @@ the same idea, and `diverseSelect` will only ever show one of them.
 
 | d | shared cells | Pathway | A | B |
 |---|---|---|---|---|
+| 2.65 | ⚠️ **24** | quick-fix | Hunt for ghost signs | Postbox spotting by royal cipher |
 | 2.65 | ⚠️ **6** | quick-fix | Find north four ways without a compass | Age a hedge by counting its species |
 
 ## Fuzzy dedupe against the existing catalogue
@@ -625,14 +638,14 @@ No family is over the cap.
 ### This wave alone
 
 ```
-  DOMINANT AXIS — which axis each activity leans into (56 rows)
+  DOMINANT AXIS — which axis each activity leans into (57 rows)
 
-    Social         10   17.9%  ######################
-    Energy         13   23.2%  ############################
-    Creative        5    8.9%  ###########
-    Analytical     10   17.9%  ######################
-    Outdoors       13   23.2%  ############################
-    Novelty         5    8.9%  ###########
+    Social         10   17.5%  ######################
+    Energy         13   22.8%  ############################
+    Creative        5    8.8%  ###########
+    Analytical     10   17.5%  ######################
+    Outdoors       13   22.8%  ############################
+    Novelty         6   10.5%  #############
     Stimulation     0    0.0%  
 
     ⚠️  NOTHING leans Stimulation — a purist on that axis can never be shown a match that agrees with their profile.
@@ -640,37 +653,37 @@ No family is over the cap.
   PER-AXIS RANGE — is the axis a real dimension, or stuck near one value?
 
     Axis          min   mean  max  spread  stdev
-    Social          1   4.80    9       8   2.29
-    Energy          1   3.98    9       8   2.72
-    Creative        1   2.66    9       8   2.36
-    Analytical      1   5.11   10       9   2.43
-    Outdoors        1   4.11   10       9   3.56
-    Novelty         1   5.88   10       9   1.98
-    Stimulation     1   3.32    8       7   1.71
+    Social          1   4.79    9       8   2.27
+    Energy          1   3.96    9       8   2.69
+    Creative        1   2.65    9       8   2.34
+    Analytical      1   5.12   10       9   2.41
+    Outdoors        1   4.12   10       9   3.53
+    Novelty         1   5.91   10       9   1.98
+    Stimulation     1   3.30    8       7   1.71
 ```
 
 ### Combined, if every survivor lands (audit corrections applied)
 
 ```
-  DOMINANT AXIS — which axis each activity leans into (188 rows)
+  DOMINANT AXIS — which axis each activity leans into (189 rows)
 
-    Social         22   11.7%  ##############
-    Energy         29   15.4%  ###################
-    Creative       35   18.6%  #######################
-    Analytical     43   22.9%  ############################
-    Outdoors       28   14.9%  ##################
-    Novelty        28   14.9%  ##################
+    Social         22   11.6%  ##############
+    Energy         29   15.3%  ###################
+    Creative       35   18.5%  #######################
+    Analytical     43   22.8%  ############################
+    Outdoors       28   14.8%  ##################
+    Novelty        29   15.3%  ###################
     Stimulation     3    1.6%  ##
 
   PER-AXIS RANGE — is the axis a real dimension, or stuck near one value?
 
     Axis          min   mean  max  spread  stdev
-    Social          1   3.56   10       9   2.60
-    Energy          1   3.64   10       9   2.71
-    Creative        1   3.24   10       9   2.60
-    Analytical      1   4.98   10       9   2.37
-    Outdoors        1   3.30   10       9   3.28
-    Novelty         1   5.59   10       9   2.01
-    Stimulation     1   3.42   10       9   1.99
+    Social          1   3.56   10       9   2.59
+    Energy          1   3.63   10       9   2.71
+    Creative        1   3.23   10       9   2.60
+    Analytical      1   4.99   10       9   2.37
+    Outdoors        1   3.31   10       9   3.28
+    Novelty         1   5.60   10       9   2.01
+    Stimulation     1   3.41   10       9   1.99
 ```
 
