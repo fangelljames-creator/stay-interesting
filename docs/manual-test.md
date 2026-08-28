@@ -438,24 +438,26 @@ Use the browser's device toolbar (F12 -> Ctrl+Shift+M) and set the sizes exactly
       options list scrolls (320 x 568, or landscape), scroll the list to the bottom, answer, and
       confirm the next question's list starts at its top.
 
-## R. Desktop results in one screen
+## R. Results: single centred vertical column, in rank order
 
-- [ ] **1440 x 900 fits one screen, with nothing cut off at the bottom.** The three ranked cards
-      sit in one row with the wildcard full-width beneath, and the page does not scroll at all.
-      *This only became true on 2026-08-28. `viewport-fit` got it from 238px over to 87px over;
-      the results amendment — attribution reduced to one line, relaxation banner deleted — took
-      the last 87px and it now measures **0**. If it starts scrolling again, the two most likely
-      causes are something being added back above the matches, or a card growing.*
+**Results may scroll, at every size including desktop.** "Desktop results fit one screen" was
+withdrawn as a goal on 2026-08-28, along with the three-across grid that served it. The
+one-viewport rule in sections O-Q still applies to hero, quiz, chooser and questions.
+
+- [ ] **One centred column at every width.** At 1440 x 900 and at 360 x 640: the cards are
+      **stacked, never side by side**, all the same width, centred, and the column stays a
+      readable measure rather than stretching across a wide monitor.
+      *If you find three cards in a row on desktop, that is the removed grid having come back,
+      not a feature.*
+- [ ] **Rank order, wildcard last.** Top to bottom: 1st, 2nd, 3rd, then the wildcard.
+- [ ] **The page lands at the top with card one fully visible.** Measured at 1440 x 900 the first
+      card ends 350px down a 900px screen; at 360 x 640, 451px down a 640px screen.
+- [ ] **The reroll counter sits above the cards**, where it can be read before you use one.
 - [ ] **The badge cluster is still pinned top-right on all four cards**, including the wildcard
-      with its 57-character sentence. In the three-up grid each card is only ~330px wide, so the
-      cluster's width cap tightens again at `lg` — if a title is being squeezed to one word per
-      line, that cap is the thing to look at.
+      with its 57-character sentence, and titles are not squeezed to one word per line.
 - [ ] **There is no profile card on the results at any size** — just the one grey "Matched to
       <title>" line. The radar and the type description live on the quiz profile card only.
-- [ ] **Mobile results still stack vertically** with full descriptions, and scrolling them is
-      expected — but **card one is fully visible without scrolling**. Measured at 360x640: the
-      first card runs 196px to 451px inside a 640px screen. That is what the attribution line
-      bought (the page went from 1216px of scroll to 784px).
+- [ ] **Full descriptions on every card**, at every size. No truncation anywhere.
 
 ## S. The collapsed mobile header
 

@@ -608,25 +608,31 @@ asynchronously - resetting only on `stage` would run against the spinner and let
 wherever the user happened to be. The options lists carry their own scroll positions that the window
 cannot reach, so each is reset by ref on `currentStep`.
 
-### Results, and the one number that did not reach its target
+### Results - a single vertical column, and the goal that was withdrawn
 
-Three ranked cards in a `lg:grid-cols-3` row, wildcard full-width beneath, badge clusters still
-pinned. `resultCardsOf` returns `[...shown, wildcard]` and `filter` preserves order, so the ranked
-cards keep indices 0-2 - which is what `rerollCard(index)` and the medal helpers read.
+⚠️ **RESULTS ARE A VERTICAL LIST ON EVERY VIEWPORT, IN ONE CENTRED `max-w-2xl` COLUMN.**
+Ranked cards stacked in rank order, 1st at the top, wildcard last. Owen's decision, 2026-08-28.
 
-⚠️ **The `lg:max-w-32` badge cap applies to the RANKED cards only.** The wildcard renders
-full-width and is the one card whose badge is a 57-character sentence; capped at 128px it stacked
-into a four-row cluster and the card grew to 300px - on its own about two thirds of what the desktop
-results view was over budget by.
+⚠️ **"DESKTOP RESULTS FIT ONE SCREEN" IS WITHDRAWN AS A GOAL.** Desktop results may scroll,
+and that is fine. This is the part most likely to be "helpfully" undone, so the history is worth
+having in full:
 
-⚠️ **Desktop results was NOT one screen at 1440x900 when this branch landed - about 87px
-over**, one screen from roughly 980px of viewport height. **Re-measured after the 2026-08-28
-results amendment**, which replaced the profile card with a single line and deleted the relaxation
-banner, **it is one screen at 1440x900 with zero overflow.** The 87px that could not be found here
-was, in the end, not a layout problem at all — it was two pieces of content that were later cut. It went 238 -> 87 via the wildcard cap above, the slim profile
-strip and dropping the duplicate `<h1>` on this stage. The remaining 87px is the three cards' full
-descriptions, and shortening those is a content decision rather than a layout one. Recorded rather
-than rounded off.
+- `viewport-fit` built a `lg:grid-cols-3` row of the three ranked cards with the wildcard
+  full-width beneath, widened the results wrapper to `lg:max-w-6xl` to hold it, and added a third
+  badge-cap tier (`lg:max-w-32`) because a card in that grid is only ~330px wide - excluding the
+  wildcard, whose 57-character badge stacked into a four-row cluster and grew that card to 300px
+  when capped. It got the view from 238px over one screen to 87px over.
+- The results amendment then took the last 87px by cutting content (the profile card became one
+  line, the relaxation banner went), and it did briefly measure one screen at 1440x900.
+- **All of that layout machinery is now gone**: no grid, no `lg:max-w-6xl`, no `lg:max-w-32`.
+  Full-width cards on a wide monitor were never the point.
+
+⚠️ **THE ONE-VIEWPORT RULE STILL HOLDS FOR THE INTERACTIVE STAGES** - hero, quiz, chooser,
+questions. Only the results claim was withdrawn. Everything else in this section stands.
+
+The render is now one plain `resultCards.map(...)`, which is also the safest form: `resultCardsOf`
+returns `[...shown, wildcard]`, so the array index IS the rank that `rerollCard(index)` dispatches
+on and that the medal helpers read. Do not sort or rebuild that list.
 
 ### The collapsed mobile header
 
@@ -1371,6 +1377,27 @@ stays publicly readable with no write policy.
 
 ## Recently completed
 
+**Results layout correction, 2026-08-28** (branch `results-layout`, **merge held for Owen's
+click-through**). Supersedes the "three cards in a row on desktop" half of the viewport work.
+
+- **Results are a single centred vertical column on every viewport**, `max-w-2xl`, ranked cards in
+  rank order with the wildcard last. The `lg:grid-cols-3` grid, the `lg:max-w-6xl` results-only
+  wrapper width and the `lg:max-w-32` badge-cap tier are all gone. Owen's decision.
+- ⚠️ **"Desktop results fit one screen" is withdrawn as a goal.** Desktop results may scroll.
+  **The one-viewport rule for hero, quiz, chooser and questions is unchanged** - re-verified at
+  360x640, 390x844, 1440x760 and 1440x900, all still `pageY=0`, `pageX=0`, no internal scroll.
+- **Everything the fitting work bought is kept**: the density pass, scroll-to-top on entering
+  results, the pinned top-right badge cluster, full descriptions, the one-line type attribution,
+  and the reroll counter above the cards.
+- **Measured**: at 1440x900 and 360x640 the four cards stack in one column at 672px and 321px
+  respectively, in the order 1st > 2nd > 3rd > Wildcard, badges pinned top-right on all four, page
+  lands at `scrollY=0`, and card one is fully visible (bottom at 350px of 900, and 451px of 640).
+- The render went back to one `resultCards.map(...)`; the `rankedCards`/`wildcardCard` split existed
+  only to feed the grid and was deleted with it.
+- `npx tsc --noEmit` clean, `next build` clean, all four routes still statically prerendered, all
+  seven dev scripts pass, lint held at the 6 known errors in `app/page.tsx`.
+
+
 **Results-page amendment, 2026-08-28** (branch `results-amendments`, **merged into `main` and
 deployed 2026-08-28 on Owen's instruction — the click-through had NOT happened first**). Two
 changes, both Owen's decisions, both reversals of things this file previously argued for - so the
@@ -1402,11 +1429,12 @@ the distinction is worth keeping if the copy is ever reopened.
 - ⚠️ **Both changes remove information the user previously got.** A user whose location
   answer was eased is no longer told so; they simply get three cards. That is the accepted trade -
   recorded here because it is exactly the kind of thing a future session would otherwise "fix".
-- **Measured after, on the real page.** Desktop results **now fits one screen at 1440x900 with
-  zero overflow** — the figure `viewport-fit` could not reach, which got it from 238px over to
-  87px; these two changes took the remaining 87px. On a phone at 360x640 the results page went
-  from **1216px of scroll to 784px**, and the first ranked card is now **fully visible without
-  scrolling** (196px to 451px inside a 640px screen), which is what the amendment was for.
+- **Measured after, on the real page.** On a phone at 360x640 the results page went from **1216px
+  of scroll to 784px**, and the first ranked card became **fully visible without scrolling** (196px
+  to 451px inside a 640px screen), which is what the amendment was for - and that still holds.
+  Desktop results also briefly measured one screen at 1440x900 with zero overflow; that goal was
+  **withdrawn on 2026-08-28** along with the desktop grid, so the figure is history rather than a
+  property to preserve.
 - `npx tsc --noEmit` clean, `next build` clean, all four routes still statically prerendered, all
   seven dev scripts pass, lint held at the 6 known errors in `app/page.tsx`.
 
@@ -1438,8 +1466,9 @@ not notice.
   thing to shrink.
 - **A pre-existing horizontal overflow was fixed**: the inline auth form was ~342px against 328px at
   360px wide, on every stage. It collapses to a "Log in" button below `sm`.
-- **Not achieved: desktop results in one screen at 1440x900.** 238px over -> 87px over; one screen
-  from ~980px of height. The rest is the cards' full descriptions. Stated rather than smoothed over.
+- **Desktop results in one screen: 238px over -> 87px over.** Later reached zero via the results
+  amendment, and then **withdrawn entirely as a goal on 2026-08-28** when the desktop grid was
+  removed and results went back to a single vertical column. Kept here as history only.
 - **Nothing was truncated anywhere.** No line-clamp, no ellipsis, no removed option description; the
   one piece of readable text that is hidden below 800px of height is `/quiz`'s own subtitle, which is
   that page's preamble rather than any part of the quiz.

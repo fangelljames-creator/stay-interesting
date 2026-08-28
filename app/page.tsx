@@ -264,20 +264,6 @@ export default function Home() {
 
   const resultCards = resultCardsOf(results);
 
-  /**
-   * The same cards, split by kind, because they are laid out differently on a
-   * desktop: the three ranked ones go in a row and the wildcard runs full-width
-   * beneath them.
-   *
-   * ⚠️ `filter` PRESERVES ORDER, and that is what keeps this safe.
-   * resultCardsOf returns [...shown, wildcard], so dropping the wildcard leaves
-   * the ranked cards at exactly the indices they had before — which is what
-   * rerollCard(index) and the medal helpers read. Sorting or rebuilding this
-   * list would silently reroll the wrong card.
-   */
-  const rankedCards = resultCards.filter((activity) => !activity.isWildcard);
-  const wildcardCard = resultCards.find((activity) => activity.isWildcard);
-
   // The profile behind the ranking, for the card at the top of the results.
   // Null when storage is blocked and there is no session — the same condition
   // that leaves the results unranked, so the card and the ordering agree about
@@ -530,10 +516,10 @@ export default function Home() {
   };
 
   /**
-   * One result card. Extracted from the results JSX purely so the three ranked
-   * cards and the wildcard can be rendered in two different places — a grid on
-   * `lg` and a full-width row beneath it — without the card's markup existing
-   * twice. Nothing about a card changed in the move.
+   * One result card. Extracted when the desktop grid needed the markup in two
+   * places; that grid is gone, so this has ONE call site again and stays only
+   * because it keeps the results JSX readable. Nothing about a card has
+   * changed through either move.
    *
    * ⚠️ `index` MEANS RANK, and both of its consumers depend on that:
    * rerollCard(index) dispatches against results.shown by position, and
@@ -594,22 +580,15 @@ export default function Home() {
             20rem, so the cap stops constraining and the title
             takes the rest.
 
-            ⚠️ AND THE CAP COMES BACK AT `lg` FOR THE RANKED CARDS ONLY,
-            because that is where the three of them go into a row. A card in
-            that grid is about 330px wide inside its padding — near enough the
-            371px phone the 128px cap was measured against, and nowhere near
-            the full-width card the 20rem cap assumes. Left at 20rem the
-            cluster would take the whole header row and squeeze the title to
-            nothing.
-
-            ⚠️ THE WILDCARD IS EXCLUDED FROM THAT, and it is not a detail. It
-            renders full-width BENEATH the grid, so it has the room the 20rem
-            cap assumes — and it is the one card whose badge is a 57-character
-            sentence. Capped at 128px that badge stacked into a four-row
-            cluster and the card grew to 300px, on its own about two thirds of
-            what the desktop results view was over budget by.
+            There was briefly a third tier here, `lg:max-w-32`, narrowing the
+            cap again for the ~330px cards of the desktop grid — and excluding
+            the wildcard, whose 57-character badge stacked into a four-row
+            cluster and grew that card to 300px when capped. **The grid is
+            gone (2026-08-28) and so is that tier**: every card is full width
+            in one centred column again, which is exactly what the 20rem cap
+            was measured for.
           */}
-          <div className={`flex flex-wrap items-center justify-end gap-2 shrink-0 max-w-32 sm:max-w-[20rem] ${activity.isWildcard ? '' : 'lg:max-w-32'}`}>
+          <div className="flex flex-wrap items-center justify-end gap-2 shrink-0 max-w-32 sm:max-w-[20rem]">
             {typeof activity.matchPercent === "number" && (
               <span
                 title="How closely this matches your personality vector"
@@ -876,10 +855,17 @@ export default function Home() {
       </div>
       {authMessage && <p className="hidden sm:block shrink-0 text-xs text-center text-amber-600 font-medium mb-2">{authMessage}</p>}
 
+      {/*
+        ⚠️ ONE CENTRED COLUMN AT `max-w-2xl`, ON EVERY STAGE INCLUDING RESULTS.
+        Results briefly widened to `lg:max-w-6xl` to make room for a three-across
+        card grid; both were withdrawn 2026-08-28 (Owen's decision). Full-width
+        cards on a wide monitor are not the goal, so this stays a single width
+        for the whole funnel.
+      */}
       <div
-        className={`w-full text-center ${
-          stage === "results" ? "max-w-2xl lg:max-w-6xl" : "max-w-2xl"
-        } ${isFitted ? "flex min-h-0 flex-1 flex-col" : "my-auto"}`}
+        className={`w-full max-w-2xl text-center ${
+          isFitted ? "flex min-h-0 flex-1 flex-col" : "my-auto"
+        }`}
       >
         {/*
           Hidden on the hero, which sets the name itself and at hero scale.
@@ -1237,23 +1223,24 @@ export default function Home() {
                 )}
 
                 {/*
-                  THREE RANKED CARDS IN A ROW ON `lg`, WILDCARD FULL-WIDTH
-                  BENEATH — which is what makes the desktop results one screen.
-                  Below `lg` it is the same vertical list it has always been.
+                  ⚠️ A SINGLE VERTICAL COLUMN, ON EVERY VIEWPORT. Owen's
+                  decision, 2026-08-28. There was briefly a
+                  `lg:grid-cols-3` here putting the three ranked cards in a row
+                  with the wildcard full-width beneath, in service of fitting
+                  the desktop results on one screen. **That goal is withdrawn**
+                  and the grid is gone with it — do not reintroduce either.
 
-                  ⚠️ The index passed to renderResultCard is the card's position
-                  among the RANKED cards, and it has to stay that way:
-                  rerollCard(index) dispatches against results.shown, and
-                  getMedalStyles/getMedalText read it as the medal rank.
-                  resultCardsOf returns [...shown, wildcard] and filter
-                  preserves order, so ranked cards keep indices 0-2 exactly as
-                  they had when the wildcard was the last element of one list.
+                  Rank order top to bottom, wildcard last, which is exactly the
+                  order resultCardsOf hands over: [...shown, wildcard]. So this
+                  is one plain map and the index IS the rank —
+                  rerollCard(index) dispatches against results.shown by
+                  position and getMedalStyles/getMedalText read it as 1st/2nd/
+                  3rd. The wildcard lands on an index past the end, which both
+                  medal helpers ignore because they branch on isWildcard first.
+                  Do not sort or rebuild this list; that would reroll the wrong
+                  card.
                 */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 tall:gap-4 items-start">
-                  {rankedCards.map((activity, index) => renderResultCard(activity, index))}
-                </div>
-
-                {wildcardCard && renderResultCard(wildcardCard, rankedCards.length)}
+                {resultCards.map((activity, index) => renderResultCard(activity, index))}
 
                 <button onClick={restart} className="w-full bg-slate-900 text-white py-3 tall:py-4 mt-3 tall:mt-4 rounded-xl font-bold hover:bg-slate-800 transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
                   Try a different path
