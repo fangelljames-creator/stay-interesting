@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { personalityQuestions, type QuizOption } from "../data/personalityQuiz";
 import { writeQuizSession } from "../lib/quizSession";
@@ -42,6 +42,23 @@ export default function PersonalityQuiz({ onContinue }: PersonalityQuizProps) {
   const [direction, setDirection] = useState<1 | -1>(1);
 
   const [profileType, setProfileType] = useState<PersonalityType | null>(null);
+
+  /**
+   * The options list is its own scroll region (see the render), so it carries
+   * its own scroll position — and without this, a question answered after
+   * scrolling down would hand the NEXT question that same offset, opening it
+   * halfway down its own options. The page-level reset in app/page.tsx cannot
+   * reach this: the window never scrolls here, this element does.
+   *
+   * The ref is on the scroll container rather than on the keyed inner wrapper
+   * precisely so it survives the question change; a node that remounts every
+   * step would be a fresh element with scrollTop 0 that this never had to fix,
+   * but it would also throw away the entrance animation's stability.
+   */
+  const optionsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    optionsRef.current?.scrollTo({ top: 0 });
+  }, [currentStep]);
 
   // Expecting exactly 7 numbers now
   const handleSelectOption = (
@@ -143,8 +160,17 @@ export default function PersonalityQuiz({ onContinue }: PersonalityQuizProps) {
 
   if (isFinished && profileType) {
     return (
-      <div className="max-w-2xl mx-auto p-8 bg-white rounded-2xl shadow-xl border border-gray-100 text-center animate-in fade-in zoom-in duration-500">
-        <div className="inline-block px-4 py-1.5 rounded-full bg-indigo-100 text-indigo-800 text-sm font-bold tracking-wider uppercase mb-6">
+      <div className="max-w-2xl w-full mx-auto flex min-h-0 flex-1 flex-col p-4 tall:p-6 taller:p-8 bg-white rounded-2xl shadow-xl border border-gray-100 text-center animate-in fade-in zoom-in duration-500">
+        {/*
+          The card is a flex column so the CTA can sit OUTSIDE the scroll
+          region below and stay on screen. The type descriptions vary a lot in
+          length, and the longest of them on a short viewport is the one case
+          where this card cannot fit — scrolling the copy while "Find My
+          Perfect Activities" stays put is much better than pushing the button
+          off the bottom of the screen.
+        */}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="inline-block px-3 sm:px-4 py-1 tall:py-1.5 rounded-full bg-indigo-100 text-indigo-800 text-xs sm:text-sm font-bold tracking-wider uppercase mb-3 tall:mb-4 taller:mb-6">
           Your Profile
         </div>
 
@@ -169,21 +195,29 @@ export default function PersonalityQuiz({ onContinue }: PersonalityQuizProps) {
           emphasis only, so the card and the copy agree about which axes are
           being talked about.
         */}
-        <div className="flex flex-col md:flex-row md:items-center md:text-left gap-6 md:gap-8">
-          <div className="shrink-0 self-center">
+        <div className="flex flex-col md:flex-row md:items-center md:text-left gap-y-3 tall:gap-y-5 gap-x-0 md:gap-x-8">
+          {/*
+            The width classes are the whole sizing mechanism, here and
+            everywhere else the radar appears. TasteRadar's svg is width:100%
+            with its per-mode maxWidth as a CAP, so constraining this wrapper
+            shrinks the chart and the cap simply stops binding. Nothing inside
+            the component needed changing to make it responsive.
+          */}
+          <div className="shrink-0 self-center w-40 sm:w-56 md:w-[300px]">
             <TasteRadar mode="final" vector={liveVector} highlightAxes={profileType.axes} />
           </div>
           <div className="flex-1">
-            <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-4">{profileType.title}</h2>
-            <p className="text-lg text-gray-600 leading-relaxed">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-gray-900 mb-2 tall:mb-3 taller:mb-4">{profileType.title}</h2>
+            <p className="text-sm sm:text-base md:text-lg text-gray-600 leading-relaxed">
               {profileType.description}
             </p>
           </div>
         </div>
+        </div>
 
         <button
           onClick={handleContinue}
-          className="w-full sm:w-auto mt-8 px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-indigo-200"
+          className="shrink-0 w-full sm:w-auto sm:self-center mt-4 tall:mt-6 taller:mt-8 px-8 py-3 tall:py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-indigo-200"
         >
           Find My Perfect Activities →
         </button>
@@ -195,7 +229,20 @@ export default function PersonalityQuiz({ onContinue }: PersonalityQuizProps) {
   const progress = Math.round((currentStep / personalityQuestions.length) * 100);
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white rounded-2xl shadow-xl border border-gray-100 transition-all relative overflow-hidden">
+    /*
+      THE CARD IS A FLEX COLUMN THAT FILLS ITS SHELL. A fixed header band and
+      a scrollable options region, so the question and the progress bar are
+      pinned and only the options can ever move. On a viewport tall enough for
+      the whole question — which is the target, including Q4's five options at
+      360x640 — the options region simply does not scroll and there is no
+      visible difference.
+
+      `min-h-0` is load-bearing on every flex child in this chain. Without it a
+      flex item refuses to shrink below its content, the column grows past the
+      shell, and the page scrolls again — which is the entire thing this
+      layout exists to prevent.
+    */
+    <div className="max-w-2xl w-full mx-auto flex min-h-0 flex-1 flex-col p-3 tall:p-4 taller:p-6 bg-white rounded-2xl shadow-xl border border-gray-100 transition-all relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-1.5 bg-gray-100">
         <div
           className="h-full bg-indigo-600 transition-all duration-500 ease-out"
@@ -203,7 +250,7 @@ export default function PersonalityQuiz({ onContinue }: PersonalityQuizProps) {
         />
       </div>
 
-      <div className="mb-8 mt-2">
+      <div className="shrink-0 mb-2 tall:mb-4 taller:mb-6 mt-2">
         <div className="flex items-center justify-between gap-4">
           <span className="text-xs font-bold tracking-wider text-indigo-600 uppercase">
             Question {currentStep + 1} of {personalityQuestions.length}
@@ -231,49 +278,101 @@ export default function PersonalityQuiz({ onContinue }: PersonalityQuizProps) {
           to currentStep would remount it on every question, throwing away the
           in-flight morph and making the shape jump instead of reshape.
         */}
-        <div className="flex flex-col md:flex-row md:items-start gap-4 md:gap-6 mt-2">
-          <div className="flex-1 order-2 md:order-1">
+        {/*
+          THE RADAR SITS BESIDE THE QUESTION AT EVERY WIDTH NOW. It used to be
+          `flex-col` with `order-1` below `md`, which put a 132px chart plus its
+          gap ABOVE the question — about 148px of the most valuable space on the
+          screen, before the user had read a word. Beside the question instead,
+          it costs only the difference between a 2-3 line question block and a
+          64px chart, which is close to nothing.
+
+          It is smaller on a phone but not by much less than it can afford:
+          `building` mode draws no labels, so a 64px chart is still legible AS A
+          SHAPE, which is all this instance has to be. (The hero's `demo` radar
+          is the one that cannot shrink — its labels scale with the viewBox. See
+          app/page.tsx.)
+        */}
+        <div className="flex flex-row items-start gap-3 md:gap-6 mt-2">
+          <div className="flex-1 min-w-0">
             <h2
               key={currentStep}
-              className={`text-2xl font-bold text-gray-900 leading-snug animate-in fade-in duration-300 ${
+              className={`text-base sm:text-xl md:text-2xl font-bold text-gray-900 leading-snug animate-in fade-in duration-300 ${
                 direction === 1 ? "slide-in-from-right-4" : "slide-in-from-left-4"
               }`}
             >
               {question.scenario}
             </h2>
             {currentStep === 0 && (
-              <p className="text-sm text-indigo-500 font-semibold mt-3">
+              <p className="text-xs sm:text-sm text-indigo-500 font-semibold mt-2 sm:mt-3">
                 Every answer reshapes your taste map.
               </p>
             )}
           </div>
 
-          <div className="shrink-0 self-center order-1 md:order-2">
+          <div className="shrink-0 self-center w-16 sm:w-24 md:w-28">
             <TasteRadar mode="building" vector={liveVector} />
           </div>
         </div>
       </div>
 
-      <div
-        key={currentStep}
-        className={`space-y-4 animate-in fade-in duration-300 ${
-          direction === 1 ? "slide-in-from-right-4" : "slide-in-from-left-4"
-        }`}
-      >
-        {question.options.map((option, index) => (
-          <button
-            key={index}
-            onClick={() => handleSelectOption(option.vector)}
-            className="w-full text-left p-5 rounded-xl border-2 border-gray-100 hover:border-indigo-600 hover:bg-indigo-50/50 transition-all group flex flex-col"
-          >
-            <span className="font-semibold text-lg text-gray-800 group-hover:text-indigo-900">
-              {option.label}
-            </span>
-            <span className="text-sm text-gray-500 mt-1">
-              {option.description}
-            </span>
-          </button>
-        ))}
+      {/*
+        The scroll region. `overflow-y-auto`, not `scroll`, so no scrollbar and
+        no scroll exists at all when the options fit — which is the intended
+        state on every viewport at or above 360x640, Q4's five options
+        included. Below that it degrades to scrolling the list rather than the
+        page, which is the documented floor behaviour.
+
+        The keyed wrapper is INSIDE this element rather than being this element:
+        the ref above resets scrollTop on every question change, and it needs a
+        node that survives the change to do it.
+
+        `-mx-1 px-1` gives the option cards' focus rings and hover borders room
+        to breathe without being clipped by the scroll container's edge.
+      */}
+      <div ref={optionsRef} className="min-h-0 flex-1 overflow-y-auto -mx-1 px-1">
+        <div
+          key={currentStep}
+          className={`space-y-1.5 tall:space-y-2 taller:space-y-4 animate-in fade-in duration-300 ${
+            direction === 1 ? "slide-in-from-right-4" : "slide-in-from-left-4"
+          }`}
+        >
+          {question.options.map((option, index) => (
+            <button
+              key={index}
+              onClick={() => handleSelectOption(option.vector)}
+              /*
+                p-2.5 at the base tier is MEASURED, not a taste call. At 360x640
+                the header band leaves the options region 411px and Q4's five
+                options came to 431 at p-3 — 20px over, which is one small
+                internal scroll on the question that most needs to be seen
+                whole. The 2px per side recovers exactly that, and the gap and
+                the band's margin give it slack rather than landing on the
+                number.
+
+                The tiers are HEIGHT, not width. At `sm`/`md` a 1440x900 laptop
+                took p-5 and overflowed by 151px; a 900px-tall viewport has less
+                room than a 844px-tall phone once the desktop's larger heading,
+                footer and page padding are paid for.
+              */
+              className="w-full text-left p-2.5 tall:p-3 taller:p-5 rounded-xl border-2 border-gray-100 hover:border-indigo-600 hover:bg-indigo-50/50 transition-all group flex flex-col"
+            >
+              <span className="font-semibold text-sm tall:text-base taller:text-lg text-gray-800 group-hover:text-indigo-900">
+                {option.label}
+              </span>
+              {/*
+                COMPRESSED, NEVER CLAMPED. The descriptions carry the actual
+                meaning of each option — the labels alone are too terse to
+                choose between — so they shrink with the type scale and wrap to
+                as many lines as they need. No line-clamp, no truncation. The
+                longest of them (Q4's "Sketch your way in", 111 characters) is
+                what the whole height budget was measured against.
+              */}
+              <span className="text-xs tall:text-sm text-gray-500 mt-0.5 tall:mt-1 leading-snug">
+                {option.description}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

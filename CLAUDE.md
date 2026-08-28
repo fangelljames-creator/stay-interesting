@@ -499,6 +499,128 @@ already owned. Blue and green stay the Bored/Hobby pathway colours and **purple 
 wildcard's** — the wildcard's "this card is deliberately different" signal is load-bearing, and the
 badge copy depends on it reading as an exception.
 
+## Viewport fit - the funnel holds one screen
+
+Added 2026-08-28 (branch `viewport-fit`). **Every interactive stage - hero, personality quiz,
+chooser, feasibility questions - fits one viewport, and the page itself never scrolls.** Results is
+the one deliberate exception.
+
+### Two shell regimes
+
+`app/page.tsx` renders one of two shells, chosen by stage:
+
+- **Fitted** (`loading`, `hero`, `quiz`, `chooser`, `questions`) - `h-[100dvh] overflow-hidden`, a
+  flex column of pinned header / `flex-1 min-h-0` stage / pinned footer.
+- **Scrolling** (`results`) - `min-h-[100dvh]`, ordinary document flow.
+
+`dvh` and not `vh`, so a collapsing mobile URL bar cannot leave a stage short of the screen it was
+sized against.
+
+⚠️ **`overflow-hidden` is a BACKSTOP, not the fitting mechanism.** Clipping is a silent
+failure - nothing throws, nothing warns, the content is simply not there, which is the same trap the
+radar's axis labels fell into when `LABEL_SPACE` was too small and they read "imulation". What
+actually absorbs a stage that does not fit is its options list being `flex-1 min-h-0
+overflow-y-auto`: when everything fits it does nothing and no scrollbar appears, and when it does
+not, the **list** scrolls and the page still does not. The small/landscape floor is therefore not a
+separate code path - it is that one property showing up.
+
+⚠️ **`min-h-0` is load-bearing on every flex child in the chain** (content wrapper -> stage
+wrapper -> card -> options region). Without it a flex item refuses to shrink below its content, the
+column grows past the shell, and the page scrolls again.
+
+### ⚠️ Vertical density is keyed to HEIGHT, and getting that wrong is the mistake to avoid
+
+Two variants in `app/globals.css`, since Tailwind's stock breakpoints are all horizontal:
+
+```css
+@custom-variant tall   (@media (min-height: 800px));
+@custom-variant taller (@media (min-height: 1080px));
+```
+
+The first pass keyed padding, gaps and type to `sm`/`md`. That is the wrong axis for a fitting
+problem and it failed in both directions: **a 1440x900 laptop is `md`-wide, so it took the roomiest
+tier and Q4 overflowed by 151px**, and a landscape phone at 640x360 is `sm`-wide and would have done
+the same with 360px of height to spend.
+
+⚠️ **Never set the same property from both a width tier and a height tier.** The winner would
+depend on which rule the compiler happens to emit later. Type SIZE stays on width tiers because it
+decides line wrapping, which is a horizontal question - the one exception is the page's own `<h1>`,
+two short words that never wrap, whose size is purely a question of vertical room.
+
+⚠️ **A TIER IS ONLY CORRECT IF ITS FLOOR FITS.** `tall` was first set at 720 because 760
+nearly fitted - which quietly signs a 720px window up for a density that overflows it by ~47px. 800
+is where the middle tier's own shortest member clears Q4 with room, which is why a 1440x760 window (a
+900px laptop screen once browser chrome is paid for) correctly takes the compact base tier.
+
+### The binding case, and what it cost
+
+**Q4 of the personality quiz - five options, one with a 111-character description - at 360x640.**
+Everything else has slack; this does not. What paid for it, in order of size:
+
+| lever | recovered |
+|---|---|
+| the big `<h1>` hidden below `sm`, wordmark takes the restart click | ~72px |
+| the radar moved beside the question instead of above it | ~85px |
+| the three hero chips fitting one row (`px-2`, `gap-1.5`) | 34px |
+| option padding `p-3` -> `p-2.5`, gaps and band margin | 32px |
+
+⚠️ **The chips are measured, not styled.** At `px-3` they came to 340px against the 321px a
+360px phone leaves, so they wrapped to a second row. Widening the padding or lengthening a chip's
+text puts that row back.
+
+⚠️ **Nothing was truncated to achieve any of this.** No line-clamp, no ellipsis; every option
+description is whole at every size. Compression is padding, gaps and type scale only.
+
+### ⚠️ The hero radar cannot be shrunk to buy height
+
+`demo` mode draws axis labels, so its viewBox is `(RADIUS + LABEL_SPACE) * 2 = 368` units around a
+200-unit ring and the 11-unit label text scales with the box: ~9.6px rendered at 320px wide, ~7.2px
+at 240, ~4.8px at 160. **Below roughly 280px the axis names stop being readable**, and the names are
+the entire reason the hero shows a chart. It holds at 288px on a phone and the hero's height comes
+out of the copy's type scale instead. The `building` and `final` instances have no labels and shrink
+freely - that asymmetry is about labels, not about importance.
+
+⚠️ **`TasteRadar` itself was not touched by any of this.** Its svg is `width="100%"` with the
+per-mode `maxWidth` as a cap, so a `w-*` class on the existing `className` prop shrinks it and the
+cap stops binding. Morph behaviour, the retarget-mid-flight rule and the reduced-motion path are all
+unchanged.
+
+### Scroll discipline
+
+`window.scrollTo` on `[stage, isLoading]`. `isLoading` is in the deps because results arrive
+asynchronously - resetting only on `stage` would run against the spinner and let the real list appear
+wherever the user happened to be. The options lists carry their own scroll positions that the window
+cannot reach, so each is reset by ref on `currentStep`.
+
+### Results, and the one number that did not reach its target
+
+Three ranked cards in a `lg:grid-cols-3` row, wildcard full-width beneath, badge clusters still
+pinned. `resultCardsOf` returns `[...shown, wildcard]` and `filter` preserves order, so the ranked
+cards keep indices 0-2 - which is what `rerollCard(index)` and the medal helpers read.
+
+⚠️ **The `lg:max-w-32` badge cap applies to the RANKED cards only.** The wildcard renders
+full-width and is the one card whose badge is a 57-character sentence; capped at 128px it stacked
+into a four-row cluster and the card grew to 300px - on its own about two thirds of what the desktop
+results view was over budget by.
+
+⚠️ **Desktop results is NOT one screen at 1440x900 - it is about 87px over**, and one screen
+from roughly 980px of viewport height. It went 238 -> 87 via the wildcard cap above, the slim profile
+strip and dropping the duplicate `<h1>` on this stage. The remaining 87px is the three cards' full
+descriptions, and shortening those is a content decision rather than a layout one. Recorded rather
+than rounded off.
+
+### The collapsed mobile header
+
+Below `sm` the auth form is a single "Log in" button opening an absolutely-positioned panel, so it
+costs the stage no height. ⚠️ **This fixed a pre-existing horizontal overflow**: two inputs, a
+submit and a toggle in a non-wrapping row came to ~342px against the 328px a 360px phone leaves, and
+inputs will not shrink below their intrinsic size.
+
+Keyboard behaviour is left at Next's default `interactiveWidget: resizes-visual`, which does not
+change `dvh` when the keyboard opens. `viewport-fit: cover` is deliberately NOT set: without it iOS
+lays the content out inside the safe area, so `100dvh` already excludes the home indicator and no
+`env()` padding is needed.
+
 ## Manual testing — `docs/manual-test.md`
 
 ⚠️ **`docs/manual-test.md` is the repo's ONE standing click-through checklist, and every feature
@@ -1224,6 +1346,34 @@ stays publicly readable with no write policy.
   correct.
 
 ## Recently completed
+
+**Viewport fit, 2026-08-28** (branch `viewport-fit`, **merge held for Owen's click-through on his
+actual phone**). Full design under **Viewport fit** above.
+
+- **Every interactive stage now fits one viewport with no page scroll**, verified by driving Chrome
+  against the dev server and asserting `scrollHeight <= innerHeight` and `scrollWidth <= innerWidth`
+  at 360x640, 390x844, 320x568, 640x360, 1440x760/799/800/900/1080 and 1512x982, plus `/quiz` at
+  five of those. Q4 - five options, the longest description in the quiz - is clean at every size at
+  or above 360x640, with no internal scroll either.
+- ⚠️ **The first pass keyed vertical density to `sm`/`md`, which is the wrong axis**, and
+  measuring is what caught it: a 1440x900 laptop took the roomiest tier and overflowed by 151px.
+  Rebuilt on `tall`/`taller` min-height variants. The threshold then had to move 720 -> 800, because
+  a tier is only correct if its own shortest member fits.
+- ⚠️ **The hero radar has a hard floor of ~280px** - its labels scale with the viewBox - so the
+  hero buys its height from the copy's type scale instead. Recorded because it looks like an obvious
+  thing to shrink.
+- **A pre-existing horizontal overflow was fixed**: the inline auth form was ~342px against 328px at
+  360px wide, on every stage. It collapses to a "Log in" button below `sm`.
+- **Not achieved: desktop results in one screen at 1440x900.** 238px over -> 87px over; one screen
+  from ~980px of height. The rest is the cards' full descriptions. Stated rather than smoothed over.
+- **Nothing was truncated anywhere.** No line-clamp, no ellipsis, no removed option description; the
+  one piece of readable text that is hidden below 800px of height is `/quiz`'s own subtitle, which is
+  that page's preamble rather than any part of the quiz.
+- `npx tsc --noEmit` clean, `next build` clean, all four routes still statically prerendered, all
+  seven dev scripts pass, lint held at the 6 known errors in `app/page.tsx`.
+- `components/TasteRadar.tsx` and everything in `lib/` are **untouched** - this is layout only, which
+  is why the whole dev-script suite is a pure regression check here.
+
 
 **15 personality types, a 15-shape hero, and the reachability audit, 2026-08-27** (branch
 `personality-types`, **merged into `main` and deployed 2026-08-27 on Owen's

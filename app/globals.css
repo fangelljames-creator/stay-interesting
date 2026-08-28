@@ -12,6 +12,47 @@
    is Tailwind v4 and has no config file. */
 @import "tw-animate-css";
 
+/* HEIGHT TIERS — the funnel's vertical density is a function of vertical space.
+
+   ⚠️ THIS IS THE CORRECTION THAT MATTERS, AND IT WAS FOUND BY MEASURING.
+   Vertical padding, gaps and type scale were first keyed to Tailwind's stock
+   `sm`/`md` breakpoints, which are all about WIDTH. That is the wrong axis for
+   a fitting problem, and it fails in both directions:
+
+     - a 1440x900 laptop is `md`-wide, so it took the roomiest tier and the
+       personality quiz's Q4 overflowed its options region by 151px;
+     - a landscape phone at 640x360 is `sm`-wide and would likewise take the
+       roomy styles with 360px of height to spend.
+
+   Keyed to height instead, both fall out correctly and the rule reads the way
+   the constraint actually works: more vertical room, more vertical breathing.
+
+   ⚠️ ONLY EVER SET A VERTICAL PROPERTY THROUGH THESE, AND A HORIZONTAL ONE
+   THROUGH sm/md. Setting the same property from both a width tier and a height
+   tier makes the winner depend on the order the rules happen to be emitted in,
+   which is not something to rely on. Type SIZE is deliberately left on width
+   tiers, because it decides line wrapping, which is a horizontal question. The
+   one exception is the page's own <h1>: it is two short words that never wrap,
+   so its size is purely a question of vertical room and it takes these tiers.
+
+   ⚠️ THE THRESHOLDS ARE MEASURED, AND THE TEST IS THE TIER'S SHORTEST MEMBER.
+   A tier is only correct if its FLOOR fits — the mistake worth not repeating is
+   setting `tall` at 720 because 760 nearly fitted, which quietly signs a 720px
+   window up for a density that overflows it by ~47px. 800 is where the middle
+   tier's own floor clears the quiz's Q4 with room, so a 1440x760 window (a
+   900px laptop screen once browser chrome is paid for) correctly takes the
+   compact base tier instead. 1080 is where there is genuinely room for the
+   full-size heading, the footer and p-5 option cards at once; at 1000 the
+   roomiest tier fitted with about 10px to spare, which is not a margin.
+
+   `taller` is declared after `tall` so its rules are emitted later and win
+   wherever both match.
+
+   @custom-variant is Tailwind v4 (>= 4.0); this project is on 4.3.3 and has no
+   config file, so this is the only place a variant can be declared. */
+@custom-variant tall (@media (min-height: 800px));
+@custom-variant taller (@media (min-height: 1080px));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
