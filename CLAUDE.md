@@ -1347,8 +1347,18 @@ stays publicly readable with no write policy.
 
 ## Recently completed
 
-**Viewport fit, 2026-08-28** (branch `viewport-fit`, **merge held for Owen's click-through on his
-actual phone**). Full design under **Viewport fit** above.
+**Viewport fit, 2026-08-28** (branch `viewport-fit`, **merged into `main` and deployed 2026-08-28 on
+Owen's instruction — the click-through on a real phone had NOT happened first**). Full design under
+**Viewport fit** above.
+
+⚠️ **THE ONE THING NO SCRIPT AND NO HEADLESS MEASUREMENT COULD CHECK IS EXACTLY THE THING THAT WENT
+UNCHECKED.** Every number below was taken by driving Chrome and reading `scrollHeight` against
+`innerHeight`, which proves the geometry and nothing else. It does not prove that `p-2.5` option
+cards with `text-xs` descriptions are comfortable to read at arm's length, that a 64px radar still
+reads as a shape on a real screen, or that 288px of hero radar has legible axis labels on a phone
+rather than in a 288px iframe on a desktop monitor. Those are judgement calls about a physical
+device, they are the reason `docs/manual-test.md` exists, and they are still outstanding. Part 3,
+sections O-S.
 
 - **Every interactive stage now fits one viewport with no page scroll**, verified by driving Chrome
   against the dev server and asserting `scrollHeight <= innerHeight` and `scrollWidth <= innerWidth`
