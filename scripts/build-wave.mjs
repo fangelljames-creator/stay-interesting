@@ -642,6 +642,47 @@ if (tagAudit.length) {
   out.push("");
 }
 
+// --- exertion vs the Energy axis
+//
+// The ONLY cross-check this repo has between a tag and a vector, and it earned
+// its place: run against the 134-row seed it flagged exactly two rows, and both
+// were real mis-tags that wave 1 had noticed and nobody had actioned.
+//
+// ⚠️ IT IS A CONSISTENCY CHECK, NOT A DEFINITION. `exertion` means "demands real
+// effort"; Energy is a 1-10 rubric score. They are different questions and the
+// tag is not derivable from the axis. What the check catches is a row that
+// answers them incompatibly — E>=7 with no tag, or the tag at E<=4 — which is
+// always one of the two being wrong. Between 5 and 6 it is a judgement and
+// nothing is reported. Non-fatal, because which of the two to fix is a human
+// call.
+const ENERGY = 1;
+const energyClashes = [
+  ...projected.filter((a) => a.vector[ENERGY] >= 7 && !a.tags.includes("exertion"))
+    .map((a) => ({ a, why: `Energy ${a.vector[ENERGY]} with no \`exertion\` tag` })),
+  ...projected.filter((a) => a.vector[ENERGY] <= 4 && a.tags.includes("exertion"))
+    .map((a) => ({ a, why: `\`exertion\` at Energy ${a.vector[ENERGY]}` })),
+];
+out.push("## `exertion` against the Energy axis");
+out.push("");
+out.push("The one cross-check between a tag and a vector. **Non-fatal** — `exertion` (\"demands real");
+out.push("effort\") and Energy (a 1-10 rubric score) are different questions, and the tag is not");
+out.push("derivable from the axis. What is reported is a row answering them incompatibly: Energy 7+");
+out.push("with no tag, or the tag at Energy 4 or below. Energy 5-6 is a judgement and is left alone.");
+out.push("");
+out.push("Measured over the seed **plus** this wave and its tag corrections, so a correction that");
+out.push("fixes a clash shows up as the clash disappearing.");
+out.push("");
+if (!energyClashes.length) {
+  out.push(`No row disagrees with itself. All ${projected.length} rows are consistent.`);
+} else {
+  out.push("| Title | Clash | Tags |");
+  out.push("|---|---|---|");
+  for (const { a, why } of energyClashes) {
+    out.push(`| ${a.title} | ${why} | \`${a.tags.join(" ")}\` |`);
+  }
+}
+out.push("");
+
 // --- starvation, before and after
 out.push("## Starvation — before and after this wave");
 out.push("");

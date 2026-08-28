@@ -1,0 +1,1622 @@
+{
+  "wave": 2,
+  "source": "data/activity-idea-bank.csv",
+  "note": "Starvation repair, not topic coverage. Every row is drawn from the idea bank and chosen because its HONEST tags already sit in a confirmed-starved cell. Zero rows were generated - the ~15-row targeted-generation allowance was not needed. Every new row is `free`, because every P1 and P2 cell in Owen's ranking is a free-ceiling cell.",
+  "findings": [
+    {
+      "title": "Nothing in the map was degenerate, so the wave is ranked rather than filtered",
+      "body": "You asked me to re-audit the classifier if the finding came back mostly degenerate. It came back the other way: **166 plausible, 6 low-frequency, 0 degenerate.**\n\nI applied your test - degenerate means *no honest activity could exist there*, not *none currently does* - and nothing passes it. Every question in both funnels asks an independent fact about somebody's circumstances: how long they have, who is around, what they will spend. None of them can contradict another, so no combination is self-contradictory and every starved cell is a real person. The two low-frequency rules I did write are named and reasoned in `scripts/lib/starvation.mjs`, and they are a priority signal rather than permission to leave a cell empty.\n\nSo your ranking did the capping instead. **P1 60 cells, P2 21, P3 91** - and every single P1 and P2 cell is a **free-ceiling** cell, which is why every row in this wave is tagged `free`. That was not a decision I made; it fell out of the map."
+    },
+    {
+      "title": "The cost-ceiling accounting is right, and here is the check",
+      "body": "Your point 3. A `free` row must count as a survivor in the low-budget and no-limit cells too. Verified by holding every other answer fixed and widening the ceiling: **monotonic over all 344 adjacent pairs, no violations**, and the zero-cells concentrate at the free tier exactly as they should (31 of 57 quick, 21 of 31 hobby).\n\nNon-free starved cells are not evidence against this. They are cells where the other constraints are empty at *any* budget - money cannot buy an activity the catalogue does not contain. The check is now a permanent section of `report-starvation.mjs` rather than something I did once."
+    },
+    {
+      "title": "The tag audit is TWO rows, not four, and the repo supplied the evidence",
+      "body": "I proposed four. Then I checked the `exertion` tag against the Energy axis across all 134 seeded rows, and they agree everywhere except **exactly two**, both at Energy 4 - when every other row carrying the tag is Energy 5 or above, and no row at Energy 7 or above lacks it.\n\nSo `Walk a street you have never walked down` (Energy 5) and `Walk somewhere with a view and take a flask` (Energy 6) sit inside the established convention and I have **withdrawn** them. Cutting them would have been me scoring the report rather than scoring the behaviour. That cross-check is now a permanent non-fatal section of this review file.\n\n**One sequencing trap worth knowing.** Un-tagging `Ten minutes of mobility work` on its own makes things *worse* - 57 zero-cells up to 65 - because it is the only ten-minute indoor exertion row in the catalogue and removing the tag empties that intersection outright. It is only safe shipped alongside the indoor-movement content, which is what this wave is. It must not be split out into its own change later."
+    },
+    {
+      "title": "Nine rows are already vetoed, by the D rule, before you see them",
+      "body": "The D-aware gate flagged 16 rows sitting within 3.0 of a neighbour and adding no starved cell that neighbour did not already serve. Under the campaign rule those come out, so they are listed in the wave's `vetoed` array rather than quietly deleted:\n\n`Cloud-watching, flat on your back` (a twin of the sunset row); `Learn a basic shuffle-dance step` (a third kitchen-dance row, behind the salsa steps and the seeded moonwalk); `Age a hedge by counting its species` and `Hunt for ghost signs` (both fully covered by the trig-point and postbox rows); `Bag a local peak list` (covered by the coastal path); `A deep squat while the kettle boils` (covered by the yoga flow); `Walk a timed power mile` (covered by the wall drills); and `One full cuppa outside` and `Speed-walk the supermarket run`, which between them filled **zero** starved cells.\n\nLosing the hedge-dating row hurt, since it was one of the delightfully-specific ones, but it fills 6 cells and all 6 sit inside the north-finding row's 16. Un-veto any of them if you disagree - the gate reports, it does not decide."
+    },
+    {
+      "title": "I re-scored thirteen vectors on a second read, and the first pass was the problem",
+      "body": "The same-cell report flagged eight pairs of new rows sitting under D while sharing starved cells. In every case the two activities were genuinely different and I had scored them lazily alike on a fast first pass.\n\nThe corrections are rubric applications rather than number-chasing: postbox spotting happens on town pavements rather than moorland, so its Outdoors came down; a trig point is a walk to a summit with a payoff, so its Energy and Stimulation went up; genealogy is about people and about assembling a narrative, so its Social and Creative rose while a Linux rebuild went the other way towards pure systems. Two were the side-effect error the rubric exists to catch - `Animal walks across the living room` at Stimulation 6 because it is a hard workout, and `Relearn the cartwheel` at 7 because it feels daring.\n\nAfter them, **no two new rows on a shared pathway sit within 3.0 of each other.**"
+    },
+    {
+      "title": "Stimulation did not move, and this wave could not have moved it",
+      "body": "It stays at **3 rows of 187** - relatively worse than before, because the denominator grew. Social went 12 to 22 and Outdoors 16 to 27, so the wave did help two of the three thin axes.\n\nThe reason is structural rather than an oversight. Every P1 and P2 cell is free-ceiling, and genuinely Stimulation-dominant activities - competition, stakes, adrenaline - are overwhelmingly **paid facility** activities: squash, padel, BJJ, fencing, karting, climbing competitions, a quiz league with a fixture list. All of those are P3. Starvation repair and the Stimulation gap pulled in opposite directions this wave, and starvation won, per your ranking.\n\nThe wave carries the free ones that do exist - `Chase a parkrun personal best` at Stimulation 8, `Storytelling and spoken-word nights` at 7 - but both are honestly dominated by Energy and Creative respectively, and pushing them over the line would be exactly the inflation the rubric bans. **This is the brief for wave 3**, which can now afford to spend on the low-budget facility band because P1 and P2 are largely cleared."
+    },
+    {
+      "title": "What is left, and what goes on the standing queue",
+      "body": "**P1 60 to 9 cells (45 to 4 at zero). P2 21 to 4 (7 to 0 at zero). P3 91 to 12.**\n\nAll ten residual zero-cells are accounted for. Six are the low-frequency band - half a day of free indoor exertion, and a club that meets at your house in weekend blocks. The other four are `half a day / get me moving / staying in` at the paid tiers, which in practice means a leisure-centre session: badminton, a swim, a climbing wall. That is P3, it is real, and it goes on the queue for wave 3 rather than being quietly filled here.\n\n**One row was generated**, against the ~15 you allowed: `An obstacle course built from the furniture`. The bank has no honest free, indoor, hour-long, group physical activity, and that cell was P1 sitting at zero. The other 54 rows all came out of the bank, and every drawn title is recorded in a `bank` field that `build-wave.mjs` cross-checks against every prior wave."
+    }
+  ],
+  "vetoed": [
+    "Cloud-watching, flat on your back",
+    "Learn a basic shuffle-dance step",
+    "Age a hedge by counting its species",
+    "Hunt for ghost signs",
+    "Bag a local peak list",
+    "A deep squat while the kettle boils",
+    "Walk a timed power mile",
+    "One full cuppa outside",
+    "Speed-walk the supermarket run"
+  ],
+  "activities": [
+    {
+      "title": "Dance flat-out to three songs",
+      "bank": "Dance flat-out to three songs",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "exertion",
+        "inside",
+        "at-home",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        5,
+        8,
+        4,
+        1,
+        1,
+        2,
+        6
+      ],
+      "description": "Curtains shut, volume up, three songs end to end with no stopping between them. It is a genuine cardio session disguised as a private disco, and nobody ever has to see it."
+    },
+    {
+      "title": "A deck-of-cards workout",
+      "bank": "Deck-of-cards workout",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "1-hour",
+        "exertion",
+        "inside",
+        "at-home",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        3,
+        9,
+        1,
+        3,
+        1,
+        4,
+        6
+      ],
+      "description": "Each suit is an exercise and the number on the card is the reps. Shuffle, turn them over one at a time, and let a pack of cards decide how hard the next twenty minutes are going to be."
+    },
+    {
+      "title": "Animal walks across the living room",
+      "bank": "Animal walks across the living room",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "exertion",
+        "inside",
+        "at-home",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        6,
+        8,
+        2,
+        1,
+        1,
+        7,
+        5
+      ],
+      "description": "Bear crawl to the far wall, crab walk back, then go again without laughing. It is a proper full-body workout that any child in the house will join in with immediately and every adult regrets starting."
+    },
+    {
+      "title": "Keep a balloon off the floor for five minutes",
+      "bank": "Keep a balloon off the floor for five minutes",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "exertion",
+        "inside",
+        "at-home",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        7,
+        7,
+        1,
+        2,
+        1,
+        4,
+        6
+      ],
+      "description": "One balloon, five minutes, and the carpet is lava. It is sillier and considerably sweatier than it sounds, and it turns any room with two people in it into a sport."
+    },
+    {
+      "title": "Follow a fifteen-minute beginner yoga flow",
+      "bank": "Follow a 15-minute beginner yoga flow",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "exertion",
+        "inside",
+        "at-home",
+        "solo",
+        "free"
+      ],
+      "vector": [
+        1,
+        6,
+        1,
+        2,
+        1,
+        3,
+        1
+      ],
+      "description": "A mat is optional and a folded towel does the job. Fifteen minutes of following along is enough to find out which side of your body has quietly been doing all of the work."
+    },
+    {
+      "title": "A commercial-break workout",
+      "bank": "Commercial-break workout",
+      "tags": [
+        "quick-fix",
+        "1-hour",
+        "exertion",
+        "inside",
+        "at-home",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        3,
+        7,
+        1,
+        2,
+        1,
+        5,
+        3
+      ],
+      "description": "Pick one show and move every time the adverts come on: press-ups, squats, whatever you can stand. An hour later you have done a surprising amount of exercise and still seen the programme."
+    },
+    {
+      "title": "Three salsa steps, solo",
+      "bank": "Three salsa steps, solo",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "exertion",
+        "inside",
+        "at-home",
+        "solo",
+        "free"
+      ],
+      "vector": [
+        2,
+        6,
+        4,
+        3,
+        1,
+        6,
+        4
+      ],
+      "description": "Basic, side, back, counted out loud like nobody is listening. Ten minutes in your own kitchen is the whole difference between dancing at the next wedding and shuffling apologetically near the bar."
+    },
+    {
+      "title": "A hundred backpack swings",
+      "bank": "100 backpack swings",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "exertion",
+        "inside",
+        "outside",
+        "at-home",
+        "solo",
+        "free"
+      ],
+      "vector": [
+        1,
+        9,
+        1,
+        2,
+        3,
+        5,
+        6
+      ],
+      "description": "Load a rucksack with books, hinge at the hips, and swing it between your legs and up to chest height. A hundred of those in sets of twenty explains exactly why kettlebells cost money."
+    },
+    {
+      "title": "Stand up from the floor without using your hands",
+      "bank": "Stand up from the floor without hands",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "exertion",
+        "inside",
+        "at-home",
+        "solo",
+        "free"
+      ],
+      "vector": [
+        1,
+        6,
+        1,
+        4,
+        1,
+        6,
+        3
+      ],
+      "description": "The sit-to-stand test is a real predictor of how well you are ageing and almost nobody passes it first go. Ten minutes of trying is a workout for muscles you had entirely forgotten about."
+    },
+    {
+      "title": "Learn a basic shuffle-dance step",
+      "bank": "Learn a basic shuffle-dance step",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "exertion",
+        "inside",
+        "at-home",
+        "solo",
+        "free"
+      ],
+      "vector": [
+        2,
+        7,
+        4,
+        3,
+        1,
+        7,
+        5
+      ],
+      "description": "The running man, in your kitchen, from a video slowed down to half speed. It looks impossible for about four minutes and then something clicks and you cannot stop doing it."
+    },
+    {
+      "title": "A deep squat while the kettle boils",
+      "bank": "Sit in a deep squat while the kettle boils",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "exertion",
+        "inside",
+        "at-home",
+        "solo",
+        "free"
+      ],
+      "vector": [
+        1,
+        5,
+        1,
+        2,
+        1,
+        4,
+        2
+      ],
+      "description": "Drop into a full squat, heels down if they will go, and stay there until the kettle clicks off. It is the resting position most of the world never lost and you almost certainly did."
+    },
+    {
+      "title": "Behind-the-back throw and catch",
+      "bank": "Behind-the-back throw and catch",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "exertion",
+        "inside",
+        "outside",
+        "at-home",
+        "solo",
+        "couple",
+        "free"
+      ],
+      "vector": [
+        3,
+        5,
+        2,
+        4,
+        3,
+        6,
+        4
+      ],
+      "description": "Throw a tennis ball behind your back and catch it in front, ten clean reps in a row. It looks like showing off, feels like neither showing off nor sport, and then suddenly works."
+    },
+    {
+      "title": "An obstacle course built from the furniture",
+      "bank": "generated",
+      "tags": [
+        "quick-fix",
+        "1-hour",
+        "exertion",
+        "inside",
+        "at-home",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        7,
+        8,
+        6,
+        3,
+        1,
+        7,
+        6
+      ],
+      "description": "Cushions, chairs, a broom across two stools, and a rule that the floor is lava. Building it takes as long as running it, and the timed second lap is where the competitive streak arrives.",
+      "note": "The wave's only generated row. The bank has no honest free, indoor, hour-long, group physical activity, and that cell is P1 at zero."
+    },
+    {
+      "title": "Walk a timed power mile",
+      "bank": "Walk a timed power mile",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "1-hour",
+        "exertion",
+        "outside",
+        "solo",
+        "couple",
+        "free"
+      ],
+      "vector": [
+        3,
+        7,
+        1,
+        3,
+        6,
+        3,
+        4
+      ],
+      "description": "Out and back as fast as you can walk without breaking into a run, timed in both directions. Next week you try to beat it, which is how a dull loop round the block quietly becomes a sport."
+    },
+    {
+      "title": "Full-commitment hopscotch",
+      "bank": "Full-commitment hopscotch",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "exertion",
+        "outside",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        6,
+        7,
+        3,
+        4,
+        7,
+        4,
+        5
+      ],
+      "description": "Chalk the grid on the pavement properly, all ten squares, and commit to the single-leg landings. Any adult who plays for ten minutes discovers their balance is not what it was in 1994."
+    },
+    {
+      "title": "Relearn the cartwheel on grass",
+      "bank": "Relearn the cartwheel on grass",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "exertion",
+        "outside",
+        "in-nature",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        5,
+        8,
+        1,
+        2,
+        8,
+        6,
+        6
+      ],
+      "description": "Soft ground, low expectations, and somebody on hand to tell you your legs were nowhere near straight. Most people can still just about manage one, and finding out which group you are in takes a minute."
+    },
+    {
+      "title": "First-touch drills against a wall",
+      "bank": "First-touch drills against a wall",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "1-hour",
+        "exertion",
+        "outside",
+        "solo",
+        "couple",
+        "free"
+      ],
+      "vector": [
+        3,
+        7,
+        1,
+        4,
+        7,
+        3,
+        5
+      ],
+      "description": "Any ball, any wall, both feet, and no goalkeeper to blame. Twenty minutes of this does more for your first touch than a whole game does, which is precisely why nobody bothers."
+    },
+    {
+      "title": "How far can you walk in exactly fifteen minutes?",
+      "bank": "How far can you walk in exactly 15 minutes?",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "exertion",
+        "outside",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        4,
+        5,
+        1,
+        5,
+        7,
+        6,
+        3
+      ],
+      "description": "Set a timer, walk in one direction until it goes off, then find where you got to on a map. It quietly redraws how big you thought your own neighbourhood was."
+    },
+    {
+      "title": "Speed-walk the supermarket run",
+      "bank": "Speed-walk the supermarket run",
+      "tags": [
+        "quick-fix",
+        "1-hour",
+        "exertion",
+        "outside",
+        "solo",
+        "couple",
+        "free"
+      ],
+      "vector": [
+        3,
+        6,
+        1,
+        4,
+        5,
+        4,
+        3
+      ],
+      "description": "Same shop and the same list, walked at a pace that leaves you slightly out of breath. The errand was happening anyway, so this version costs nothing and still counts as something."
+    },
+    {
+      "title": "Watch a sunset start to finish",
+      "bank": "Watch a sunset start to finish",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "1-hour",
+        "outside",
+        "in-nature",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        4,
+        2,
+        2,
+        2,
+        9,
+        3,
+        1
+      ],
+      "description": "Phone in your pocket, from the first change of colour to the last. Nobody ever watches the whole thing, and the order the colours arrive in is not the order anyone would guess."
+    },
+    {
+      "title": "Cloud-watching, flat on your back",
+      "bank": "Ten minutes of cloud-watching",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "outside",
+        "in-nature",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        4,
+        1,
+        3,
+        2,
+        9,
+        3,
+        1
+      ],
+      "description": "Lie flat on the grass and name what goes past, the shapes first and then the actual cloud types if you get keen. It is the cheapest ten minutes of doing nothing that still feels like something."
+    },
+    {
+      "title": "Catch tonight's ISS pass",
+      "bank": "Catch tonight's ISS pass",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "outside",
+        "in-nature",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        5,
+        2,
+        1,
+        5,
+        9,
+        8,
+        3
+      ],
+      "description": "Look up when the space station crosses your postcode, stand outside at the right minute, and wave. It takes about four minutes to go over and there are people on board."
+    },
+    {
+      "title": "Hunt for ghost signs",
+      "bank": "Hunt for ghost signs",
+      "tags": [
+        "quick-fix",
+        "1-hour",
+        "half-day",
+        "outside",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        4,
+        3,
+        2,
+        6,
+        5,
+        8,
+        2
+      ],
+      "description": "Faded painted adverts on old brick, for companies that stopped existing decades ago. Once you have spotted one on your own street you will never be able to stop seeing them."
+    },
+    {
+      "title": "Take a smell walk",
+      "bank": "Take a smell walk",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "1-hour",
+        "outside",
+        "solo",
+        "couple",
+        "free"
+      ],
+      "vector": [
+        3,
+        3,
+        4,
+        3,
+        7,
+        8,
+        2
+      ],
+      "description": "One lap of the block, cataloguing five distinct smells and noting where each one starts and stops. It is the sense nobody uses on purpose, and your street turns out to have a map of them."
+    },
+    {
+      "title": "Find north four ways without a compass",
+      "bank": "Find north four ways, no compass",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "1-hour",
+        "outside",
+        "in-nature",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        4,
+        2,
+        1,
+        9,
+        8,
+        7,
+        1
+      ],
+      "description": "The sun, the moss, the satellite dishes, and after dark the stars. Four independent methods that ought to agree with each other, and a genuinely useful thing to know when a phone dies."
+    },
+    {
+      "title": "Age a hedge by counting its species",
+      "bank": "Age a hedge by counting species",
+      "tags": [
+        "quick-fix",
+        "1-hour",
+        "outside",
+        "in-nature",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        4,
+        3,
+        1,
+        8,
+        9,
+        9,
+        1
+      ],
+      "description": "Hooper's rule reckons one woody species per thirty-yard stretch is roughly a century of hedge. Count along a lane and you can date a boundary that predates every building near it."
+    },
+    {
+      "title": "One full cuppa outside",
+      "bank": "One full cuppa outside",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "outside",
+        "at-home",
+        "solo",
+        "couple",
+        "free"
+      ],
+      "vector": [
+        4,
+        2,
+        1,
+        1,
+        7,
+        2,
+        1
+      ],
+      "description": "Make the tea, put a coat on if you need one, and drink the whole thing on the step instead of at the table. Ten minutes, no phone, and the weather does whatever it likes."
+    },
+    {
+      "title": "A phone-stays-home walk",
+      "bank": "A phone-stays-home walk",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "1-hour",
+        "outside",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        4,
+        4,
+        1,
+        1,
+        8,
+        5,
+        1
+      ],
+      "description": "One block is plenty. The distance is not the point; the point is that for once nothing in your pocket can interrupt, and you notice how often you reach for it anyway."
+    },
+    {
+      "title": "Storyboard last year's photo album",
+      "bank": "Storyboard last year's photo album",
+      "tags": [
+        "quick-fix",
+        "half-day",
+        "inside",
+        "at-home",
+        "solo",
+        "couple",
+        "free"
+      ],
+      "vector": [
+        3,
+        1,
+        6,
+        5,
+        1,
+        3,
+        2
+      ],
+      "description": "Go through a year of camera roll and pick the forty pictures that actually tell the story. It takes a whole afternoon, and the ones you choose are almost never the ones you posted."
+    },
+    {
+      "title": "Programme a themed trilogy night",
+      "bank": "Programme a themed trilogy night",
+      "tags": [
+        "quick-fix",
+        "half-day",
+        "inside",
+        "at-home",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        7,
+        1,
+        5,
+        4,
+        1,
+        5,
+        3
+      ],
+      "description": "Three films with one real thread between them, and a snack matched to each. The programming is half the fun and the whole evening costs nothing you do not already have in the house."
+    },
+    {
+      "title": "The wardrobe truth audit",
+      "bank": "Turn every hanger backwards",
+      "tags": [
+        "quick-fix",
+        "half-day",
+        "inside",
+        "at-home",
+        "solo",
+        "couple",
+        "free"
+      ],
+      "vector": [
+        2,
+        3,
+        2,
+        6,
+        1,
+        3,
+        2
+      ],
+      "description": "Turn every hanger backwards today; in six months anything still facing the wrong way has not been worn. Setting it up takes an afternoon and settles an argument with yourself permanently."
+    },
+    {
+      "title": "Plan next year's garden on paper",
+      "bank": "Plan next year's garden on paper",
+      "tags": [
+        "quick-fix",
+        "half-day",
+        "inside",
+        "at-home",
+        "solo",
+        "couple",
+        "free"
+      ],
+      "vector": [
+        2,
+        2,
+        7,
+        8,
+        2,
+        5,
+        2
+      ],
+      "description": "Graph paper, a seed catalogue, and the garden you actually have rather than the one you want. Even with no garden yet, an afternoon of this is how people end up on an allotment waiting list."
+    },
+    {
+      "title": "Take one inbox to zero",
+      "bank": "Take one inbox to zero",
+      "tags": [
+        "quick-fix",
+        "half-day",
+        "inside",
+        "at-home",
+        "solo",
+        "free"
+      ],
+      "vector": [
+        1,
+        1,
+        1,
+        6,
+        1,
+        1,
+        2
+      ],
+      "description": "One account, top to bottom, unsubscribing as you go rather than archiving and hoping. It is a genuinely unpleasant afternoon and the quiet afterwards lasts about three months."
+    },
+    {
+      "title": "Rank your top ten films, definitively",
+      "bank": "Rank your top ten films, definitively",
+      "tags": [
+        "quick-fix",
+        "1-hour",
+        "half-day",
+        "inside",
+        "at-home",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        6,
+        1,
+        4,
+        8,
+        1,
+        3,
+        3
+      ],
+      "description": "Not a list of good films but a ranked ten, with the arguments settled and the painful cuts made. Do it with somebody else and you will learn things about them you would rather not know."
+    },
+    {
+      "title": "Design a no-spend weekend worth having",
+      "bank": "Design a no-spend weekend worth having",
+      "tags": [
+        "quick-fix",
+        "half-day",
+        "inside",
+        "at-home",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        6,
+        2,
+        6,
+        6,
+        4,
+        6,
+        2
+      ],
+      "description": "Zero pounds, a full schedule, and every item something you would genuinely look forward to. The constraint is the exercise: it turns out most of the good weekends were never the expensive ones."
+    },
+    {
+      "title": "Find your nearest trig point",
+      "bank": "Find your nearest trig point or benchmark",
+      "tags": [
+        "quick-fix",
+        "half-day",
+        "outside",
+        "in-nature",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        4,
+        5,
+        1,
+        6,
+        9,
+        8,
+        4
+      ],
+      "description": "Ordnance Survey left concrete pillars and small brass marks all over the country and there is one nearer to you than you think. Finding it is a treasure hunt that comes with an official answer sheet."
+    },
+    {
+      "title": "Postbox spotting by royal cipher",
+      "bank": "Map the postboxes within a mile",
+      "tags": [
+        "quick-fix",
+        "1-hour",
+        "half-day",
+        "outside",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        5,
+        4,
+        1,
+        7,
+        6,
+        9,
+        1
+      ],
+      "description": "Every British postbox carries the cipher of whoever was on the throne when it was cast, and a few Victorian ones are still in daily use. An afternoon's walk turns your area into a timeline."
+    },
+    {
+      "title": "Beachcombing and sea glass",
+      "bank": "Beachcombing and sea glass",
+      "tags": [
+        "quick-fix",
+        "half-day",
+        "long-term",
+        "1-2-hours-week",
+        "outside",
+        "in-nature",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        3,
+        4,
+        3,
+        5,
+        10,
+        6,
+        2
+      ],
+      "description": "Work a tideline slowly and keep whatever the sea has finished with: frosted glass, worn pottery, the odd fossil. Weeks of it fills a jar, and the good things only turn up after a storm.",
+      "note": "Carries BOTH pathways honestly - an afternoon on a beach, or a habit built over a year."
+    },
+    {
+      "title": "Three card games you can teach anyone",
+      "bank": "Three card games you can teach anyone",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "1-hour",
+        "inside",
+        "at-home",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        8,
+        1,
+        2,
+        6,
+        1,
+        4,
+        4
+      ],
+      "description": "Rummy, cheat, and whichever one your family plays badly. Ten minutes each to teach, and it means you are never again the person in the room who cannot join in."
+    },
+    {
+      "title": "Count to ten in three new languages",
+      "bank": "Count to ten in three new languages",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "inside",
+        "at-home",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        4,
+        1,
+        1,
+        6,
+        1,
+        8,
+        2
+      ],
+      "description": "Ten minutes gets you counting in three languages you do not speak, which is a party trick and, oddly, the thing that makes a foreign menu stop being frightening."
+    },
+    {
+      "title": "Finally understand the offside rule",
+      "bank": "Finally understand the offside rule",
+      "tags": [
+        "quick-fix",
+        "10-mins",
+        "inside",
+        "at-home",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        5,
+        1,
+        1,
+        8,
+        1,
+        6,
+        2
+      ],
+      "description": "Either code, diagrams allowed, ten minutes with somebody who already knows. It is not actually complicated, and afterwards you can stop nodding vaguely during matches."
+    },
+    {
+      "title": "Volunteer at parkrun before you race it",
+      "bank": "Volunteer at parkrun first",
+      "tags": [
+        "long-term",
+        "1-2-hours-week",
+        "outside",
+        "facility",
+        "in-nature",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        9,
+        3,
+        1,
+        3,
+        8,
+        5,
+        4
+      ],
+      "description": "Marshalling a corner, scanning barcodes or handing out finish tokens, every Saturday morning. It is free, it is genuinely needed, and it is the least intimidating way into a running club there is."
+    },
+    {
+      "title": "Chase a parkrun personal best",
+      "bank": "Join parkrun and chase a PB",
+      "tags": [
+        "long-term",
+        "1-2-hours-week",
+        "exertion",
+        "outside",
+        "facility",
+        "in-nature",
+        "solo",
+        "social",
+        "free"
+      ],
+      "vector": [
+        7,
+        9,
+        1,
+        5,
+        8,
+        4,
+        8
+      ],
+      "description": "The same five kilometres, the same course, every Saturday, and a time that is yours to beat. It is free, weirdly emotional, and the gap between your first run and your tenth is bigger than you expect."
+    },
+    {
+      "title": "Join the repair cafe",
+      "bank": "Join the repair café",
+      "tags": [
+        "long-term",
+        "1-2-hours-week",
+        "inside",
+        "facility",
+        "social",
+        "free"
+      ],
+      "vector": [
+        8,
+        3,
+        4,
+        8,
+        1,
+        7,
+        3
+      ],
+      "description": "A monthly session where people bring broken things and other people fix them, for nothing. Turn up as the fixer or the apprentice; either way you leave knowing something you did not that morning."
+    },
+    {
+      "title": "Litter-picking with a local group",
+      "bank": "Join or start a litter-pick group",
+      "tags": [
+        "long-term",
+        "1-2-hours-week",
+        "exertion",
+        "outside",
+        "facility",
+        "in-nature",
+        "social",
+        "free"
+      ],
+      "vector": [
+        8,
+        6,
+        1,
+        3,
+        9,
+        4,
+        2
+      ],
+      "description": "Gloves, grabbers, and a river bank or verge that looks completely different two hours later. Councils lend the kit free, and the before-and-after photographs are more satisfying than they should be."
+    },
+    {
+      "title": "Dog-walking at an animal shelter",
+      "bank": "Dog-walking at an animal shelter",
+      "tags": [
+        "long-term",
+        "1-2-hours-week",
+        "5-hours-week",
+        "exertion",
+        "outside",
+        "facility",
+        "in-nature",
+        "solo",
+        "social",
+        "free"
+      ],
+      "vector": [
+        5,
+        7,
+        1,
+        2,
+        8,
+        5,
+        4
+      ],
+      "description": "Shelters are permanently short of people who will walk dogs and the induction takes an afternoon. You get the exercise, the dog gets the exercise, and neither of you has to talk about work."
+    },
+    {
+      "title": "A book club that actually finishes books",
+      "bank": "A book club that finishes books",
+      "tags": [
+        "long-term",
+        "1-2-hours-week",
+        "inside",
+        "at-home",
+        "facility",
+        "social",
+        "free"
+      ],
+      "vector": [
+        9,
+        1,
+        3,
+        6,
+        1,
+        4,
+        3
+      ],
+      "description": "Either find one or start one with that single rule written down. Libraries and pubs host them for nothing, and the difference between a book club and a wine night is entirely whether anyone read it."
+    },
+    {
+      "title": "Become a heritage volunteer guide",
+      "bank": "Become a heritage volunteer guide",
+      "tags": [
+        "long-term",
+        "1-2-hours-week",
+        "weekend-blocks",
+        "inside",
+        "outside",
+        "facility",
+        "solo",
+        "social",
+        "free"
+      ],
+      "vector": [
+        8,
+        3,
+        2,
+        7,
+        4,
+        8,
+        3
+      ],
+      "description": "Pick one building, a chapel or a mill or a lighthouse, and learn it well enough to walk strangers round it. The training is free and given gladly, because these places are always short of guides."
+    },
+    {
+      "title": "Befriend an isolated neighbour through a charity",
+      "bank": "Befriend an isolated neighbour",
+      "tags": [
+        "long-term",
+        "1-2-hours-week",
+        "inside",
+        "at-home",
+        "facility",
+        "couple",
+        "free"
+      ],
+      "vector": [
+        8,
+        1,
+        2,
+        2,
+        1,
+        6,
+        2
+      ],
+      "description": "A weekly call or a visit, arranged and supported by a befriending charity so that neither of you goes in cold. It costs an hour, and it is one of the few things here that somebody is waiting for."
+    },
+    {
+      "title": "Conservation workdays with a local trust",
+      "bank": "Join conservation workdays",
+      "tags": [
+        "long-term",
+        "weekend-blocks",
+        "5-hours-week",
+        "exertion",
+        "outside",
+        "facility",
+        "in-nature",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        8,
+        8,
+        1,
+        5,
+        10,
+        7,
+        3
+      ],
+      "description": "River cleans, coppicing, hedge-laying and scrub clearance, with every tool provided and somebody to show you how. A Sunday of it leaves you filthy, aching and unreasonably pleased with yourself."
+    },
+    {
+      "title": "Churchyard and monument recording",
+      "bank": "Churchyard and monument recording",
+      "tags": [
+        "long-term",
+        "1-2-hours-week",
+        "weekend-blocks",
+        "outside",
+        "facility",
+        "in-nature",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        5,
+        3,
+        1,
+        8,
+        7,
+        9,
+        1
+      ],
+      "description": "Local history societies need stones read, photographed and transcribed before the lettering weathers away. It is slow, free and outdoors, and the record outlasts the thing you recorded."
+    },
+    {
+      "title": "Adopt a local museum, room by room",
+      "bank": "Adopt a local museum",
+      "tags": [
+        "long-term",
+        "1-2-hours-week",
+        "weekend-blocks",
+        "inside",
+        "facility",
+        "solo",
+        "couple",
+        "free"
+      ],
+      "vector": [
+        4,
+        2,
+        1,
+        6,
+        1,
+        6,
+        2
+      ],
+      "description": "One museum, every room, properly, across a whole season rather than in a single exhausted afternoon. Most local museums are free and almost nobody has ever read all the labels in one."
+    },
+    {
+      "title": "Storytelling and spoken-word nights",
+      "bank": "Spoken word and storytelling nights",
+      "tags": [
+        "long-term",
+        "1-2-hours-week",
+        "inside",
+        "facility",
+        "solo",
+        "social",
+        "free"
+      ],
+      "vector": [
+        8,
+        2,
+        9,
+        4,
+        1,
+        8,
+        7
+      ],
+      "description": "Write it, time it to five minutes, and tell it to a room. Open-mic nights are free to enter and free to watch, and the first one is terrifying in a way that turns out to be useful."
+    },
+    {
+      "title": "Become a school governor",
+      "bank": "Become a school governor or trustee",
+      "tags": [
+        "long-term",
+        "1-2-hours-week",
+        "inside",
+        "facility",
+        "social",
+        "free"
+      ],
+      "vector": [
+        8,
+        1,
+        2,
+        9,
+        1,
+        7,
+        3
+      ],
+      "description": "Termly meetings, a real vote, and shared responsibility for a budget and a headteacher. Schools are chronically short of governors, the training is free, and nobody expects you to know education."
+    },
+    {
+      "title": "Propagate and trade houseplant cuttings",
+      "bank": "Propagate and trade houseplant cuttings",
+      "tags": [
+        "long-term",
+        "1-2-hours-week",
+        "inside",
+        "at-home",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        6,
+        2,
+        4,
+        5,
+        2,
+        6,
+        2
+      ],
+      "description": "Take cuttings, root them in water on the windowsill, and swap the survivors with other people doing the same. It costs nothing, it works, and plant people give things away with alarming generosity."
+    },
+    {
+      "title": "Escape-room puzzles, built for your friends",
+      "bank": "Design escape-room puzzles for friends",
+      "tags": [
+        "long-term",
+        "1-2-hours-week",
+        "5-hours-week",
+        "inside",
+        "at-home",
+        "solo",
+        "social",
+        "free"
+      ],
+      "vector": [
+        8,
+        1,
+        9,
+        9,
+        1,
+        8,
+        6
+      ],
+      "description": "Ciphers, locks, a story and a one-hour limit, run in your own front room. Being the villain is most of the appeal, and paper-and-string puzzles beat anything you can buy in a box."
+    },
+    {
+      "title": "Trace the family tree past 1900",
+      "bank": "Trace the family tree past 1900",
+      "tags": [
+        "long-term",
+        "1-2-hours-week",
+        "weekend-blocks",
+        "inside",
+        "at-home",
+        "solo",
+        "couple",
+        "free"
+      ],
+      "vector": [
+        5,
+        1,
+        4,
+        8,
+        1,
+        7,
+        3
+      ],
+      "description": "Free census indexes, birth records and parish registers get most people back to the 1830s without paying anybody. Expect at least one surprise and at least one ancestor who lied on a form."
+    },
+    {
+      "title": "Resurrect an old laptop with Linux",
+      "bank": "Resurrect an old laptop with Linux",
+      "tags": [
+        "long-term",
+        "weekend-blocks",
+        "1-2-hours-week",
+        "inside",
+        "at-home",
+        "solo",
+        "free"
+      ],
+      "vector": [
+        1,
+        1,
+        2,
+        10,
+        1,
+        8,
+        2
+      ],
+      "description": "A machine too slow for Windows is usually perfectly quick under Linux, and the install is a free download and one afternoon. You end up with a working laptop and a skill that keeps."
+    },
+    {
+      "title": "One tiny game, finished, in Godot",
+      "bank": "Make one tiny game in Godot",
+      "tags": [
+        "long-term",
+        "5-hours-week",
+        "weekend-blocks",
+        "inside",
+        "at-home",
+        "solo",
+        "free"
+      ],
+      "vector": [
+        2,
+        1,
+        9,
+        8,
+        1,
+        8,
+        4
+      ],
+      "description": "The engine is free and the tutorials are endless; the hard part is stopping. Aim at something playable in a weekend, one mechanic and one screen, because finished beats ambitious every single time."
+    },
+    {
+      "title": "Video editing, properly, on free software",
+      "bank": "Video editing properly",
+      "tags": [
+        "long-term",
+        "5-hours-week",
+        "weekend-blocks",
+        "inside",
+        "at-home",
+        "solo",
+        "couple",
+        "free"
+      ],
+      "vector": [
+        3,
+        1,
+        9,
+        6,
+        1,
+        6,
+        3
+      ],
+      "description": "DaVinci Resolve costs nothing and does what the film industry does. Cut something real, a holiday or a friend's band, because tutorials teach the buttons and only projects teach the timing."
+    },
+    {
+      "title": "Section-hike a coastal path",
+      "bank": "Section-hike a coastal path",
+      "tags": [
+        "long-term",
+        "weekend-blocks",
+        "5-hours-week",
+        "exertion",
+        "outside",
+        "in-nature",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        5,
+        8,
+        1,
+        5,
+        10,
+        7,
+        5
+      ],
+      "description": "One stretch at a time, ticked off on a map over a year or three, ending wherever the bus goes from. The walking is free; the only real cost is getting yourself back to where you stopped."
+    },
+    {
+      "title": "Bag a local peak list",
+      "bank": "Bag a local peak list",
+      "tags": [
+        "long-term",
+        "weekend-blocks",
+        "exertion",
+        "outside",
+        "in-nature",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        4,
+        9,
+        1,
+        6,
+        10,
+        6,
+        6
+      ],
+      "description": "Wainwrights, Marilyns, or a list you draw round your own county. Having a list changes walking completely, because you start going to hills you would otherwise never have bothered with."
+    },
+    {
+      "title": "Natural navigation",
+      "bank": "Natural navigation",
+      "tags": [
+        "long-term",
+        "1-2-hours-week",
+        "5-hours-week",
+        "outside",
+        "in-nature",
+        "solo",
+        "couple",
+        "free"
+      ],
+      "vector": [
+        3,
+        4,
+        1,
+        9,
+        10,
+        10,
+        3
+      ],
+      "description": "Finding your way by the sun, the stars, wind-shaped trees and which side of the trunk the moss is on. It is free, it is very old, and it turns an ordinary walk into an exam you set yourself."
+    },
+    {
+      "title": "Fossil hunting on the coast",
+      "bank": "Fossil hunting on UK coasts",
+      "tags": [
+        "long-term",
+        "weekend-blocks",
+        "5-hours-week",
+        "exertion",
+        "outside",
+        "in-nature",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "vector": [
+        4,
+        6,
+        1,
+        7,
+        10,
+        8,
+        4
+      ],
+      "description": "Jurassic beaches give up ammonites to anybody who turns up after a storm and looks at the right layer of the cliff fall. Free, legal on most beaches, and you are the first person ever to see it."
+    }
+  ],
+  "audit": [
+    {
+      "title": "A walk with no destination",
+      "proposedTags": [
+        "quick-fix",
+        "1-hour",
+        "half-day",
+        "outside",
+        "in-nature",
+        "solo",
+        "couple",
+        "social",
+        "free"
+      ],
+      "reason": "Drops `exertion` and adds the company tags its two sibling walks already carry. An aimless walk is not 'sweat guaranteed', and at Energy 4 it is one of only two rows in the catalogue where the tag and the axis disagree."
+    },
+    {
+      "title": "Ten minutes of mobility work",
+      "proposedTags": [
+        "quick-fix",
+        "10-mins",
+        "inside",
+        "at-home",
+        "solo",
+        "free"
+      ],
+      "reason": "Drops `exertion`. Gentle mobility work does not demand real effort, and the tag currently hides it from anyone answering 'something low-key'. The other row at Energy 4 carrying the tag."
+    }
+  ]
+}

@@ -230,6 +230,91 @@ export function classifyCell(cell) {
 }
 
 // ---------------------------------------------------------------------------
+// PRIORITY — which starved cells a wave is allowed to spend itself on
+// ---------------------------------------------------------------------------
+/**
+ * ⚠️ A SECOND HAND-WRITTEN ORACLE, and a different question from CELL_RULES.
+ * That one asks whether a cell is a REAL user; this one asks whether a real user
+ * is CORE TRAFFIC. A cell can be entirely plausible and still wait several
+ * waves.
+ *
+ * Owen's rule, 2026-08-28, given when he delegated the cell confirmation. It
+ * exists because the map found 166 plausible starved cells and a wave holds ~65
+ * rows: confirming the map wholesale would be confirming something no wave can
+ * deliver, and the honest alternative to that is a ranking with a recorded tail
+ * rather than a quiet one.
+ *
+ * ⚠️ P3 IS DEFERRED, NOT DISMISSED. It is the standing queue for waves 3+, and
+ * `CLAUDE.md` records it as such. A cell dropping out of P1/P2 because an
+ * earlier wave filled it is the mechanism working; a cell sitting in P3 forever
+ * because nobody re-runs this is the failure mode.
+ *
+ * ⚠️ WHY "DON'T MIND" PLACE ANSWERS COUNT AS CORE. The rule names inside and
+ * outside. A starved "don't mind" cell is one where BOTH are starved at once —
+ * strictly worse than either, since its pool is their union. Excluding it on a
+ * literal reading would rank the worst cells lowest.
+ */
+export const PRIORITY_RULES = [
+  {
+    priority: 1,
+    name: "quick-free-solo-inside",
+    reason: "Free, alone, indoors — the most common thing anybody opens this site to solve.",
+    test: (c) =>
+      c.pathway === "quick-fix" && c.costTier === "free" && c.requires("solo") && c.requires("inside"),
+  },
+  {
+    priority: 1,
+    name: "quick-free-with-company",
+    reason:
+      "Free, with someone — indoors, outdoors, or either. Company is a hard constraint that " +
+      "never relaxes, so a starved cell here can only ever be answered by bending something else.",
+    test: (c) =>
+      c.pathway === "quick-fix" &&
+      c.costTier === "free" &&
+      (c.requires("couple") || c.requires("social")),
+  },
+  {
+    priority: 1,
+    name: "hobby-cheap-weekly-at-home",
+    reason:
+      "An hour or two a week, at home, for little or nothing — the entry point to every " +
+      "long-term pathway and the answer most first-time hobbyists are actually looking for.",
+    test: (c) =>
+      c.pathway === "long-term" &&
+      (c.costTier === "free" || c.costTier === "low-budget") &&
+      c.timeTag === "1-2-hours-week" &&
+      c.requires("at-home"),
+  },
+  {
+    priority: 1,
+    name: "hobby-free-facility-or-community",
+    reason:
+      "Free, at a venue or with a club. The catalogue's single largest hole: all 18 facility " +
+      "rows are paid, so this is at absolute zero rather than merely thin.",
+    test: (c) =>
+      c.pathway === "long-term" &&
+      c.costTier === "free" &&
+      (c.requires("facility") || c.requires("social")),
+  },
+  {
+    priority: 2,
+    name: "free-ceiling",
+    reason:
+      "Every remaining cell where the user said they will spend nothing. Cost never relaxes, " +
+      "so these are starved permanently until content fixes them.",
+    test: (c) => c.costTier === "free",
+  },
+];
+
+/** 1, 2 or 3, with the rule that decided it. Rules are tested in order. */
+export function prioritiseCell(cell) {
+  const hit = PRIORITY_RULES.find((rule) => rule.test(cell));
+  return hit
+    ? { priority: hit.priority, rule: hit.name, reason: hit.reason }
+    : { priority: 3, rule: null, reason: "Deferred to the standing queue for waves 3+." };
+}
+
+// ---------------------------------------------------------------------------
 // THE INTERSECTION GRID — what actually tells you what to author
 // ---------------------------------------------------------------------------
 /**

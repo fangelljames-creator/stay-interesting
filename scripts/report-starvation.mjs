@@ -35,6 +35,8 @@ import {
   intersectionGrid,
   classifyCell,
   CELL_RULES,
+  prioritiseCell,
+  PRIORITY_RULES,
   MIN_RESULTS,
 } from "./lib/starvation.mjs";
 
@@ -177,6 +179,102 @@ if (!CELL_RULES.some((r) => r.band === "degenerate")) {
   console.log("      is around, what they will spend. None can contradict another, so no");
   console.log("      combination is self-contradictory and every starved cell is a real user.");
 }
+console.log("");
+
+// ---------------------------------------------------------------------------
+// PRIORITY — the confirmed work list, and the recorded tail
+// ---------------------------------------------------------------------------
+console.log(rule);
+console.log("PRIORITY — Owen's ranking rule, 2026-08-28");
+console.log(rule);
+console.log("");
+console.log("  A wave holds ~65 rows against 166 plausible starved cells, so the map is confirmed");
+console.log("  RANKED AND CAPPED rather than wholesale. P3 is deferred, not dismissed — it is the");
+console.log("  standing queue for waves 3+.");
+console.log("");
+
+const priorityRows = [];
+for (const spec of PATHWAY_SPECS) {
+  const map = starvationOf(activities, spec);
+  const counts = [0, 0, 0];
+  const zeros = [0, 0, 0];
+  for (const cell of map.starved) {
+    const p = prioritiseCell(cell).priority;
+    counts[p - 1]++;
+    if (cell.count === 0) zeros[p - 1]++;
+  }
+  priorityRows.push({ spec, counts, zeros });
+  console.log(
+    `  ${spec.label.padEnd(7)}` +
+      [1, 2, 3]
+        .map((p) => `P${p} ${String(counts[p - 1]).padStart(3)} (${zeros[p - 1]} at zero)`)
+        .join("   ")
+  );
+}
+console.log("");
+const totalP = [0, 1, 2].map((i) => priorityRows.reduce((n, r) => n + r.counts[i], 0));
+const totalZ = [0, 1, 2].map((i) => priorityRows.reduce((n, r) => n + r.zeros[i], 0));
+console.log(
+  `  TOTAL  ` +
+    [1, 2, 3].map((p) => `P${p} ${String(totalP[p - 1]).padStart(3)} (${totalZ[p - 1]} at zero)`).join("   ")
+);
+console.log("");
+for (const r of PRIORITY_RULES) {
+  console.log(`  [P${r.priority}] ${r.name}`);
+  console.log(`      ${r.reason.replace(/\s+/g, " ")}`);
+}
+console.log("  [P3] everything else — deferred to the standing queue for waves 3+.");
+console.log("");
+
+// ---------------------------------------------------------------------------
+// COST-CEILING NESTING — a correctness check on the map itself
+// ---------------------------------------------------------------------------
+console.log(rule);
+console.log("COST-CEILING NESTING — is the accounting right?");
+console.log(rule);
+console.log("");
+console.log("  A `free` row must count as a survivor in the low-budget and no-limit cells too,");
+console.log("  because cost is applied as a CEILING. If it did not, wider-ceiling cells would look");
+console.log("  starved for a reason that is an accounting bug rather than a content gap. Checked by");
+console.log("  holding every other answer fixed and widening the ceiling: the count must never fall.");
+console.log("");
+for (const spec of PATHWAY_SPECS) {
+  const map = starvationOf(activities, spec);
+  const costIndex = spec.questions.findIndex((q) => q.constraint === "cost");
+  const order = { free: 0, "low-budget": 1, any: 2 };
+  const groups = new Map();
+  for (const cell of map.cells) {
+    const key = cell.picks.map((p, i) => (i === costIndex ? "*" : p)).join(",");
+    groups.set(key, [...(groups.get(key) ?? []), cell]);
+  }
+  let checked = 0;
+  const violations = [];
+  for (const group of groups.values()) {
+    const sorted = [...group].sort((a, b) => order[a.costTier] - order[b.costTier]);
+    for (let i = 1; i < sorted.length; i++) {
+      checked++;
+      if (sorted[i].count < sorted[i - 1].count) violations.push(sorted[i]);
+    }
+  }
+  const tally = { free: 0, "low-budget": 0, any: 0 };
+  const zeroTally = { free: 0, "low-budget": 0, any: 0 };
+  for (const cell of map.starved) {
+    tally[cell.costTier]++;
+    if (cell.count === 0) zeroTally[cell.costTier]++;
+  }
+  console.log(
+    `  ${spec.label.padEnd(7)} monotonic over ${checked} adjacent pairs: ` +
+      (violations.length ? `⚠️  ${violations.length} VIOLATION(S)` : "OK")
+  );
+  console.log(
+    `          starved by ceiling — free ${tally.free}, low ${tally["low-budget"]}, no-limit ${tally.any}` +
+      `   |   zero-cells — free ${zeroTally.free}, low ${zeroTally["low-budget"]}, no-limit ${zeroTally.any}`
+  );
+}
+console.log("");
+console.log("  ⚠️  Non-free starved cells are NOT evidence of a broken ceiling. They are cells");
+console.log("      where the other constraints are empty whatever the budget — the `!!` marks in");
+console.log("      the grid below. Money cannot buy an activity the catalogue does not contain.");
 console.log("");
 
 // ---------------------------------------------------------------------------
