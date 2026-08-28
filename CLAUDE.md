@@ -252,8 +252,20 @@ The hobby path mirrors it with `setting` (`at-home` / `facility` / `in-nature`) 
 `place`, **no energy question**, and a "don't mind" option on company.
 
 **Graceful relaxation.** When fewer than `MIN_RESULTS` (3) survive, one constraint is bent at a
-time, in order: **place/setting → energy → time (widened one slot up the ladder)**. The results
-page states exactly what was bent — relaxation is never silent.
+time, in order: **place/setting → energy → time (widened one slot up the ladder)**.
+
+⚠️ **RELAXATION IS SILENT, AND THAT IS DELIBERATE. Superseded 2026-08-28 (Owen's decision).**
+This line used to read "the results page states exactly what was bent — relaxation is never silent",
+and a blue banner on the results said so whenever the ladder had eased anything. **The banner is
+gone, on all viewports.** It fired on roughly a third of all answer combinations - the measured
+starvation rate - so for a third of users the first thing above their matches was an apology for
+them.
+
+⚠️ **THE MECHANISM DID NOT CHANGE AND MUST NOT BE "TIDIED" TO MATCH.** `selectSurvivors` still
+eases place/setting, then energy, then time, in that order; cost and company still never bend;
+`lib/selectionPipeline.ts` was not touched, still returns `bent`, and
+`scripts/audit-activity-reachability.mjs` still reads it. What went is the disclosure UI only. A
+future session finding no banner should not conclude the ladder is undocumented and add one back.
 
 ⚠️ **`RELAXATION_STEPS` must never contain `cost` or `company`.** Someone who said "keep it free"
 cannot act on a paid suggestion, and someone on their own cannot act on one needing three people.
@@ -279,9 +291,13 @@ Do not reinstate it on the reasoning above — it was considered and rejected.
 `RELAXATION_STEPS`, so the three ranked cards still honour a budget answer absolutely. One
 deliberately labelled random card is a different object from a ranked recommendation the user cannot
 act on. Two pieces of results copy depend on that distinction and were reworded when the exception
-went: the relaxation banner now names the wildcard as the exception to "your budget was left exactly
-as you set them", and the empty state says "we will not **rank** something at you that costs more
-than you said" rather than "we will not suggest".
+went: the relaxation banner named the wildcard as the exception to "your budget was left exactly as
+you set them", and the empty state says "we will not **rank** something at you that costs more than
+you said" rather than "we will not suggest".
+
+⚠️ **Only the empty state carries that distinction now** - the relaxation banner was removed
+2026-08-28, so the empty state is the single place the wildcard's budget exemption is spelled out.
+It is therefore the one that must not lose it.
 
 The wildcard renders whenever any activity is left beyond the shown cards, and shows its real
 `matchPercent`: a true number on a randomly drawn row, saying how well the draw happens to fit — not
@@ -603,8 +619,11 @@ full-width and is the one card whose badge is a 57-character sentence; capped at
 into a four-row cluster and the card grew to 300px - on its own about two thirds of what the desktop
 results view was over budget by.
 
-⚠️ **Desktop results is NOT one screen at 1440x900 - it is about 87px over**, and one screen
-from roughly 980px of viewport height. It went 238 -> 87 via the wildcard cap above, the slim profile
+⚠️ **Desktop results was NOT one screen at 1440x900 when this branch landed - about 87px
+over**, one screen from roughly 980px of viewport height. **Re-measured after the 2026-08-28
+results amendment**, which replaced the profile card with a single line and deleted the relaxation
+banner, **it is one screen at 1440x900 with zero overflow.** The 87px that could not be found here
+was, in the end, not a layout problem at all — it was two pieces of content that were later cut. It went 238 -> 87 via the wildcard cap above, the slim profile
 strip and dropping the duplicate `<h1>` on this stage. The remaining 87px is the three cards' full
 descriptions, and shortening those is a content decision rather than a layout one. Recorded rather
 than rounded off.
@@ -885,10 +904,14 @@ Three places, all reading the same table:
 
 - **The profile card** at the end of the quiz — `components/PersonalityQuiz.tsx`, large radar
   beside title and copy.
-- **The results page** — a card above the matches, under the eyebrow "Ranked against". Deliberate
+- **The results page** — ONE QUIET LINE, "Matched to <title>". Title only: no description, no
+  radar, no eyebrow, on every viewport. **Changed 2026-08-28 (Owen's decision)**; it was a full
+  bordered card with the eyebrow "Ranked against", the description and a `final` radar. Deliberate
   repetition: the user met their type, then answered nine more feasibility questions, and by the
   time the matches appear the profile that produced every match percentage has scrolled out of
-  sight. Rendered **only when there is a session** — with storage blocked there is no vector,
+  sight. ⚠️ What the full card got wrong was where it spent the space — on a phone it pushed
+  the first match most of a screen down, and attribution only needs to NAME the profile. The full
+  payoff stays on the quiz profile card, where it was earned. Rendered **only when there is a session** — with storage blocked there is no vector,
   nothing is ranked, and claiming a personality type would be inventing one.
 - **The returning-visitor banner** on the chooser — title only.
 
@@ -920,7 +943,8 @@ not the one that runs.
 2. **Constraints mutate cumulatively** across ladder steps. Bending place and then energy leaves
    both bent.
 3. **A `widenTime` returning `null` does not count as a change**, so the step pushes no label.
-   Relaxation is disclosed to the user by name, and claiming to have bent something already at the
+   (Since 2026-08-28 nothing renders `bent` to the user, but the reachability audit reads it and
+   reports it, so an honest label still matters.) Claiming to have bent something already at the
    top of the ladder is a lie in the copy.
 
 Side effect worth knowing: the pre-existing eslint error count in `app/page.tsx` fell **7 → 6**,
@@ -1347,6 +1371,33 @@ stays publicly readable with no write policy.
 
 ## Recently completed
 
+**Results-page amendment, 2026-08-28** (branch `results-amendments`, **merge held for Owen's
+click-through**). Two changes, both Owen's decisions, both reversals of things this file previously
+argued for - so the reasoning that is now superseded is recorded beside them rather than deleted.
+
+- **Type attribution is one line.** "Matched to <title>", centred, `text-sm`, slate-500, on every
+  viewport. No description, no radar, no card. It was the full payoff repeated - eyebrow, title,
+  copy and a `final` radar - which on a phone cost ~141px and pushed the first match most of a
+  screen down. The quiz profile card is untouched.
+- **The relaxation disclosure banner is gone**, all viewports. ⚠️ **The ladder is completely
+  unchanged**: same constraints, same order, cost and company still never bend, and
+  `lib/selectionPipeline.ts` was not edited at all. `relaxedConstraints` state was deleted from
+  `app/page.tsx` because with nothing rendering it, it was write-only - the same reasoning that
+  deleted `wildcardEligible` and `rerollPoolFrom`.
+- **The true-empty state stays**, and is now the ONLY place the wildcard's budget exemption is
+  spelled out. It is not disclosure - it is the only thing between the user and a blank page.
+- ⚠️ **Both changes remove information the user previously got.** A user whose location
+  answer was eased is no longer told so; they simply get three cards. That is the accepted trade -
+  recorded here because it is exactly the kind of thing a future session would otherwise "fix".
+- **Measured after, on the real page.** Desktop results **now fits one screen at 1440x900 with
+  zero overflow** — the figure `viewport-fit` could not reach, which got it from 238px over to
+  87px; these two changes took the remaining 87px. On a phone at 360x640 the results page went
+  from **1216px of scroll to 784px**, and the first ranked card is now **fully visible without
+  scrolling** (196px to 451px inside a 640px screen), which is what the amendment was for.
+- `npx tsc --noEmit` clean, `next build` clean, all four routes still statically prerendered, all
+  seven dev scripts pass, lint held at the 6 known errors in `app/page.tsx`.
+
+
 **Viewport fit, 2026-08-28** (branch `viewport-fit`, **merged into `main` and deployed 2026-08-28 on
 Owen's instruction — the click-through on a real phone had NOT happened first**). Full design under
 **Viewport fit** above.
@@ -1591,6 +1642,7 @@ through — `main` auto-deploys**):
 - All 37 activities retagged: 40 distinct tags down to 20, exactly one cost tier each, four
   carrying both pathways. `supabase/retag-activities.sql` migrates the live table by title.
 - Tag scoring retired entirely; graceful relaxation added, with disclosure on the results page.
+  (That disclosure was removed 2026-08-28 - see **Graceful relaxation** above. The ladder stayed.)
 - Validator v2: unknown tags, cost-tier count and per-pathway completeness are hard failures, plus
   a non-fatal coverage report over all 516 answer combinations.
 

@@ -94,9 +94,6 @@ export default function Home() {
   const [path, setPath] = useState<"bored" | "hobby" | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [answerHistory, setAnswerHistory] = useState<FilterAction[]>([]);
-  // Which constraints, if any, had to be bent to find anything. Surfaced on
-  // the results so relaxation is never silent.
-  const [relaxedConstraints, setRelaxedConstraints] = useState<string[]>([]);
   /**
    * The whole results view, as ONE reducer. It was five useStates whose
    * handlers read every value out of their closure, which meant two rerolls
@@ -347,12 +344,16 @@ export default function Home() {
     // no dev script could reach them — the ladder in particular had never been
     // checked by anything. Behaviour is unchanged; this is the same code, moved.
     const pool = poolFor(activities, pathwayTag);
-    const { survivors, bent } = selectSurvivors(
+    // ⚠️ `bent` IS DELIBERATELY NOT DESTRUCTURED HERE ANY MORE. The ladder
+    // still runs and selectSurvivors still reports what it eased — the
+    // reachability audit reads it — but the results page no longer discloses
+    // it, so storing it would be write-only state. See the note at the results
+    // stage for why the banner went and why the mechanism did not.
+    const { survivors } = selectSurvivors(
       pool,
       constraintsFrom(questions, answers),
       pathwayTag
     );
-    setRelaxedConstraints(bent);
 
     // Rotation: remember what was shown last time so it can be pushed down.
     const recentKey = `recent_shown_${path}`;
@@ -431,7 +432,6 @@ export default function Home() {
   /** Everything the results view owns. Every way back out clears all of it. */
   const resetResults = () => {
     dispatchResults({ type: "reset" });
-    setRelaxedConstraints([]);
   };
 
   /** The vector the results were built against, or null if storage was blocked. */
@@ -1125,61 +1125,52 @@ export default function Home() {
             <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 text-center">Your Curated Results</h2>
 
             {/*
-              WHY THE PROFILE IS REPEATED HERE. The user met their type once, on
-              the card at the end of the personality quiz, and then answered
-              nine more questions and changed pathway at least once before
-              arriving. By the time the matches appear, the thing doing the
-              ranking has scrolled a long way out of sight — and every card
-              below carries a match percentage measured against exactly this
-              shape. Showing it beside the results is what makes those numbers
-              mean something.
+              TYPE ATTRIBUTION, TITLE ONLY. Changed 2026-08-28 (Owen's
+              decision). This was the full personality payoff repeated —
+              eyebrow, title, description and a `final` radar in a bordered
+              card, ~141px on a phone. It is now one quiet line.
+
+              ⚠️ THIS IS A DELIBERATE REVERSAL AND THE OLD ARGUMENT IS NOT A
+              REASON TO PUT IT BACK. The card was here because the profile that
+              produced every match percentage had scrolled out of sight by the
+              time the matches appeared, so repeating it was what made those
+              numbers mean something. What that reasoning got wrong is where it
+              spent the space: on a phone the payoff card pushed the FIRST
+              MATCH — the thing the user came for — most of a screen down.
+              Attribution only needs to name the profile, and a line does that.
+              The full payoff (title, copy, large labelled radar) is untouched
+              on the quiz profile card, which is where it was earned.
 
               Rendered only when there is a session: with storage blocked there
               is no vector, nothing is ranked, and the banner below says so.
               Claiming a personality type in that state would be inventing one.
             */}
             {quizSession && profile && (
-              /*
-                SLIMMER ON `lg`, because that is where the three ranked cards
-                sit in a row and the whole results view is meant to land on one
-                screen. At its full size this card is ~230px of the ~900px a
-                laptop has, which is most of the reason it did not fit.
-
-                The copy is NOT cut — every word of the type description is
-                still here, at a smaller size. The radar drops from 210px to
-                110px, which `final` mode can afford far better than the hero's
-                `demo` can: see the note on the hero radar above for why that
-                one has a hard floor and this one does not.
-              */
-              <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-7 lg:gap-5 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 tall:p-5">
-                <div className="shrink-0 self-center w-[180px] sm:w-[210px] lg:w-20">
-                  <TasteRadar
-                    mode="final"
-                    vector={sessionUserVector(quizSession)}
-                    highlightAxes={profile.axes}
-                    size={210}
-                  />
-                </div>
-                <div className="min-w-0 flex-1 text-center sm:text-left">
-                  <p className="text-xs font-bold uppercase tracking-wider text-indigo-500 mb-1">
-                    Ranked against
-                  </p>
-                  <h3 className="text-xl sm:text-2xl lg:text-xl font-extrabold text-slate-900 leading-tight mb-1 sm:mb-2">
-                    {profile.title}
-                  </h3>
-                  <p className="text-sm sm:text-base lg:text-sm text-slate-600 leading-relaxed">{profile.description}</p>
-                </div>
-              </div>
-            )}
-
-            {relaxedConstraints.length > 0 && shownActivities.length > 0 && (
-              <p className="text-center text-sm text-sky-800 bg-sky-50 border border-sky-200 rounded-xl px-4 py-3">
-                Nothing matched everything you asked for, so we bent{" "}
-                <strong>{relaxedConstraints.join(", then ")}</strong> to find these. Your budget
-                and who you are with were left exactly as you set them.
-                {wildcard && " The wildcard is the exception — it ignores all of it, on purpose."}
+              <p className="text-center text-sm text-slate-500">
+                Matched to{" "}
+                <span className="font-semibold text-slate-700">{profile.title}</span>
               </p>
             )}
+
+            {/*
+              ⚠️ THERE IS NO RELAXATION DISCLOSURE BANNER, AND ITS ABSENCE IS A
+              DECISION — removed 2026-08-28 on Owen's instruction. A blue box
+              reading "Nothing matched everything you asked for, so we bent
+              <constraints> to find these" used to sit here whenever the ladder
+              had eased anything, which on the measured coverage is a third of
+              all answer combinations.
+
+              ⚠️ THE MECHANISM IS COMPLETELY UNCHANGED. selectSurvivors still
+              eases place/setting, then energy, then time, in that order, when
+              fewer than MIN_RESULTS survive, and cost and company still never
+              bend — see lib/selectionPipeline.ts, which was not touched. It
+              still returns `bent`, and scripts/audit-activity-reachability.mjs
+              still reads it. Only the disclosure UI is gone; do not "restore"
+              it by weakening the ladder.
+
+              The true-empty state below stays. It is not disclosure — it is the
+              only thing standing between the user and a blank page.
+            */}
 
             {!quizSession && shownActivities.length > 0 && (
               <p className="text-center text-sm text-slate-700 bg-slate-100 border border-slate-200 rounded-xl px-4 py-3">
