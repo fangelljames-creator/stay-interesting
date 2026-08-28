@@ -92,13 +92,17 @@ node scripts/validate-activity-seed.mjs
       exempt — see section E.*
 - [ ] **Solo run.** Answer that you are on your own. No ranked card may require a group.
       *Verifies: company is not in `RELAXATION_STEPS` either.*
-- [ ] **Relaxation disclosure.** Find a narrow combination (e.g. quick path, 10 minutes,
-      outside, on your own, free). When fewer than 3 things fit, a blue banner appears
-      naming exactly what was bent, in order, and states that budget and company were left
-      as you set them.
-      *Verifies: relaxation is never silent.*
-- [ ] **The relaxation banner names the wildcard as the exception** when a wildcard is on
-      screen.
+- [ ] **NO relaxation banner renders, ever.** Find a narrow combination (e.g. quick path,
+      10 minutes, outside, on your own, free) so the ladder definitely eases something.
+      There must be **no blue box** above the matches, on any viewport.
+      *This replaced "a blue banner appears naming exactly what was bent" — the disclosure
+      was removed 2026-08-28 on Owen's instruction. The mechanism did not change, so if you
+      see a banner, something has been added back rather than something being broken.*
+- [ ] **A bent-constraint run still fills three cards.** The same narrow combination must
+      still produce three ranked matches. The ladder easing silently is the intended
+      behaviour; easing *less* is not.
+      *Verifies: only the UI went. `node scripts/audit-activity-reachability.mjs` still
+      reports which constraints were eased per cell, so the mechanism stays measurable.*
 - [ ] **Empty state.** If a combination still yields nothing, the card reads "Nothing
       fits, even after bending what we could" and says we will not **rank** something that
       costs more than you said. The wording is "rank", not "suggest" — the wildcard can
@@ -345,14 +349,19 @@ that hybrid; else the pure dominant axis. Judged on raw sums, never averages.
       `node scripts/analyze-quiz-balance.mjs` proves it is reachable.
 - [ ] **The type name and copy appear on the profile card** at the end of the quiz, beside
       the large radar.
-- [ ] **The same type appears again on the results page**, in a card above the matches,
-      under the eyebrow "Ranked against". This is deliberate repetition — by the time the
-      matches appear, the profile that produced every match percentage has scrolled well
-      out of sight.
+- [ ] **The results page names the type on ONE quiet line** — "Matched to <title>",
+      centred, small and grey, above the matches. **No description, no radar, no card**, on
+      every viewport.
+      *This replaced a full bordered card with the eyebrow "Ranked against", the type copy
+      and a radar (changed 2026-08-28, Owen's decision). On a phone that card cost ~141px
+      and pushed the first match most of a screen down. If you find the card back, it is a
+      regression, not a restoration.*
+- [ ] **The title on that line matches the profile card's** — take the quiz, note the
+      type, and check the results line agrees.
 - [ ] **The returning-visitor banner shows the same title** as the profile card did. Take
       the quiz, return to the chooser, and check the two agree.
 - [ ] **With storage blocked** (`sessionStorage.clear()` before the results load), the
-      results page shows **no** type card at all — and still shows the "not in any
+      results page shows **no** type line at all — and still shows the "not in any
       particular order" banner. It must not invent a personality type it has no vector for.
 - [ ] **The copy matches the axes.** Read each type's description against the axes named in
       `data/personality-types-review.md`. The Detour-Taker sits at Energy 18, so nothing in
@@ -425,20 +434,22 @@ Use the browser's device toolbar (F12 -> Ctrl+Shift+M) and set the sizes exactly
 
 ## R. Desktop results in one screen
 
-- [ ] **1440 x 900.** The three ranked cards sit in one row with the wildcard full-width beneath.
-      *Measured honestly: at 1440x900 this is still about **87px** short of one screen, and it is
-      one screen from roughly **980px** of viewport height. The remaining 87px is the three cards'
-      full descriptions, which stay. Going from 238px over to 87px came from slimming the profile
-      strip, dropping the duplicate `<h1>` on this stage, and — the big one — letting the
-      full-width wildcard keep the roomy badge cap instead of the grid's narrow one.*
+- [ ] **1440 x 900 fits one screen, with nothing cut off at the bottom.** The three ranked cards
+      sit in one row with the wildcard full-width beneath, and the page does not scroll at all.
+      *This only became true on 2026-08-28. `viewport-fit` got it from 238px over to 87px over;
+      the results amendment — attribution reduced to one line, relaxation banner deleted — took
+      the last 87px and it now measures **0**. If it starts scrolling again, the two most likely
+      causes are something being added back above the matches, or a card growing.*
 - [ ] **The badge cluster is still pinned top-right on all four cards**, including the wildcard
       with its 57-character sentence. In the three-up grid each card is only ~330px wide, so the
       cluster's width cap tightens again at `lg` — if a title is being squeezed to one word per
       line, that cap is the thing to look at.
-- [ ] **The profile card is the slim strip on desktop** — small radar, title, full description —
-      and still reads as the thing the match percentages were measured against.
+- [ ] **There is no profile card on the results at any size** — just the one grey "Matched to
+      <title>" line. The radar and the type description live on the quiz profile card only.
 - [ ] **Mobile results still stack vertically** with full descriptions, and scrolling them is
-      expected.
+      expected — but **card one is fully visible without scrolling**. Measured at 360x640: the
+      first card runs 196px to 451px inside a 640px screen. That is what the attribution line
+      bought (the page went from 1216px of scroll to 784px).
 
 ## S. The collapsed mobile header
 
