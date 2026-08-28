@@ -363,15 +363,31 @@ happen inside one results view; that key is about what to push down on the user'
 results really can be reached with no vector. Nothing can rank then, so the survivors are shown
 unordered with no `matchPercent` and the page says why. Do not "tidy" this into an empty state.
 
-**Coverage today (re-measured 2026-08-26, after wave 1):** the quick path starts below 3 survivors
-on **33%** of its 324 answer combinations (57 at zero), the hobby path on **34%** of 192 (31 at
-zero). Before wave 1 those were 44% and 43% over a 20-activity pool; the catalogue tripling to 134
-took roughly ten points off each, which is exactly the "it solves itself as the catalogue grows"
-prediction being borne out. Still not a tagging fault — five simultaneous hard filters cannot do
-much better — and relaxation absorbs it (no combination ends up empty at runtime).
-`scripts/validate-activity-seed.mjs` reports it.
-**Not being padded with hand-written activities**: the catalogue is heading for thousands, at
-which point starvation largely evaporates on its own.
+**Coverage today (re-measured 2026-08-28, after wave 2):** the quick path starts below 3 survivors
+on **3%** of its 324 answer combinations (7 at zero), the hobby path on **7%** of 192 (3 at zero).
+
+The trajectory is the whole story, and it settles an argument this file used to hedge:
+
+| | pool | quick | hobby |
+|---|---|---|---|
+| before wave 1 | 37 | 44% | 43% |
+| after wave 1 | 134 | 33% | 34% |
+| after wave 2 | 191 | **3%** | **7%** |
+
+⚠️ **Wave 1's ten points came from sheer size; wave 2's thirty came from AIM.** Wave 1 tripled the
+catalogue and moved starvation about ten points, which looked like "it solves itself as the
+catalogue grows". Wave 2 added 43% more rows and took another thirty points off — because it was
+the first wave authored against `scripts/report-starvation.mjs` and the tag-intersection grid
+rather than against an even spread of topics. Growth helps; growth **pointed at the empty
+intersections** helps an order of magnitude more. Do not read the remaining few percent as
+something the next wave will incidentally mop up.
+
+Still not a tagging fault — five simultaneous hard filters cannot do much better — and relaxation
+absorbs the remainder (no combination ends up empty at runtime).
+`scripts/validate-activity-seed.mjs` reports the headline; `scripts/report-starvation.mjs` reports
+which cells, which is what a wave should actually be authored from.
+**Not being padded with hand-written filler**: every row is a real activity a real person could do
+this week.
 ### 2. Vector quiz — `components/PersonalityQuiz.tsx`
 
 - Axis order is a fixed invariant everywhere:
@@ -697,6 +713,105 @@ below went unnoticed.
 Target: **~500 activities, 300 quick-fix and 200 long-term**, grown in reviewed waves. Wave 1 landed
 2026-08-26 and took the canonical seed from 37 to 134.
 
+### The campaign — 134 → ~500, recorded 2026-08-28
+
+Owen's stated plan for getting there, written down before wave 2 was authored so it survives the
+fresh session each wave gets. **The target and the per-wave gates are the contract; the wave
+numbers below are a route, not a promise.**
+
+**Target: ~500 activities, ~300 quick-fix and ~200 long-term.** A row carrying **both** pathway
+tags counts toward **both** — so the two figures do not sum to the total, and never will.
+
+**Baseline, measured 2026-08-28 against the canonical seed:** **134 rows — 65 quick-fix, 76
+long-term, 7 carrying both.** Remaining from there: **+235 quick-fix and +124 long-term.**
+
+**After wave 2, 2026-08-28: 191 rows — 100 quick-fix, 99 long-term, 8 carrying both.**
+Remaining: **+200 quick-fix and +101 long-term.** ⚠️ The two pathways are now level at 99 each
+against a 300/200 target, so waves 3+ must lean quick-fix harder than the nominal 2:1 to close it.
+
+⚠️ **The catalogue is currently long-term-heavy and the target is quick-heavy.** 65/76 today
+against 300/200 wanted. That is why waves are weighted **~2:1 quick-fix to long-term after their
+gap fills** — the ratio is corrective, not decorative, and a wave that ignores it makes the gap
+worse rather than merely not better.
+
+**Cadence.**
+
+- **Wave 2 = starvation repair (~65)**, not even topic coverage. Aimed at the tag intersections
+  measured at or near zero rather than spread across the topic map.
+- **Waves 3+ = bank-drain (~85 each)** from `data/activity-idea-bank.csv` until the target.
+- ⚠️ **ONE WAVE PER SESSION, IN A FRESH SESSION, AND OWEN REVIEWS BETWEEN EVERY WAVE.** Never two
+  waves without a review in between — the existing wave protocol says this and the campaign does
+  not relax it. Authoring 85 rows consumes a session's attention; two waves in one is how the
+  second gets the thinner pass.
+- **Stop at ~500**: the last wave trims to land near target and reports the final composition.
+
+**Per-wave gates — every wave, no exceptions.** The first five are machine-checked by
+`scripts/build-wave.mjs` and `scripts/validate-activity-seed.mjs`; the rest are reported for a
+human call, deliberately, because a machine cannot tell a genuine duplicate from a shared word.
+
+1. Closed vocabulary, **exactly one cost tier** — hard failure.
+2. Completeness: a company tag, a place tag, a pathway, a time tag per pathway carried, and a
+   setting tag on anything long-term — hard failure.
+3. Rubric-scored vectors, 7 integers in 1–10 — the shape is a hard failure, the honesty is not
+   checkable and is the reviewer's job.
+4. Fuzzy title dedupe against the **whole** existing catalogue and all prior waves — reported.
+5. Anti-clone caps: max 2 per template family per wave, 5–8 delightfully-specific rows.
+6. Same-cell additions **≥ D apart** from each other.
+7. House-voice descriptions.
+
+⚠️ **D-AWARE AUTHORING — a gate wave 1 did not have, and the reason it is new.** Every new row
+within `DIVERSITY_MIN_DISTANCE` (**3.0**) of any existing catalogue row **in the same pathway** is
+reported by `build-wave.mjs`. **It stays only if it fills a starved cell its neighbour does not.**
+
+The reasoning is `diverseSelect`, which landed after wave 1 was authored: the greedy re-rank skips
+a candidate that only restates one already picked, so a same-cell twin is a row **the results page
+will never show anybody**. Authoring one is not redundancy, it is wasted work that also makes the
+distance distribution worse — see **Why D = 3.0**, where the whole argument for the threshold is
+that it prunes a thin tail. A wave that fattens that tail is quietly moving D out from under
+itself.
+
+⚠️ **Never bend an activity's tags to fit a starved cell.** A candidate belongs in a cell because
+its honest tags already put it there. A cell that cannot be filled honestly is **reported as
+unfillable**, not papered over — the same doctrine that says a tag no filter reads must not exist.
+
+**After each wave's SQL is confirmed run against the live database**, re-run the starvation report,
+the axis histogram and `scripts/audit-activity-reachability.mjs`, and append the deltas to that
+wave's entry under **Recently completed**. Starvation and reachability are both functions of pool
+size and pool shape, so every wave moves them, and a row that goes dark does so silently.
+
+### ⚠️ Which starved cells a wave may spend itself on — Owen's ranking, 2026-08-28
+
+A wave holds ~65 rows against 166 plausible starved cells, so **the map is confirmed ranked and
+capped, never wholesale**. Confirming it wholesale would be confirming something no wave can
+deliver. The rule is encoded as `PRIORITY_RULES` in `scripts/lib/starvation.mjs` and printed by
+`scripts/report-starvation.mjs`, so it is re-runnable rather than a decision recorded once in prose.
+
+| | Cells |
+|---|---|
+| **P1** | quick-fix: `free` + `solo` + `inside` at any time or energy; `free` + `couple`/`social` at any place. Long-term: `free` or `low-budget` + `1-2-hours-week` + `at-home`; `free` + `facility` or `social` |
+| **P2** | every remaining `free`-ceiling cell, in severity order — 0 survivors before 1 before 2 |
+| **P3** | everything else — **deferred, not dismissed**: the standing queue for waves 3+ |
+
+⚠️ **A "don't mind" place answer counts as core traffic.** The rule names inside and outside; a
+starved "don't mind" cell is one where BOTH are starved at once, since its pool is their union.
+Reading the rule literally would rank the worst cells lowest.
+
+⚠️ **DEGENERATE MEANS "NO HONEST ACTIVITY COULD EXIST THERE", NOT "NONE CURRENTLY DOES."** Applied
+that way on 2026-08-28 the list came back **empty**, and that is a finding rather than an omission:
+every question in both funnels asks an independent fact about someone's circumstances, so no
+combination is self-contradictory and every starved cell is a real person. `LOW-FREQUENCY` is the
+band that has members — coherent, answerable, and worth filling last. If a future session finds
+`CELL_RULES` carrying no degenerate rule, that is the measurement, not a gap.
+
+⚠️ **Verify the cost-ceiling accounting before trusting any starvation map.** A `free` row must
+count as a survivor in the low-budget and no-limit cells too. `report-starvation.mjs` checks it by
+holding every other answer fixed and widening the ceiling: the count must never fall. Non-free
+starved cells are **not** evidence of a broken ceiling — they are cells empty at any budget, and
+money cannot buy an activity the catalogue does not contain.
+
+**Targeted generation is capped at ~15 rows per wave.** A bigger shortfall is not a licence for
+volume generation: stop, and report the gap per cell so Owen can commission a directed top-up bank.
+
 ### The wave protocol — every wave, in this order
 
 1. **Tooling first, if anything is missing.** A wave that cannot be measured should not be authored.
@@ -730,10 +845,19 @@ if the bank runs dry of a needed pathway**. Every other wave rule is unchanged: 
 closed-vocabulary tags with exactly one cost tier, rubric-scored vectors, review file, Owen's
 approval, one SQL block.
 
-Roughly **65 per wave**, weighted toward the remaining gap. After wave 1 that is **~237 quick-fix and
-~123 long-term**.
+Wave sizes and the remaining gap are set by **The campaign** above — ~65 for wave 2, ~85 for waves
+3+, against a remainder re-measured at **+235 quick-fix and +124 long-term** on 2026-08-28. The
+bank holds 250 quick-fix and 145 long-term, which is close enough to that remainder that **it will
+not stretch to cover careless drawing**: a wave that takes long-term rows it did not need spends
+supply the campaign has no slack in.
 
-**The topic map**, drawn from evenly:
+⚠️ **Each row records the bank title it came from**, in a `bank` field on the wave JSON
+(`"generated"` when it is not from the bank). `build-wave.mjs` cross-checks every prior wave and
+fails if a title is drawn twice — five waves across five fresh sessions, each re-reading the same
+395-row CSV, is exactly the situation where that happens unnoticed.
+
+**The topic map**, drawn from evenly — ⚠️ **except where a wave is repairing starvation**, in
+which case the starved cells choose the topics and the map is a tiebreaker, not the brief:
 
 | Quick-fix | Long-term |
 |---|---|
@@ -771,11 +895,18 @@ Roughly **65 per wave**, weighted toward the remaining gap. After wave 1 that is
   is that a tag no filter reads must not exist — but if waves 2+ bring more urban-outdoor
   activities, this becomes a real hole in the hobby path's setting question.
 
-### The live database — wave 1 confirmed present, 2026-08-26
+### The live database — in step with the seed at 191 rows, 2026-08-28
 
-The **canonical seed SQL is the source of truth** and holds 134 rows, and `content-wave-1` was
-merged into `main` on 2026-08-26 so the repo now matches what is deployed. This section previously
-said the live database still held 33; that is out of date.
+**Wave 1 run 2026-08-26, wave 2 run 2026-08-28**, both confirmed by Owen. The seed SQL and the live
+database both hold **191 rows**. `supabase/wave-1-activities.sql` and
+`supabase/wave-2-activities.sql` are both idempotent, so re-running either is safe if a count ever
+comes back short, and the verification queries sit at the bottom of each. Wave 2's block carries its
+57 new rows **and** the two tag corrections together — see the mobility-work warning in the wave-2
+entry for why those must never be separated.
+
+The **canonical seed SQL is the source of truth**, and `content-wave-1` was
+merged into `main` on 2026-08-26 so the repo matched what was deployed at that point. This section
+previously said the live database still held 33; that is out of date.
 
 **Verified**: the results page, which reads `activities` straight from Supabase, served
 `A round of disc golf` and `A blacksmithing taster day` — rows that exist only in wave 1. So wave 1
@@ -1001,17 +1132,29 @@ Median relaxed pool is 6 (quick) and 7 (hobby), so most searches end on their fi
 in the row's favour, which can only ever find *more* witnesses — so anything still called fully dark
 really is.
 
-**First run, against the 134-row seed, fit-only:** 24 MERIT-DARK rows (6 quick-fix, 18 long-term),
-of which **3 are fully dark** — no real cell and no achievable user places them in the earned 8:
+**Latest run, against the 191-row seed after wave 2, fit-only:** **41 MERIT-DARK rows** (11
+quick-fix, 30 long-term), of which the same **3 are fully dark** — no real cell and no achievable
+user places them in the earned 8:
 
-| activity | best placing ever | nearest competitor |
+| activity | best placing, 134 rows | best placing, 191 rows |
 |---|---|---|
-| Build a mechanical keyboard | rank 9, one short | 2.00 — Fermenting and kombucha brewing |
-| Sport lockpicking | rank 13 | — |
-| Build a cardboard automaton | rank 21 | — |
+| Build a mechanical keyboard | rank 9, one short | **rank 10** |
+| Sport lockpicking | rank 13 | **rank 15** |
+| Build a cardboard automaton | rank 21 | **rank 22** |
 
-All three are long-term, and the keyboard is one slot short. **Nothing has been done about them —
-that is Owen's decision.**
+All three are long-term. **Nothing has been done about them — that is Owen's decision.**
+
+⚠️ **DARKNESS GETS WORSE WITH EVERY WAVE, BY CONSTRUCTION, AND THAT IS NOT A REGRESSION.**
+MERIT-DARK went 24 → 41 across wave 2 and all three fully-dark rows slipped a place or two. "Earned"
+means inside the top 8 **on fit**, and 57 new rows are 57 new competitors for the same eight slots.
+Expect a large fraction of the catalogue to be merit-dark at ~500 rows.
+
+⚠️ **Do not read this alongside the starvation numbers as one health metric — they move in
+opposite directions on purpose.** Starvation asks *can this user be answered honestly at all*, and
+falls as the catalogue grows (3% and 7% after wave 2). Darkness asks *does this row ever win on
+fit*, and rises. A wave that improved both would be suspicious. Nothing goes invisible either way:
+the wildcard draws at random from the raw pathway pool and obeys no ranking, no filter and no budget
+answer.
 
 ## Personality quiz scoring
 
@@ -1376,6 +1519,136 @@ stays publicly readable with no write policy.
   correct.
 
 ## Recently completed
+
+**Content wave 2 — starvation repair, 2026-08-28** (branch `wave-2`). **57 new activities and 2 tag
+corrections, taking the canonical seed from 134 to 191 rows — 100 quick-fix, 99 long-term, 8
+carrying both.** Approved by Owen at both gates. Full campaign context under **The campaign** above.
+
+**Run against the live database 2026-08-28**, confirmed by Owen. `supabase/wave-2-activities.sql`
+is idempotent and re-runnable if the count ever comes back short. The post-run ritual is done and
+its deltas are at the end of this entry.
+
+- **Aimed at starvation, not at topic coverage**, and it is the first wave with the instrument to do
+  that. `scripts/report-starvation.mjs` and `scripts/lib/starvation.mjs` were built first.
+- **Quick starved cells 106 of 324 → 11 (33% → 3%), 57 zero-cells → 7. Hobby 66 of 192 → 14
+  (34% → 7%), 31 zero-cells → 3.** On Owen's ranking: **P1 60 cells → 9, P2 21 → 4 with none left at
+  zero, P3 91 → 12.**
+- ⚠️ **EVERY P1 AND P2 CELL WAS A `free`-CEILING CELL, SO EVERY ROW IN THE WAVE IS `free`.** That
+  was not a stylistic choice and it is not a precedent for waves 3+ — it fell out of the map. The
+  paid bands are largely untouched and are where wave 3 has to spend.
+- **56 of 57 rows came from `data/activity-idea-bank.csv`**, each recording its source title in a
+  `bank` field that `build-wave.mjs` cross-checks against every prior wave. **One row was
+  generated** — `An obstacle course built from the furniture` — because the bank has no honest free,
+  indoor, hour-long, group physical activity and that cell was P1 at zero. The ~15-row generation
+  allowance was otherwise unused.
+
+⚠️ **THE MOBILITY-WORK TAG CORRECTION MUST NEVER BE APPLIED ON ITS OWN.** Both corrections drop
+`exertion`: `Ten minutes of mobility work` and `A walk with no destination` (which also gains the
+`couple` and `social` tags its two sibling walks already carried). Measured individually, un-tagging
+the mobility row **makes starvation worse — 57 zero-cells to 65** — because it is the only
+ten-minute indoor exertion row in the catalogue and removing the tag empties that intersection
+outright. It is only safe alongside the indoor-movement content, which is why both statements ship
+in **one** SQL block with the wave rows. If anyone ever re-derives this correction and applies it
+as a tidy-up on its own, they will regress the quick path and nothing will report it.
+
+- **The evidence for the audit is the repo's own convention, not taste.** Checked across all 134
+  seeded rows, `exertion` and the Energy axis agreed everywhere except exactly two rows, both at
+  Energy 4, when every other tagged row is Energy 5+ and no row at Energy 7+ lacks the tag. Two
+  further walks were proposed and **withdrawn** at Energy 5 and 6 — inside the convention, and
+  cutting them would have been scoring the report rather than the behaviour. That cross-check is now
+  a permanent non-fatal section of the review file and reports clean over all 191 rows.
+- **Seven rows were vetoed by the D-aware gate before Owen saw them**, each within 3.0 of a
+  neighbour and adding no starved cell that neighbour already served; two of them (`One full cuppa
+  outside`, `Speed-walk the supermarket run`) filled zero starved cells at all. They are named with
+  reasons in the wave file's `vetoed` array rather than deleted.
+- ⚠️ **Three of the seven are walking-family rows, and those vetoes are the load-bearing ones.**
+  `Walk a timed power mile`, `Speed-walk the supermarket run` and `Bag a local peak list`. D
+  measures the taste profile, not the surface category, so it does **not** catch a catalogue
+  drifting towards walk after walk — see **The known limit: taste twins, not category monotony**.
+  That has to be caught by hand, and this wave is where it was.
+- ⚠️ **TWO ROWS WERE UN-VETOED BY OWEN AND THE GATE STILL FLAGS BOTH.** `Age a hedge by counting
+  its species` (2.65 from the north-finding row, all 6 of its cells inside that row's 16) and
+  `Hunt for ghost signs` (2.65 from `Postbox spotting by royal cipher`, all 24 of its cells
+  covered). The arithmetic is right in both cases; the override is on three grounds the gate cannot
+  see: **spark-tier charm outranks D-economy; both sit at the borderline rather than deep inside it;
+  and the rotation penalty gives same-cell pairs repeat-visit value a single-run distance cannot
+  measure.** They will keep printing as VETO CANDIDATEs, which is correct. **Do not re-apply the
+  gate to either.**
+- ⚠️ **The asymmetry with the walking vetoes IS the judgement, and it is the thing to carry
+  forward.** A same-cell pair is worth keeping when the two rows are *different ideas that score
+  alike*, and worth cutting when they are the *same idea twice*. Ghost signs and postboxes are two
+  distinct things to look for on the same walk; three timed walks are one activity with three
+  names. No script can tell those apart — which is exactly why the D report reports and never
+  drops.
+- **Thirteen vectors were re-scored on a second rubric read** after the same-cell report caught
+  eight pairs of genuinely different activities scored lazily alike on a fast first pass. Two were
+  the side-effect error the rubric exists to catch (`Animal walks across the living room` at
+  Stimulation 6 because it is a hard workout; `Relearn the cartwheel` at 7 because it feels daring).
+  Afterwards no two new rows on a shared pathway sit within 3.0 of each other.
+- **D = 3.0 is healthier after the wave, not strained**: the share of quick-fix pairs it merges fell
+  **5.0% → 2.4%**, nowhere near the 10% line at which a threshold stops de-duplicating and starts
+  thinning. The closest surviving pairs are all pre-existing seed rows.
+- **Axis balance: Social 12 → 22, Outdoors 16 → 29, Energy 17 → 30.** All seven dev scripts pass.
+
+### Post-run deltas, measured 2026-08-28 after the SQL landed
+
+| | Before (134 rows) | After (191 rows) |
+|---|---|---|
+| quick starved cells | 106 of 324 (33%), 57 at zero | **11 of 324 (3%), 7 at zero** |
+| hobby starved cells | 66 of 192 (34%), 31 at zero | **14 of 192 (7%), 3 at zero** |
+| P1 / P2 / P3 cells | 60 / 21 / 91 | **9 / 4 / 12** — P2 has none left at zero |
+| dominant Social | 12 (9.0%) | **22 (11.5%)** |
+| dominant Outdoors | 16 (11.9%) | **29 (15.2%)** |
+| dominant Energy | 17 (12.7%) | **30 (15.7%)** |
+| dominant Stimulation | 3 (2.2%) | **3 (1.6%)** — see the wave-3 brief |
+| pairs merged by D = 3.0 | quick 5.0%, long 2.1% | **quick 2.4%, long 1.5%** |
+| cost-ceiling monotonicity | — | OK over all 344 adjacent pairs |
+
+**D is healthier, not strained.** The share of pairs it merges nearly halved, which is the opposite
+of what a wave full of twins would do, and it stays far below the 10% line at which a threshold
+stops de-duplicating and starts thinning. The closest surviving pairs are all pre-existing seed rows.
+
+⚠️ **REACHABILITY WENT THE OTHER WAY, AND THIS IS THE FINDING WORTH KEEPING.** MERIT-DARK rows rose
+**24 → 41** (quick-fix 6 → 11, long-term 18 → 30), and the three fully-dark rows are still dark with
+their best placings *worse*: `Build a mechanical keyboard` rank 9 → 10, `Sport lockpicking` 13 → 15,
+`Build a cardboard automaton` 21 → 22.
+
+That is arithmetic, not a defect: "earned" means inside the top 8 **on fit**, and adding 57 rows
+adds 57 more competitors for the same eight slots. The median relaxed pool also grew — quick 6 →
+10.5, hobby 7 → 11 — which is exactly what the starvation numbers are reporting from the other side.
+
+⚠️ **So do not carry the starvation prediction across to reachability.** `CLAUDE.md` says
+starvation "mostly solves itself" as the catalogue grows, and wave 2 confirms that emphatically.
+**Darkness does the opposite and gets worse with every wave**, by construction. At ~500 rows a large
+fraction of the catalogue will be merit-dark, and that will be normal rather than alarming — nothing
+is invisible, because the wildcard draws from the raw pathway pool and obeys no ranking at all. The
+two numbers move in opposite directions and must not be read as one health metric.
+
+The audit is still the **fit-only, no-`diverseSelect`** regime the script's own header flags, so
+this dark list remains a lower bound. Teaching it about the greedy pass is still outstanding work.
+
+### ⚠️ The brief for wave 3
+
+Three things, and the first is the one that will not fix itself.
+
+1. **Stimulation is still 3 rows of 191 (1.6%), and wave 2 could not have moved it.** It is
+   relatively *worse* than before because the denominator grew. This is structural rather than an
+   oversight: genuinely Stimulation-dominant activities — competition, stakes, adrenaline — are
+   overwhelmingly **paid facility** activities (squash, padel, BJJ, fencing, karting, climbing
+   competitions, a quiz league with a fixture list), and every one of those was P3. Starvation
+   repair and the Stimulation gap pulled in opposite directions and starvation won. The wave does
+   carry the free ones that exist (`Chase a parkrun personal best` at Stimulation 8,
+   `Storytelling and spoken-word nights` at 7) but both are honestly dominated by Energy and
+   Creative. ⚠️ **Do not close this gap by raising Stimulation scores** — that is precisely the
+   inflation the `vector-rebalance` branch existed to remove. Close it with content.
+2. **The low-budget facility band is now the place to spend.** P1 and P2 are largely cleared, so
+   wave 3 can afford it — and it is the same content that fixes Stimulation, which is the one place
+   in this campaign where the axis gap and a cell gap point at the same rows.
+3. **The residual cells, all of which are on the standing queue.** Four zero-cells at
+   `half a day / get me moving / staying in` on the paid tiers — in practice a leisure-centre
+   session: badminton, a swim, a climbing wall. The other six residual zero-cells are the
+   `LOW-FREQUENCY` band (free indoor half-day exertion; a club meeting at your house in weekend
+   blocks) and are correctly filled last, not never.
 
 **Results layout correction, 2026-08-28** (branch `results-layout`, **merged into `main` and
 deployed 2026-08-28 on Owen's instruction**). Supersedes the "three cards in a row on desktop" half

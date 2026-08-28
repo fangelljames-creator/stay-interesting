@@ -14,7 +14,7 @@ immediately *before* that merge. Treat them as a **lower bound** on what is reac
 than a description of today: a pass that skips near-duplicates pulls different rows into the
 earned-8, and some of what is dark here may not be dark any more.
 
-- **Catalogue:** 134 activities from `supabase\step1-schema-rls-seed.sql`.
+- **Catalogue:** 191 activities from `supabase\step1-schema-rls-seed.sql`.
 - **Users:** all 81,920 achievable quiz answer paths, each turned into the user vector the app would hold. Every one is distinct, so nothing is sampled and nothing deduped.
 - **Earned:** inside the top 8 — the 3 ranked cards plus the 5 rerolls behind them.
 - **Baseline pool:** the whole pathway pool with no constraints. On the quick path that is a *synthetic* pool — its company question has no don't-mind option, so a fully unconstrained
@@ -35,92 +35,127 @@ construction: the wildcard is drawn at random from the raw pathway pool and obey
 ranking and no budget answer. A dark row is one that never wins a slot *on fit* — which is a
 content observation, not a fault, and what to do about it is not this script's call.
 
-## quick-fix — 65 activities
+## quick-fix — 100 activities
 
-An even split of the 8 slots would give every row 12.3%. Printed for scale; it is not a target.
+An even split of the 8 slots would give every row 8.0%. Printed for scale; it is not a target.
 
 | band | activities |
 |---|---|
-| EARNED-OFTEN | 48 (74%) |
-| EARNED-RARELY | 11 (17%) |
-| MERIT-DARK | 6 (9%) |
+| EARNED-OFTEN | 57 (57%) |
+| EARNED-RARELY | 32 (32%) |
+| MERIT-DARK | 11 (11%) |
 
 | activity | users earning it | share | band |
 |---|---|---|---|
-| List something for resale | 65,530 | 79.99% | EARNED-OFTEN |
-| Make a lemon posset | 59,644 | 72.81% | EARNED-OFTEN |
-| Bake rosemary sea salt crackers | 46,007 | 56.16% | EARNED-OFTEN |
-| Learn one card flourish | 42,773 | 52.21% | EARNED-OFTEN |
-| Tie a half-Windsor | 29,300 | 35.77% | EARNED-OFTEN |
-| Plot a running route worth running | 29,117 | 35.54% | EARNED-OFTEN |
-| Check the car's fluids | 26,806 | 32.72% | EARNED-OFTEN |
-| Learn three knots that matter | 26,558 | 32.42% | EARNED-OFTEN |
-| Build a blanket fort | 24,554 | 29.97% | EARNED-OFTEN |
-| Darts or table tennis, first to 21 | 22,618 | 27.61% | EARNED-OFTEN |
-| Learn to moonwalk | 20,277 | 24.75% | EARNED-OFTEN |
-| A round of disc golf | 19,165 | 23.39% | EARNED-OFTEN |
-| Write a review someone will actually read | 18,113 | 22.11% | EARNED-OFTEN |
-| Learn the NATO alphabet | 17,439 | 21.29% | EARNED-OFTEN |
-| Microwave mug cake | 16,225 | 19.81% | EARNED-OFTEN |
-| A board game short enough to actually finish | 15,633 | 19.08% | EARNED-OFTEN |
-| Plan a trip you may never take | 15,512 | 18.94% | EARNED-OFTEN |
-| Geography quiz blitz | 15,386 | 18.78% | EARNED-OFTEN |
-| Foam roll everything that hurts | 14,887 | 18.17% | EARNED-OFTEN |
-| Cook from whatever is already in the fridge | 11,097 | 13.55% | EARNED-OFTEN |
-| Map a historic walking tour | 10,008 | 12.22% | EARNED-OFTEN |
-| Watch a film like a cinematographer | 9,752 | 11.90% | EARNED-OFTEN |
-| Playing pool | 9,634 | 11.76% | EARNED-OFTEN |
-| Knockabout on a public court | 8,280 | 10.11% | EARNED-OFTEN |
-| Dial in one proper cup of coffee | 7,174 | 8.76% | EARNED-OFTEN |
-| Dig into local history | 7,054 | 8.61% | EARNED-OFTEN |
-| Walk somewhere with a view and take a flask | 6,985 | 8.53% | EARNED-OFTEN |
-| Mend what needs mending | 6,777 | 8.27% | EARNED-OFTEN |
-| Sourdough and bread baking | 5,449 | 6.65% | EARNED-OFTEN |
-| Ten-minute room reset | 5,069 | 6.19% | EARNED-OFTEN |
-| Repair a broken book spine | 4,122 | 5.03% | EARNED-OFTEN |
-| Block out your week on one page | 4,072 | 4.97% | EARNED-OFTEN |
-| Run a quiz round on whoever is nearby | 4,041 | 4.93% | EARNED-OFTEN |
-| Blind taste test whatever is in the cupboard | 3,350 | 4.09% | EARNED-OFTEN |
-| Ring someone for no reason | 2,931 | 3.58% | EARNED-OFTEN |
-| Kickabout at the nearest bit of grass | 2,689 | 3.28% | EARNED-OFTEN |
-| Two minutes of cold shower | 2,352 | 2.87% | EARNED-OFTEN |
-| Revive scuffed leather boots | 2,320 | 2.83% | EARNED-OFTEN |
-| A walk with no destination | 2,137 | 2.61% | EARNED-OFTEN |
-| Find five constellations | 2,064 | 2.52% | EARNED-OFTEN |
-| Sequence a playlist properly | 1,562 | 1.91% | EARNED-OFTEN |
-| Identify garden birds | 1,517 | 1.85% | EARNED-OFTEN |
-| Write a quiz for the house | 1,361 | 1.66% | EARNED-OFTEN |
-| Ten minutes of mobility work | 1,183 | 1.44% | EARNED-OFTEN |
-| Write with your other hand | 1,091 | 1.33% | EARNED-OFTEN |
-| Turn bottles into vases | 964 | 1.18% | EARNED-OFTEN |
-| Identify trees by their bark | 935 | 1.14% | EARNED-OFTEN |
-| Learn a two-player card game neither of you knows | 850 | 1.04% | EARNED-OFTEN |
-| Walk a street you have never walked down | 815 | 0.99% | EARNED-RARELY |
-| Photo walk down your own street | 782 | 0.95% | EARNED-RARELY |
-| Fold an origami crane | 474 | 0.58% | EARNED-RARELY |
-| Learn Morse code | 364 | 0.44% | EARNED-RARELY |
-| Translate a news article line by line | 196 | 0.24% | EARNED-RARELY |
-| Reset one single surface | 109 | 0.13% | EARNED-RARELY |
-| Biro sketching | 87 | 0.11% | EARNED-RARELY |
-| Put the radio on | 60 | 0.07% | EARNED-RARELY |
-| Study old maps | 57 | 0.07% | EARNED-RARELY |
-| Three bullets on today's markets | 49 | 0.06% | EARNED-RARELY |
-| Sort the spice drawer | 3 | 0.00% | EARNED-RARELY |
+| Behind-the-back throw and catch | 66,929 | 81.70% | EARNED-OFTEN |
+| List something for resale | 51,324 | 62.65% | EARNED-OFTEN |
+| Make a lemon posset | 45,694 | 55.78% | EARNED-OFTEN |
+| Bake rosemary sea salt crackers | 35,498 | 43.33% | EARNED-OFTEN |
+| Learn one card flourish | 26,472 | 32.31% | EARNED-OFTEN |
+| The wardrobe truth audit | 25,007 | 30.53% | EARNED-OFTEN |
+| Plot a running route worth running | 21,846 | 26.67% | EARNED-OFTEN |
+| Three salsa steps, solo | 21,413 | 26.14% | EARNED-OFTEN |
+| Check the car's fluids | 19,441 | 23.73% | EARNED-OFTEN |
+| How far can you walk in exactly fifteen minutes? | 18,867 | 23.03% | EARNED-OFTEN |
+| Tie a half-Windsor | 17,455 | 21.31% | EARNED-OFTEN |
+| Darts or table tennis, first to 21 | 16,379 | 19.99% | EARNED-OFTEN |
+| Build a blanket fort | 16,036 | 19.58% | EARNED-OFTEN |
+| Learn three knots that matter | 15,483 | 18.90% | EARNED-OFTEN |
+| Full-commitment hopscotch | 14,801 | 18.07% | EARNED-OFTEN |
+| A round of disc golf | 13,445 | 16.41% | EARNED-OFTEN |
+| A commercial-break workout | 12,731 | 15.54% | EARNED-OFTEN |
+| Programme a themed trilogy night | 12,013 | 14.66% | EARNED-OFTEN |
+| Write a review someone will actually read | 11,970 | 14.61% | EARNED-OFTEN |
+| First-touch drills against a wall | 11,645 | 14.22% | EARNED-OFTEN |
+| Keep a balloon off the floor for five minutes | 11,048 | 13.49% | EARNED-OFTEN |
+| Microwave mug cake | 10,678 | 13.03% | EARNED-OFTEN |
+| A board game short enough to actually finish | 10,360 | 12.65% | EARNED-OFTEN |
+| Learn to moonwalk | 10,326 | 12.60% | EARNED-OFTEN |
+| Plan a trip you may never take | 10,312 | 12.59% | EARNED-OFTEN |
+| Learn the NATO alphabet | 9,789 | 11.95% | EARNED-OFTEN |
+| Geography quiz blitz | 8,422 | 10.28% | EARNED-OFTEN |
+| Three card games you can teach anyone | 7,727 | 9.43% | EARNED-OFTEN |
+| Foam roll everything that hurts | 7,390 | 9.02% | EARNED-OFTEN |
+| Cook from whatever is already in the fridge | 6,748 | 8.24% | EARNED-OFTEN |
+| Watch a film like a cinematographer | 6,553 | 8.00% | EARNED-OFTEN |
+| Hunt for ghost signs | 6,502 | 7.94% | EARNED-OFTEN |
+| Mend what needs mending | 5,254 | 6.41% | EARNED-OFTEN |
+| Map a historic walking tour | 5,166 | 6.31% | EARNED-OFTEN |
+| Storyboard last year's photo album | 4,881 | 5.96% | EARNED-OFTEN |
+| Dial in one proper cup of coffee | 4,687 | 5.72% | EARNED-OFTEN |
+| Playing pool | 4,575 | 5.58% | EARNED-OFTEN |
+| Dig into local history | 3,706 | 4.52% | EARNED-OFTEN |
+| Knockabout on a public court | 3,608 | 4.40% | EARNED-OFTEN |
+| Sourdough and bread baking | 2,892 | 3.53% | EARNED-OFTEN |
+| A phone-stays-home walk | 2,885 | 3.52% | EARNED-OFTEN |
+| Block out your week on one page | 2,869 | 3.50% | EARNED-OFTEN |
+| Repair a broken book spine | 2,867 | 3.50% | EARNED-OFTEN |
+| Take a smell walk | 2,759 | 3.37% | EARNED-OFTEN |
+| Walk somewhere with a view and take a flask | 2,498 | 3.05% | EARNED-OFTEN |
+| Ten-minute room reset | 2,209 | 2.70% | EARNED-OFTEN |
+| Design a no-spend weekend worth having | 2,045 | 2.50% | EARNED-OFTEN |
+| Dance flat-out to three songs | 1,972 | 2.41% | EARNED-OFTEN |
+| Revive scuffed leather boots | 1,788 | 2.18% | EARNED-OFTEN |
+| Stand up from the floor without using your hands | 1,767 | 2.16% | EARNED-OFTEN |
+| Animal walks across the living room | 1,599 | 1.95% | EARNED-OFTEN |
+| Run a quiz round on whoever is nearby | 1,520 | 1.86% | EARNED-OFTEN |
+| Blind taste test whatever is in the cupboard | 1,214 | 1.48% | EARNED-OFTEN |
+| Rank your top ten films, definitively | 1,121 | 1.37% | EARNED-OFTEN |
+| Sequence a playlist properly | 1,114 | 1.36% | EARNED-OFTEN |
+| Relearn the cartwheel on grass | 1,024 | 1.25% | EARNED-OFTEN |
+| A deck-of-cards workout | 1,004 | 1.23% | EARNED-OFTEN |
+| Turn bottles into vases | 798 | 0.97% | EARNED-RARELY |
+| Finally understand the offside rule | 717 | 0.88% | EARNED-RARELY |
+| A walk with no destination | 655 | 0.80% | EARNED-RARELY |
+| Ring someone for no reason | 646 | 0.79% | EARNED-RARELY |
+| Find five constellations | 554 | 0.68% | EARNED-RARELY |
+| Identify garden birds | 538 | 0.66% | EARNED-RARELY |
+| Write with your other hand | 447 | 0.55% | EARNED-RARELY |
+| Ten minutes of mobility work | 413 | 0.50% | EARNED-RARELY |
+| Count to ten in three new languages | 381 | 0.47% | EARNED-RARELY |
+| Fold an origami crane | 365 | 0.45% | EARNED-RARELY |
+| Write a quiz for the house | 343 | 0.42% | EARNED-RARELY |
+| Photo walk down your own street | 321 | 0.39% | EARNED-RARELY |
+| Two minutes of cold shower | 272 | 0.33% | EARNED-RARELY |
+| Watch a sunset start to finish | 234 | 0.29% | EARNED-RARELY |
+| Kickabout at the nearest bit of grass | 218 | 0.27% | EARNED-RARELY |
+| Take one inbox to zero | 190 | 0.23% | EARNED-RARELY |
+| A hundred backpack swings | 157 | 0.19% | EARNED-RARELY |
+| Learn a two-player card game neither of you knows | 134 | 0.16% | EARNED-RARELY |
+| Learn Morse code | 129 | 0.16% | EARNED-RARELY |
+| Identify trees by their bark | 111 | 0.14% | EARNED-RARELY |
+| Follow a fifteen-minute beginner yoga flow | 104 | 0.13% | EARNED-RARELY |
+| Translate a news article line by line | 69 | 0.08% | EARNED-RARELY |
+| Biro sketching | 58 | 0.07% | EARNED-RARELY |
+| An obstacle course built from the furniture | 34 | 0.04% | EARNED-RARELY |
+| Reset one single surface | 32 | 0.04% | EARNED-RARELY |
+| Beachcombing and sea glass | 25 | 0.03% | EARNED-RARELY |
+| Put the radio on | 22 | 0.03% | EARNED-RARELY |
+| Three bullets on today's markets | 22 | 0.03% | EARNED-RARELY |
+| Study old maps | 16 | 0.02% | EARNED-RARELY |
+| Catch tonight's ISS pass | 14 | 0.02% | EARNED-RARELY |
+| Find your nearest trig point | 12 | 0.01% | EARNED-RARELY |
+| Walk a street you have never walked down | 1 | 0.00% | EARNED-RARELY |
 | Chess puzzle rush | 0 | 0.00% | MERIT-DARK |
 | Ten minutes of guided breathing | 0 | 0.00% | MERIT-DARK |
 | A glassblowing taster class | 0 | 0.00% | MERIT-DARK |
 | A blacksmithing taster day | 0 | 0.00% | MERIT-DARK |
 | Play through a famous chess game | 0 | 0.00% | MERIT-DARK |
 | Clear out the camera roll | 0 | 0.00% | MERIT-DARK |
+| Sort the spice drawer | 0 | 0.00% | MERIT-DARK |
+| Find north four ways without a compass | 0 | 0.00% | MERIT-DARK |
+| Age a hedge by counting its species | 0 | 0.00% | MERIT-DARK |
+| Plan next year's garden on paper | 0 | 0.00% | MERIT-DARK |
+| Postbox spotting by royal cipher | 0 | 0.00% | MERIT-DARK |
 
-### The 6 MERIT-DARK activities, and whether a real cell rescues them
+### The 11 MERIT-DARK activities, and whether a real cell rescues them
 
 #### Chess puzzle rush
 
 - **vector** Social 1 · Energy 1 · Creative 2 · Analytical 10 · Outdoors 1 · Novelty 3 · Stimulation 6
 - **tags** `quick-fix`, `10-mins`, `inside`, `at-home`, `solo`, `free`
-- **survives in** 33 of 324 answer cells
-- **WITNESS FOUND** — earns rank 8 of 19 survivors
+- **survives in** 24 of 324 answer cells
+- **WITNESS FOUND** — earns rank 8 of 22 survivors
   - answers: *10-15 minutes* · *Something low-key* · *Staying in* · *Just me* · *Keep it free*
 - **nearest competitors** (same pathway, by vector distance):
   - 3.32 — Three bullets on today's markets
@@ -133,8 +168,8 @@ An even split of the 8 slots would give every row 12.3%. Printed for scale; it i
 
 - **vector** Social 1 · Energy 1 · Creative 1 · Analytical 1 · Outdoors 1 · Novelty 3 · Stimulation 1
 - **tags** `quick-fix`, `10-mins`, `inside`, `at-home`, `solo`, `free`
-- **survives in** 33 of 324 answer cells
-- **WITNESS FOUND** — earns rank 5 of 19 survivors
+- **survives in** 24 of 324 answer cells
+- **WITNESS FOUND** — earns rank 5 of 22 survivors
   - answers: *10-15 minutes* · *Something low-key* · *Staying in* · *Just me* · *Keep it free*
 - **nearest competitors** (same pathway, by vector distance):
   - 1.73 — Put the radio on
@@ -147,52 +182,52 @@ An even split of the 8 slots would give every row 12.3%. Printed for scale; it i
 
 - **vector** Social 5 · Energy 6 · Creative 8 · Analytical 4 · Outdoors 1 · Novelty 9 · Stimulation 6
 - **tags** `quick-fix`, `half-day`, `long-term`, `weekend-blocks`, `exertion`, `inside`, `facility`, `solo`, `social`, `investment-required`
-- **survives in** 22 of 324 answer cells
-- **WITNESS FOUND** — a cell leaves only 7 survivors, too few to fill the slots
-  - answers: *Half a day or more* · *Something low-key* · *Staying in* · *Just me* · *Not a concern*
-  - after relaxing: where you wanted to be, then how active you wanted it
+- **survives in** 16 of 324 answer cells
+- **WITNESS FOUND** — a cell leaves only 5 survivors, too few to fill the slots
+  - answers: *Half a day or more* · *Get me moving* · *Staying in* · *Just me* · *Not a concern*
+  - after relaxing: where you wanted to be
 - **nearest competitors** (same pathway, by vector distance):
   - 3.87 — A blacksmithing taster day
+  - 4.12 — An obstacle course built from the furniture
   - 5.92 — Cook from whatever is already in the fridge
+  - 6.24 — Three salsa steps, solo
   - 6.63 — Build a blanket fort
-  - 7.07 — Learn to moonwalk
-  - 7.21 — Sourdough and bread baking
 
 #### A blacksmithing taster day
 
 - **vector** Social 5 · Energy 9 · Creative 7 · Analytical 4 · Outdoors 3 · Novelty 9 · Stimulation 7
 - **tags** `quick-fix`, `half-day`, `long-term`, `weekend-blocks`, `exertion`, `inside`, `outside`, `facility`, `solo`, `social`, `investment-required`
-- **survives in** 30 of 324 answer cells
-- **WITNESS FOUND** — a cell leaves only 7 survivors, too few to fill the slots
-  - answers: *Half a day or more* · *Something low-key* · *Staying in* · *Just me* · *Not a concern*
-  - after relaxing: where you wanted to be, then how active you wanted it
+- **survives in** 24 of 324 answer cells
+- **WITNESS FOUND** — a cell leaves only 5 survivors, too few to fill the slots
+  - answers: *Half a day or more* · *Get me moving* · *Staying in* · *Just me* · *Not a concern*
+  - after relaxing: where you wanted to be
 - **nearest competitors** (same pathway, by vector distance):
   - 3.87 — A glassblowing taster class
-  - 8.12 — Cook from whatever is already in the fridge
-  - 8.19 — Learn to moonwalk
-  - 8.66 — Build a blanket fort
-  - 9.17 — Photo walk down your own street
+  - 4.00 — An obstacle course built from the furniture
+  - 6.93 — Animal walks across the living room
+  - 7.07 — Three salsa steps, solo
+  - 7.94 — Behind-the-back throw and catch
 
 #### Play through a famous chess game
 
 - **vector** Social 1 · Energy 1 · Creative 1 · Analytical 10 · Outdoors 1 · Novelty 5 · Stimulation 3
 - **tags** `quick-fix`, `1-hour`, `inside`, `at-home`, `solo`, `free`
 - **survives in** 24 of 324 answer cells
-- **WITNESS FOUND** — earns rank 8 of 18 survivors
+- **WITNESS FOUND** — earns rank 8 of 19 survivors
   - answers: *About an hour* · *Something low-key* · *Staying in* · *Just me* · *Keep it free*
 - **nearest competitors** (same pathway, by vector distance):
   - 1.73 — Three bullets on today's markets
   - 3.46 — Translate a news article line by line
   - 3.74 — Chess puzzle rush
   - 4.69 — Block out your week on one page
-  - 4.90 — Plan a trip you may never take
+  - 4.69 — Finally understand the offside rule
 
 #### Clear out the camera roll
 
 - **vector** Social 1 · Energy 1 · Creative 1 · Analytical 2 · Outdoors 1 · Novelty 1 · Stimulation 1
 - **tags** `quick-fix`, `1-hour`, `inside`, `at-home`, `solo`, `free`
 - **survives in** 24 of 324 answer cells
-- **WITNESS FOUND** — earns rank 6 of 18 survivors
+- **WITNESS FOUND** — earns rank 6 of 19 survivors
   - answers: *About an hour* · *Something low-key* · *Staying in* · *Just me* · *Keep it free*
 - **nearest competitors** (same pathway, by vector distance):
   - 1.00 — Sort the spice drawer
@@ -201,81 +236,164 @@ An even split of the 8 slots would give every row 12.3%. Printed for scale; it i
   - 3.00 — Revive scuffed leather boots
   - 3.16 — Ten minutes of mobility work
 
-## long-term — 76 activities
+#### Sort the spice drawer
 
-An even split of the 8 slots would give every row 10.5%. Printed for scale; it is not a target.
+- **vector** Social 1 · Energy 2 · Creative 1 · Analytical 2 · Outdoors 1 · Novelty 1 · Stimulation 1
+- **tags** `quick-fix`, `1-hour`, `inside`, `at-home`, `solo`, `free`
+- **survives in** 24 of 324 answer cells
+- **WITNESS FOUND** — earns rank 2 of 19 survivors
+  - answers: *About an hour* · *Something low-key* · *Staying in* · *Just me* · *Keep it free*
+- **nearest competitors** (same pathway, by vector distance):
+  - 1.00 — Reset one single surface
+  - 1.00 — Clear out the camera roll
+  - 2.24 — Ten minutes of mobility work
+  - 2.45 — Ten minutes of guided breathing
+  - 2.83 — Revive scuffed leather boots
+
+#### Find north four ways without a compass
+
+- **vector** Social 4 · Energy 2 · Creative 1 · Analytical 9 · Outdoors 8 · Novelty 7 · Stimulation 1
+- **tags** `quick-fix`, `10-mins`, `1-hour`, `outside`, `in-nature`, `solo`, `couple`, `social`, `free`
+- **survives in** 108 of 324 answer cells
+- **WITNESS FOUND** — a cell leaves only 8 survivors, too few to fill the slots
+  - answers: *10-15 minutes* · *Something low-key* · *Heading out* · *One other person* · *Keep it free*
+- **nearest competitors** (same pathway, by vector distance):
+  - 2.65 — Age a hedge by counting its species
+  - 4.12 — Postbox spotting by royal cipher
+  - 4.69 — Hunt for ghost signs
+  - 4.80 — Identify trees by their bark
+  - 4.80 — Catch tonight's ISS pass
+
+#### Age a hedge by counting its species
+
+- **vector** Social 4 · Energy 3 · Creative 1 · Analytical 8 · Outdoors 9 · Novelty 9 · Stimulation 1
+- **tags** `quick-fix`, `1-hour`, `outside`, `in-nature`, `solo`, `couple`, `social`, `free`
+- **survives in** 72 of 324 answer cells
+- **WITNESS FOUND** — a cell leaves only 7 survivors, too few to fill the slots
+  - answers: *About an hour* · *Something low-key* · *Heading out* · *A few of us* · *Keep it free*
+- **nearest competitors** (same pathway, by vector distance):
+  - 2.65 — Find north four ways without a compass
+  - 3.46 — Postbox spotting by royal cipher
+  - 4.00 — Catch tonight's ISS pass
+  - 4.24 — Find your nearest trig point
+  - 4.69 — Identify trees by their bark
+
+#### Plan next year's garden on paper
+
+- **vector** Social 2 · Energy 2 · Creative 7 · Analytical 8 · Outdoors 2 · Novelty 5 · Stimulation 2
+- **tags** `quick-fix`, `half-day`, `inside`, `at-home`, `solo`, `couple`, `free`
+- **survives in** 51 of 324 answer cells
+- **WITNESS FOUND** — a cell leaves only 7 survivors, too few to fill the slots
+  - answers: *Half a day or more* · *Something low-key* · *Staying in* · *Just me* · *Keep it free*
+- **nearest competitors** (same pathway, by vector distance):
+  - 2.83 — Dial in one proper cup of coffee
+  - 3.00 — Sourdough and bread baking
+  - 3.87 — Watch a film like a cinematographer
+  - 4.00 — Cook from whatever is already in the fridge
+  - 4.12 — Storyboard last year's photo album
+
+#### Postbox spotting by royal cipher
+
+- **vector** Social 5 · Energy 4 · Creative 1 · Analytical 7 · Outdoors 6 · Novelty 9 · Stimulation 1
+- **tags** `quick-fix`, `1-hour`, `half-day`, `outside`, `solo`, `couple`, `social`, `free`
+- **survives in** 111 of 324 answer cells
+- **WITNESS FOUND** — a cell leaves only 5 survivors, too few to fill the slots
+  - answers: *Half a day or more* · *Something low-key* · *Heading out* · *Just me* · *Keep it free*
+- **nearest competitors** (same pathway, by vector distance):
+  - 2.65 — Hunt for ghost signs
+  - 3.46 — Age a hedge by counting its species
+  - 4.12 — Find north four ways without a compass
+  - 4.47 — How far can you walk in exactly fifteen minutes?
+  - 4.69 — Catch tonight's ISS pass
+
+## long-term — 99 activities
+
+An even split of the 8 slots would give every row 8.1%. Printed for scale; it is not a target.
 
 | band | activities |
 |---|---|
-| EARNED-OFTEN | 37 (49%) |
-| EARNED-RARELY | 21 (28%) |
-| MERIT-DARK | 18 (24%) |
+| EARNED-OFTEN | 44 (44%) |
+| EARNED-RARELY | 25 (25%) |
+| MERIT-DARK | 30 (30%) |
 
 | activity | users earning it | share | band |
 |---|---|---|---|
-| Restore a cast iron skillet | 58,461 | 71.36% | EARNED-OFTEN |
-| Restoring a vintage bicycle | 52,378 | 63.94% | EARNED-OFTEN |
-| Cold brew coffee | 51,304 | 62.63% | EARNED-OFTEN |
-| Basic bicycle maintenance | 46,798 | 57.13% | EARNED-OFTEN |
-| The big books project | 37,512 | 45.79% | EARNED-OFTEN |
-| Darts or table tennis, first to 21 | 35,492 | 43.33% | EARNED-OFTEN |
-| Singing in a local choir | 32,602 | 39.80% | EARNED-OFTEN |
-| Moroccan tagine cooking | 32,442 | 39.60% | EARNED-OFTEN |
-| Antiquarian book collecting | 31,025 | 37.87% | EARNED-OFTEN |
-| A round of disc golf | 30,252 | 36.93% | EARNED-OFTEN |
-| Orchid cultivation | 30,081 | 36.72% | EARNED-OFTEN |
-| Sourdough and bread baking | 28,914 | 35.30% | EARNED-OFTEN |
-| Speed cup stacking | 21,885 | 26.72% | EARNED-OFTEN |
-| Spanish language practice | 21,350 | 26.06% | EARNED-OFTEN |
-| Sourdough from a wild starter | 20,374 | 24.87% | EARNED-OFTEN |
-| Playing pool | 17,905 | 21.86% | EARNED-OFTEN |
-| Close-up card and coin magic | 16,092 | 19.64% | EARNED-OFTEN |
-| Wall-supported handstands | 13,009 | 15.88% | EARNED-OFTEN |
-| Build and paint a scale model | 11,040 | 13.48% | EARNED-OFTEN |
-| Fermenting and kombucha brewing | 9,977 | 12.18% | EARNED-OFTEN |
-| An allotment or community garden plot | 8,871 | 10.83% | EARNED-OFTEN |
-| Social dance classes | 6,383 | 7.79% | EARNED-OFTEN |
-| Shadowboxing rounds | 5,658 | 6.91% | EARNED-OFTEN |
-| Pressed flower art | 4,959 | 6.05% | EARNED-OFTEN |
-| Indoor bouldering | 4,222 | 5.15% | EARNED-OFTEN |
-| Geocaching | 4,205 | 5.13% | EARNED-OFTEN |
-| Small-build woodworking | 4,094 | 5.00% | EARNED-OFTEN |
-| Read military history properly | 2,869 | 3.50% | EARNED-OFTEN |
-| Hiking and hillwalking | 1,857 | 2.27% | EARNED-OFTEN |
-| Hand-stitch a felt wallet | 1,807 | 2.21% | EARNED-OFTEN |
-| Stand-up paddleboarding | 1,761 | 2.15% | EARNED-OFTEN |
-| Train for a half-marathon | 1,620 | 1.98% | EARNED-OFTEN |
-| Learning guitar | 1,346 | 1.64% | EARNED-OFTEN |
-| Club road cycling | 943 | 1.15% | EARNED-OFTEN |
-| Biro sketching | 937 | 1.14% | EARNED-OFTEN |
-| Carve a wooden spoon | 914 | 1.12% | EARNED-OFTEN |
-| Skateboarding at a public park | 900 | 1.10% | EARNED-OFTEN |
-| Bonsai cultivation | 551 | 0.67% | EARNED-RARELY |
-| Restore a vintage typewriter | 494 | 0.60% | EARNED-RARELY |
-| Chess study and correspondence games | 405 | 0.49% | EARNED-RARELY |
-| Urban beekeeping | 342 | 0.42% | EARNED-RARELY |
-| Small engine repair | 332 | 0.41% | EARNED-RARELY |
-| Sketch buildings from a bench | 259 | 0.32% | EARNED-RARELY |
-| Hill sprint intervals | 221 | 0.27% | EARNED-RARELY |
-| Trail running and hillwalking | 213 | 0.26% | EARNED-RARELY |
-| Make a zine | 69 | 0.08% | EARNED-RARELY |
-| Amateur radio | 65 | 0.08% | EARNED-RARELY |
-| Design an icon set | 53 | 0.06% | EARNED-RARELY |
-| Foraging for wild plants | 28 | 0.03% | EARNED-RARELY |
-| Olympic lifting, properly coached | 25 | 0.03% | EARNED-RARELY |
-| Classic car market research | 23 | 0.03% | EARNED-RARELY |
+| Propagate and trade houseplant cuttings | 65,776 | 80.29% | EARNED-OFTEN |
+| Adopt a local museum, room by room | 50,023 | 61.06% | EARNED-OFTEN |
+| Restore a cast iron skillet | 47,534 | 58.02% | EARNED-OFTEN |
+| Cold brew coffee | 43,468 | 53.06% | EARNED-OFTEN |
+| Restoring a vintage bicycle | 43,063 | 52.57% | EARNED-OFTEN |
+| Basic bicycle maintenance | 39,616 | 48.36% | EARNED-OFTEN |
+| Darts or table tennis, first to 21 | 31,029 | 37.88% | EARNED-OFTEN |
+| The big books project | 28,260 | 34.50% | EARNED-OFTEN |
+| Singing in a local choir | 27,747 | 33.87% | EARNED-OFTEN |
+| A round of disc golf | 26,354 | 32.17% | EARNED-OFTEN |
+| Moroccan tagine cooking | 23,364 | 28.52% | EARNED-OFTEN |
+| Orchid cultivation | 22,927 | 27.99% | EARNED-OFTEN |
+| Sourdough and bread baking | 21,989 | 26.84% | EARNED-OFTEN |
+| Antiquarian book collecting | 19,030 | 23.23% | EARNED-OFTEN |
+| Dog-walking at an animal shelter | 15,897 | 19.41% | EARNED-OFTEN |
+| Speed cup stacking | 14,546 | 17.76% | EARNED-OFTEN |
+| Sourdough from a wild starter | 13,466 | 16.44% | EARNED-OFTEN |
+| Playing pool | 12,785 | 15.61% | EARNED-OFTEN |
+| Close-up card and coin magic | 11,340 | 13.84% | EARNED-OFTEN |
+| Spanish language practice | 11,163 | 13.63% | EARNED-OFTEN |
+| Befriend an isolated neighbour through a charity | 10,684 | 13.04% | EARNED-OFTEN |
+| Wall-supported handstands | 9,215 | 11.25% | EARNED-OFTEN |
+| Build and paint a scale model | 9,092 | 11.10% | EARNED-OFTEN |
+| An allotment or community garden plot | 5,969 | 7.29% | EARNED-OFTEN |
+| A book club that actually finishes books | 5,476 | 6.68% | EARNED-OFTEN |
+| Volunteer at parkrun before you race it | 4,851 | 5.92% | EARNED-OFTEN |
+| Fermenting and kombucha brewing | 4,606 | 5.62% | EARNED-OFTEN |
+| Shadowboxing rounds | 4,098 | 5.00% | EARNED-OFTEN |
+| Pressed flower art | 3,918 | 4.78% | EARNED-OFTEN |
+| Small-build woodworking | 3,335 | 4.07% | EARNED-OFTEN |
+| Social dance classes | 3,195 | 3.90% | EARNED-OFTEN |
+| Indoor bouldering | 2,126 | 2.60% | EARNED-OFTEN |
+| Beachcombing and sea glass | 1,953 | 2.38% | EARNED-OFTEN |
+| Geocaching | 1,849 | 2.26% | EARNED-OFTEN |
+| Become a heritage volunteer guide | 1,847 | 2.25% | EARNED-OFTEN |
+| Litter-picking with a local group | 1,665 | 2.03% | EARNED-OFTEN |
+| Hand-stitch a felt wallet | 1,547 | 1.89% | EARNED-OFTEN |
+| Read military history properly | 1,418 | 1.73% | EARNED-OFTEN |
+| Trace the family tree past 1900 | 1,102 | 1.35% | EARNED-OFTEN |
+| Hiking and hillwalking | 1,089 | 1.33% | EARNED-OFTEN |
+| Train for a half-marathon | 953 | 1.16% | EARNED-OFTEN |
+| Stand-up paddleboarding | 914 | 1.12% | EARNED-OFTEN |
+| Learning guitar | 892 | 1.09% | EARNED-OFTEN |
+| Biro sketching | 874 | 1.07% | EARNED-OFTEN |
+| Carve a wooden spoon | 785 | 0.96% | EARNED-RARELY |
+| Skateboarding at a public park | 471 | 0.57% | EARNED-RARELY |
+| Bonsai cultivation | 420 | 0.51% | EARNED-RARELY |
+| Club road cycling | 371 | 0.45% | EARNED-RARELY |
+| Restore a vintage typewriter | 242 | 0.30% | EARNED-RARELY |
+| Sketch buildings from a bench | 201 | 0.25% | EARNED-RARELY |
+| Small engine repair | 177 | 0.22% | EARNED-RARELY |
+| Hill sprint intervals | 125 | 0.15% | EARNED-RARELY |
+| Chase a parkrun personal best | 117 | 0.14% | EARNED-RARELY |
+| Chess study and correspondence games | 111 | 0.14% | EARNED-RARELY |
+| Join the repair cafe | 71 | 0.09% | EARNED-RARELY |
+| Urban beekeeping | 52 | 0.06% | EARNED-RARELY |
+| Design an icon set | 48 | 0.06% | EARNED-RARELY |
+| Make a zine | 46 | 0.06% | EARNED-RARELY |
+| Trail running and hillwalking | 39 | 0.05% | EARNED-RARELY |
 | Build a miniature diorama | 10 | 0.01% | EARNED-RARELY |
-| EV market analysis | 9 | 0.01% | EARNED-RARELY |
-| 35mm film photography | 8 | 0.01% | EARNED-RARELY |
-| Rugby drills | 5 | 0.01% | EARNED-RARELY |
-| A glassblowing taster class | 4 | 0.00% | EARNED-RARELY |
+| Foraging for wild plants | 7 | 0.01% | EARNED-RARELY |
+| 35mm film photography | 6 | 0.01% | EARNED-RARELY |
+| EV market analysis | 4 | 0.00% | EARNED-RARELY |
+| Become a school governor | 4 | 0.00% | EARNED-RARELY |
 | Traditional bookbinding | 3 | 0.00% | EARNED-RARELY |
-| Tabletop roleplaying | 2 | 0.00% | EARNED-RARELY |
+| Amateur radio | 2 | 0.00% | EARNED-RARELY |
+| Olympic lifting, properly coached | 1 | 0.00% | EARNED-RARELY |
+| Classic car market research | 1 | 0.00% | EARNED-RARELY |
+| A glassblowing taster class | 1 | 0.00% | EARNED-RARELY |
+| Rugby drills | 0 | 0.00% | MERIT-DARK |
 | Build a small tool you actually use | 0 | 0.00% | MERIT-DARK |
 | Open-water swimming | 0 | 0.00% | MERIT-DARK |
 | Classical oil painting | 0 | 0.00% | MERIT-DARK |
 | Web design and front-end coding | 0 | 0.00% | MERIT-DARK |
 | Amateur astronomy | 0 | 0.00% | MERIT-DARK |
+| Tabletop roleplaying | 0 | 0.00% | MERIT-DARK |
 | 3D printing and CAD | 0 | 0.00% | MERIT-DARK |
 | Build a mechanical keyboard | 0 | 0.00% | MERIT-DARK |
 | Build an Arduino weather station | 0 | 0.00% | MERIT-DARK |
@@ -289,15 +407,39 @@ An even split of the 8 slots would give every row 10.5%. Printed for scale; it i
 | A blacksmithing taster day | 0 | 0.00% | MERIT-DARK |
 | Parkour, at a class | 0 | 0.00% | MERIT-DARK |
 | Scuba certification | 0 | 0.00% | MERIT-DARK |
+| Conservation workdays with a local trust | 0 | 0.00% | MERIT-DARK |
+| Churchyard and monument recording | 0 | 0.00% | MERIT-DARK |
+| Storytelling and spoken-word nights | 0 | 0.00% | MERIT-DARK |
+| Escape-room puzzles, built for your friends | 0 | 0.00% | MERIT-DARK |
+| Resurrect an old laptop with Linux | 0 | 0.00% | MERIT-DARK |
+| One tiny game, finished, in Godot | 0 | 0.00% | MERIT-DARK |
+| Video editing, properly, on free software | 0 | 0.00% | MERIT-DARK |
+| Section-hike a coastal path | 0 | 0.00% | MERIT-DARK |
+| Natural navigation | 0 | 0.00% | MERIT-DARK |
+| Fossil hunting on the coast | 0 | 0.00% | MERIT-DARK |
 
-### The 18 MERIT-DARK activities, and whether a real cell rescues them
+### The 30 MERIT-DARK activities, and whether a real cell rescues them
+
+#### Rugby drills
+
+- **vector** Social 8 · Energy 10 · Creative 2 · Analytical 4 · Outdoors 8 · Novelty 3 · Stimulation 9
+- **tags** `long-term`, `5-hours-week`, `exertion`, `outside`, `facility`, `solo`, `couple`, `social`, `low-budget`
+- **survives in** 35 of 192 answer cells
+- **WITNESS FOUND** — a cell leaves only 5 survivors, too few to fill the slots
+  - answers: *A few solid hours* · *A place I go - club, gym, studio* · *Some kit is fine* · *A solo pursuit*
+- **nearest competitors** (same pathway, by vector distance):
+  - 2.45 — Chase a parkrun personal best
+  - 3.74 — Club road cycling
+  - 5.10 — Skateboarding at a public park
+  - 5.29 — Rowing at a river club
+  - 6.56 — Train for a half-marathon
 
 #### Build a small tool you actually use
 
 - **vector** Social 1 · Energy 2 · Creative 6 · Analytical 9 · Outdoors 1 · Novelty 6 · Stimulation 3
 - **tags** `long-term`, `5-hours-week`, `inside`, `at-home`, `solo`, `free`
-- **survives in** 40 of 192 answer cells
-- **WITNESS FOUND** — a cell leaves only 4 survivors, too few to fill the slots
+- **survives in** 26 of 192 answer cells
+- **WITNESS FOUND** — a cell leaves only 7 survivors, too few to fill the slots
   - answers: *A few solid hours* · *At home* · *Free to start* · *A solo pursuit*
 - **nearest competitors** (same pathway, by vector distance):
   - 1.41 — Web design and front-end coding
@@ -310,23 +452,22 @@ An even split of the 8 slots would give every row 10.5%. Printed for scale; it i
 
 - **vector** Social 5 · Energy 8 · Creative 1 · Analytical 3 · Outdoors 10 · Novelty 8 · Stimulation 9
 - **tags** `long-term`, `1-2-hours-week`, `weekend-blocks`, `exertion`, `outside`, `in-nature`, `solo`, `couple`, `social`, `free`
-- **survives in** 115 of 192 answer cells
-- **WITNESS FOUND** — a cell leaves only 7 survivors, too few to fill the slots
-  - answers: *Weekend blocks* · *At home* · *Free to start* · *A solo pursuit*
-  - after relaxing: where you wanted to be, then how much time you have
+- **survives in** 77 of 192 answer cells
+- **WITNESS FOUND** — a cell leaves only 6 survivors, too few to fill the slots
+  - answers: *Weekend blocks* · *Out in nature* · *Free to start* · *A solo pursuit*
 - **nearest competitors** (same pathway, by vector distance):
   - 2.83 — Kite surfing lessons
   - 3.74 — Skateboarding at a public park
   - 4.36 — Stand-up paddleboarding
+  - 4.58 — Section-hike a coastal path
   - 5.00 — Trail running and hillwalking
-  - 5.66 — Club road cycling
 
 #### Classical oil painting
 
 - **vector** Social 1 · Energy 2 · Creative 10 · Analytical 3 · Outdoors 1 · Novelty 6 · Stimulation 2
 - **tags** `long-term`, `5-hours-week`, `inside`, `at-home`, `solo`, `investment-required`
 - **survives in** 8 of 192 answer cells
-- **WITNESS FOUND** — earns rank 2 of 12 survivors
+- **WITNESS FOUND** — earns rank 3 of 15 survivors
   - answers: *A few solid hours* · *At home* · *Happy to invest properly* · *A solo pursuit*
 - **nearest competitors** (same pathway, by vector distance):
   - 1.41 — Build a miniature diorama
@@ -339,8 +480,8 @@ An even split of the 8 slots would give every row 10.5%. Printed for scale; it i
 
 - **vector** Social 1 · Energy 1 · Creative 7 · Analytical 9 · Outdoors 1 · Novelty 6 · Stimulation 3
 - **tags** `long-term`, `5-hours-week`, `inside`, `at-home`, `solo`, `free`
-- **survives in** 40 of 192 answer cells
-- **WITNESS FOUND** — a cell leaves only 4 survivors, too few to fill the slots
+- **survives in** 26 of 192 answer cells
+- **WITNESS FOUND** — a cell leaves only 7 survivors, too few to fill the slots
   - answers: *A few solid hours* · *At home* · *Free to start* · *A solo pursuit*
 - **nearest competitors** (same pathway, by vector distance):
   - 1.41 — Build a small tool you actually use
@@ -354,21 +495,35 @@ An even split of the 8 slots would give every row 10.5%. Printed for scale; it i
 - **vector** Social 2 · Energy 2 · Creative 3 · Analytical 8 · Outdoors 9 · Novelty 8 · Stimulation 3
 - **tags** `long-term`, `1-2-hours-week`, `outside`, `in-nature`, `solo`, `couple`, `investment-required`
 - **survives in** 12 of 192 answer cells
-- **WITNESS FOUND** — a cell leaves only 7 survivors, too few to fill the slots
-  - answers: *An hour or two, fitted around things* · *Out in nature* · *Happy to invest properly* · *Me and a mate*
+- **WITNESS FOUND** — earns rank 5 of 16 survivors
+  - answers: *An hour or two, fitted around things* · *Out in nature* · *Happy to invest properly* · *A solo pursuit*
 - **nearest competitors** (same pathway, by vector distance):
   - 2.65 — Foraging for wild plants
+  - 3.87 — Natural navigation
+  - 4.47 — Beachcombing and sea glass
   - 4.58 — Urban beekeeping
-  - 5.74 — Geocaching
-  - 6.16 — Small engine repair
-  - 6.63 — Orienteering in the park
+  - 4.80 — Churchyard and monument recording
+
+#### Tabletop roleplaying
+
+- **vector** Social 10 · Energy 1 · Creative 8 · Analytical 5 · Outdoors 1 · Novelty 7 · Stimulation 5
+- **tags** `long-term`, `1-2-hours-week`, `inside`, `at-home`, `facility`, `social`, `low-budget`
+- **survives in** 24 of 192 answer cells
+- **WITNESS FOUND** — a cell leaves only 8 survivors, too few to fill the slots
+  - answers: *An hour or two, fitted around things* · *At home* · *Some kit is fine* · *A club or community*
+- **nearest competitors** (same pathway, by vector distance):
+  - 3.46 — Storytelling and spoken-word nights
+  - 4.80 — Escape-room puzzles, built for your friends
+  - 5.00 — Singing in a local choir
+  - 6.08 — Join the repair cafe
+  - 6.32 — Close-up card and coin magic
 
 #### 3D printing and CAD
 
 - **vector** Social 1 · Energy 2 · Creative 7 · Analytical 9 · Outdoors 1 · Novelty 7 · Stimulation 3
 - **tags** `long-term`, `5-hours-week`, `inside`, `at-home`, `solo`, `investment-required`
 - **survives in** 8 of 192 answer cells
-- **WITNESS FOUND** — earns rank 6 of 12 survivors
+- **WITNESS FOUND** — earns rank 6 of 15 survivors
   - answers: *A few solid hours* · *At home* · *Happy to invest properly* · *A solo pursuit*
 - **nearest competitors** (same pathway, by vector distance):
   - 1.41 — Build a small tool you actually use
@@ -384,7 +539,7 @@ An even split of the 8 slots would give every row 10.5%. Printed for scale; it i
 - **survives in** 8 of 192 answer cells
 - ⚠️ **FULLY DARK** — no combination of a real answer cell and an achievable user puts this
   row inside the earned slots. It is reachable only as a wildcard.
-  - best placing it ever manages: **rank 9**, against 8 slots — one short
+  - best placing it ever manages: **rank 10**, against 8 slots
   - at: *An hour or two, fitted around things* · *At home* · *Happy to invest properly* · *A solo pursuit*
 - **nearest competitors** (same pathway, by vector distance):
   - 2.00 — Fermenting and kombucha brewing
@@ -397,8 +552,8 @@ An even split of the 8 slots would give every row 10.5%. Printed for scale; it i
 
 - **vector** Social 1 · Energy 2 · Creative 5 · Analytical 10 · Outdoors 2 · Novelty 7 · Stimulation 3
 - **tags** `long-term`, `5-hours-week`, `inside`, `at-home`, `solo`, `low-budget`
-- **survives in** 18 of 192 answer cells
-- **WITNESS FOUND** — a cell leaves only 6 survivors, too few to fill the slots
+- **survives in** 16 of 192 answer cells
+- **WITNESS FOUND** — earns rank 5 of 9 survivors
   - answers: *A few solid hours* · *At home* · *Some kit is fine* · *A solo pursuit*
 - **nearest competitors** (same pathway, by vector distance):
   - 2.00 — Build a small tool you actually use
@@ -412,82 +567,81 @@ An even split of the 8 slots would give every row 10.5%. Printed for scale; it i
 - **vector** Social 9 · Energy 10 · Creative 1 · Analytical 5 · Outdoors 8 · Novelty 7 · Stimulation 6
 - **tags** `long-term`, `5-hours-week`, `exertion`, `outside`, `facility`, `in-nature`, `social`, `investment-required`
 - **survives in** 12 of 192 answer cells
-- **WITNESS FOUND** — a cell leaves only 8 survivors, too few to fill the slots
+- **WITNESS FOUND** — earns rank 5 of 10 survivors
   - answers: *A few solid hours* · *A place I go - club, gym, studio* · *Happy to invest properly* · *A club or community*
 - **nearest competitors** (same pathway, by vector distance):
   - 4.00 — Club road cycling
+  - 4.24 — Chase a parkrun personal best
+  - 4.24 — Conservation workdays with a local trust
+  - 5.00 — Section-hike a coastal path
   - 5.29 — Rugby drills
-  - 5.29 — Scuba certification
-  - 6.16 — Open-water swimming
-  - 6.32 — Geocaching
 
 #### Orienteering in the park
 
 - **vector** Social 5 · Energy 7 · Creative 1 · Analytical 9 · Outdoors 9 · Novelty 7 · Stimulation 5
 - **tags** `long-term`, `weekend-blocks`, `exertion`, `outside`, `in-nature`, `solo`, `social`, `low-budget`
-- **survives in** 34 of 192 answer cells
-- **WITNESS FOUND** — a cell leaves only 6 survivors, too few to fill the slots
-  - answers: *Weekend blocks* · *At home* · *Some kit is fine* · *A solo pursuit*
-  - after relaxing: where you wanted to be
+- **survives in** 26 of 192 answer cells
+- **WITNESS FOUND** — earns rank 7 of 10 survivors
+  - answers: *Weekend blocks* · *Out in nature* · *Some kit is fine* · *A solo pursuit*
 - **nearest competitors** (same pathway, by vector distance):
   - 2.65 — Geocaching
+  - 3.00 — Fossil hunting on the coast
   - 3.87 — Urban beekeeping
-  - 5.39 — Foraging for wild plants
-  - 5.57 — Scuba certification
-  - 6.16 — Stand-up paddleboarding
+  - 4.24 — Section-hike a coastal path
+  - 5.20 — Natural navigation
 
 #### Build a cardboard automaton
 
 - **vector** Social 2 · Energy 2 · Creative 9 · Analytical 8 · Outdoors 1 · Novelty 8 · Stimulation 3
 - **tags** `long-term`, `1-2-hours-week`, `inside`, `at-home`, `solo`, `low-budget`
-- **survives in** 17 of 192 answer cells
+- **survives in** 16 of 192 answer cells
 - ⚠️ **FULLY DARK** — no combination of a real answer cell and an achievable user puts this
   row inside the earned slots. It is reachable only as a wildcard.
-  - best placing it ever manages: **rank 21**, against 8 slots
+  - best placing it ever manages: **rank 22**, against 8 slots
   - at: *An hour or two, fitted around things* · *At home* · *Some kit is fine* · *A solo pursuit*
 - **nearest competitors** (same pathway, by vector distance):
+  - 1.41 — One tiny game, finished, in Godot
   - 2.65 — 3D printing and CAD
+  - 3.16 — Video editing, properly, on free software
   - 3.32 — Web design and front-end coding
   - 3.46 — Build a mechanical keyboard
-  - 3.87 — Build a small tool you actually use
-  - 4.12 — Design an icon set
 
 #### Sport lockpicking
 
 - **vector** Social 1 · Energy 2 · Creative 2 · Analytical 9 · Outdoors 1 · Novelty 9 · Stimulation 4
 - **tags** `long-term`, `1-2-hours-week`, `inside`, `at-home`, `solo`, `low-budget`
-- **survives in** 17 of 192 answer cells
+- **survives in** 16 of 192 answer cells
 - ⚠️ **FULLY DARK** — no combination of a real answer cell and an achievable user puts this
   row inside the earned slots. It is reachable only as a wildcard.
-  - best placing it ever manages: **rank 13**, against 8 slots
+  - best placing it ever manages: **rank 15**, against 8 slots
   - at: *An hour or two, fitted around things* · *At home* · *Some kit is fine* · *A solo pursuit*
 - **nearest competitors** (same pathway, by vector distance):
   - 2.65 — Watchmaking and horology
+  - 2.65 — Resurrect an old laptop with Linux
   - 3.61 — Classic car market research
   - 3.61 — Antiquarian book collecting
   - 4.00 — Spanish language practice
-  - 4.00 — Build an Arduino weather station
 
 #### Kite surfing lessons
 
 - **vector** Social 5 · Energy 9 · Creative 2 · Analytical 5 · Outdoors 10 · Novelty 9 · Stimulation 10
 - **tags** `long-term`, `weekend-blocks`, `exertion`, `outside`, `in-nature`, `facility`, `social`, `investment-required`
-- **survives in** 14 of 192 answer cells
-- **WITNESS FOUND** — a cell leaves only 4 survivors, too few to fill the slots
+- **survives in** 13 of 192 answer cells
+- **WITNESS FOUND** — a cell leaves only 7 survivors, too few to fill the slots
   - answers: *Weekend blocks* · *A place I go - club, gym, studio* · *Happy to invest properly* · *A club or community*
 - **nearest competitors** (same pathway, by vector distance):
   - 2.83 — Open-water swimming
   - 4.90 — Skateboarding at a public park
   - 4.90 — Scuba certification
-  - 6.24 — Stand-up paddleboarding
-  - 6.48 — Rowing at a river club
+  - 5.57 — Section-hike a coastal path
+  - 6.16 — Chase a parkrun personal best
 
 #### Historical European martial arts
 
 - **vector** Social 8 · Energy 8 · Creative 2 · Analytical 7 · Outdoors 1 · Novelty 10 · Stimulation 8
 - **tags** `long-term`, `5-hours-week`, `exertion`, `inside`, `facility`, `social`, `investment-required`
 - **survives in** 8 of 192 answer cells
-- **WITNESS FOUND** — a cell leaves only 8 survivors, too few to fill the slots
+- **WITNESS FOUND** — earns rank 6 of 10 survivors
   - answers: *A few solid hours* · *A place I go - club, gym, studio* · *Happy to invest properly* · *A club or community*
 - **nearest competitors** (same pathway, by vector distance):
   - 3.61 — Parkour, at a class
@@ -501,22 +655,22 @@ An even split of the 8 slots would give every row 10.5%. Printed for scale; it i
 - **vector** Social 1 · Energy 1 · Creative 4 · Analytical 10 · Outdoors 1 · Novelty 9 · Stimulation 3
 - **tags** `long-term`, `5-hours-week`, `inside`, `at-home`, `solo`, `investment-required`
 - **survives in** 8 of 192 answer cells
-- **WITNESS FOUND** — earns rank 8 of 12 survivors
+- **WITNESS FOUND** — earns rank 8 of 15 survivors
   - answers: *A few solid hours* · *At home* · *Happy to invest properly* · *A solo pursuit*
 - **nearest competitors** (same pathway, by vector distance):
+  - 2.45 — Resurrect an old laptop with Linux
   - 2.65 — Build an Arduino weather station
   - 2.65 — Sport lockpicking
   - 3.87 — Build a small tool you actually use
   - 3.87 — 3D printing and CAD
-  - 4.24 — Build a mechanical keyboard
 
 #### A blacksmithing taster day
 
 - **vector** Social 5 · Energy 9 · Creative 7 · Analytical 4 · Outdoors 3 · Novelty 9 · Stimulation 7
 - **tags** `quick-fix`, `half-day`, `long-term`, `weekend-blocks`, `exertion`, `inside`, `outside`, `facility`, `solo`, `social`, `investment-required`
-- **survives in** 15 of 192 answer cells
+- **survives in** 13 of 192 answer cells
 - **WITNESS FOUND** — a cell leaves only 6 survivors, too few to fill the slots
-  - answers: *It'll take what it takes* · *A place I go - club, gym, studio* · *Happy to invest properly* · *A solo pursuit*
+  - answers: *Weekend blocks* · *A place I go - club, gym, studio* · *Happy to invest properly* · *A solo pursuit*
 - **nearest competitors** (same pathway, by vector distance):
   - 3.87 — A glassblowing taster class
   - 5.20 — Parkour, at a class
@@ -528,10 +682,9 @@ An even split of the 8 slots would give every row 10.5%. Printed for scale; it i
 
 - **vector** Social 7 · Energy 10 · Creative 3 · Analytical 5 · Outdoors 2 · Novelty 9 · Stimulation 9
 - **tags** `long-term`, `5-hours-week`, `exertion`, `inside`, `facility`, `social`, `low-budget`
-- **survives in** 19 of 192 answer cells
-- **WITNESS FOUND** — a cell leaves only 8 survivors, too few to fill the slots
-  - answers: *A few solid hours* · *At home* · *Some kit is fine* · *A club or community*
-  - after relaxing: where you wanted to be
+- **survives in** 17 of 192 answer cells
+- **WITNESS FOUND** — a cell leaves only 7 survivors, too few to fill the slots
+  - answers: *A few solid hours* · *A place I go - club, gym, studio* · *Some kit is fine* · *A club or community*
 - **nearest competitors** (same pathway, by vector distance):
   - 3.61 — Historical European martial arts
   - 3.87 — Olympic lifting, properly coached
@@ -543,8 +696,8 @@ An even split of the 8 slots would give every row 10.5%. Printed for scale; it i
 
 - **vector** Social 8 · Energy 7 · Creative 1 · Analytical 7 · Outdoors 9 · Novelty 10 · Stimulation 8
 - **tags** `long-term`, `weekend-blocks`, `exertion`, `outside`, `facility`, `in-nature`, `social`, `investment-required`
-- **survives in** 14 of 192 answer cells
-- **WITNESS FOUND** — a cell leaves only 4 survivors, too few to fill the slots
+- **survives in** 13 of 192 answer cells
+- **WITNESS FOUND** — a cell leaves only 7 survivors, too few to fill the slots
   - answers: *Weekend blocks* · *A place I go - club, gym, studio* · *Happy to invest properly* · *A club or community*
 - **nearest competitors** (same pathway, by vector distance):
   - 4.90 — Kite surfing lessons
@@ -552,6 +705,146 @@ An even split of the 8 slots would give every row 10.5%. Printed for scale; it i
   - 5.57 — Orienteering in the park
   - 5.66 — Open-water swimming
   - 5.66 — Urban beekeeping
+
+#### Conservation workdays with a local trust
+
+- **vector** Social 8 · Energy 8 · Creative 1 · Analytical 5 · Outdoors 10 · Novelty 7 · Stimulation 3
+- **tags** `long-term`, `weekend-blocks`, `5-hours-week`, `exertion`, `outside`, `facility`, `in-nature`, `solo`, `couple`, `social`, `free`
+- **survives in** 118 of 192 answer cells
+- **WITNESS FOUND** — a cell leaves only 4 survivors, too few to fill the slots
+  - answers: *Weekend blocks* · *A place I go - club, gym, studio* · *Free to start* · *A solo pursuit*
+- **nearest competitors** (same pathway, by vector distance):
+  - 3.61 — Section-hike a coastal path
+  - 4.24 — Rowing at a river club
+  - 4.36 — Litter-picking with a local group
+  - 4.69 — Club road cycling
+  - 4.69 — Geocaching
+
+#### Churchyard and monument recording
+
+- **vector** Social 5 · Energy 3 · Creative 1 · Analytical 8 · Outdoors 7 · Novelty 9 · Stimulation 1
+- **tags** `long-term`, `1-2-hours-week`, `weekend-blocks`, `outside`, `facility`, `in-nature`, `solo`, `couple`, `social`, `free`
+- **survives in** 113 of 192 answer cells
+- **WITNESS FOUND** — a cell leaves only 7 survivors, too few to fill the slots
+  - answers: *An hour or two, fitted around things* · *A place I go - club, gym, studio* · *Free to start* · *A solo pursuit*
+- **nearest competitors** (same pathway, by vector distance):
+  - 4.47 — Natural navigation
+  - 4.80 — Amateur astronomy
+  - 4.90 — Geocaching
+  - 4.90 — Urban beekeeping
+  - 5.00 — Become a heritage volunteer guide
+
+#### Storytelling and spoken-word nights
+
+- **vector** Social 8 · Energy 2 · Creative 9 · Analytical 4 · Outdoors 1 · Novelty 8 · Stimulation 7
+- **tags** `long-term`, `1-2-hours-week`, `inside`, `facility`, `solo`, `social`, `free`
+- **survives in** 36 of 192 answer cells
+- **WITNESS FOUND** — a cell leaves only 7 survivors, too few to fill the slots
+  - answers: *An hour or two, fitted around things* · *A place I go - club, gym, studio* · *Free to start* · *A solo pursuit*
+- **nearest competitors** (same pathway, by vector distance):
+  - 3.46 — Tabletop roleplaying
+  - 5.20 — Escape-room puzzles, built for your friends
+  - 5.29 — A glassblowing taster class
+  - 5.48 — Close-up card and coin magic
+  - 5.74 — Singing in a local choir
+
+#### Escape-room puzzles, built for your friends
+
+- **vector** Social 8 · Energy 1 · Creative 9 · Analytical 9 · Outdoors 1 · Novelty 8 · Stimulation 6
+- **tags** `long-term`, `1-2-hours-week`, `5-hours-week`, `inside`, `at-home`, `solo`, `social`, `free`
+- **survives in** 57 of 192 answer cells
+- **WITNESS FOUND** — a cell leaves only 7 survivors, too few to fill the slots
+  - answers: *A few solid hours* · *At home* · *Free to start* · *A solo pursuit*
+- **nearest competitors** (same pathway, by vector distance):
+  - 4.80 — Tabletop roleplaying
+  - 5.20 — Storytelling and spoken-word nights
+  - 6.32 — Join the repair cafe
+  - 6.40 — One tiny game, finished, in Godot
+  - 6.71 — Trace the family tree past 1900
+
+#### Resurrect an old laptop with Linux
+
+- **vector** Social 1 · Energy 1 · Creative 2 · Analytical 10 · Outdoors 1 · Novelty 8 · Stimulation 2
+- **tags** `long-term`, `weekend-blocks`, `1-2-hours-week`, `inside`, `at-home`, `solo`, `free`
+- **survives in** 36 of 192 answer cells
+- **WITNESS FOUND** — a cell leaves only 4 survivors, too few to fill the slots
+  - answers: *Weekend blocks* · *At home* · *Free to start* · *A solo pursuit*
+- **nearest competitors** (same pathway, by vector distance):
+  - 2.45 — Watchmaking and horology
+  - 2.65 — Sport lockpicking
+  - 3.16 — Classic car market research
+  - 3.61 — EV market analysis
+  - 3.61 — Build an Arduino weather station
+
+#### One tiny game, finished, in Godot
+
+- **vector** Social 2 · Energy 1 · Creative 9 · Analytical 8 · Outdoors 1 · Novelty 8 · Stimulation 4
+- **tags** `long-term`, `5-hours-week`, `weekend-blocks`, `inside`, `at-home`, `solo`, `free`
+- **survives in** 38 of 192 answer cells
+- **WITNESS FOUND** — a cell leaves only 7 survivors, too few to fill the slots
+  - answers: *A few solid hours* · *At home* · *Free to start* · *A solo pursuit*
+- **nearest competitors** (same pathway, by vector distance):
+  - 1.41 — Build a cardboard automaton
+  - 3.00 — 3D printing and CAD
+  - 3.16 — Video editing, properly, on free software
+  - 3.32 — Web design and front-end coding
+  - 3.74 — Build a mechanical keyboard
+
+#### Video editing, properly, on free software
+
+- **vector** Social 3 · Energy 1 · Creative 9 · Analytical 6 · Outdoors 1 · Novelty 6 · Stimulation 3
+- **tags** `long-term`, `5-hours-week`, `weekend-blocks`, `inside`, `at-home`, `solo`, `couple`, `free`
+- **survives in** 57 of 192 answer cells
+- **WITNESS FOUND** — a cell leaves only 7 survivors, too few to fill the slots
+  - answers: *A few solid hours* · *At home* · *Free to start* · *A solo pursuit*
+- **nearest competitors** (same pathway, by vector distance):
+  - 2.65 — Design an icon set
+  - 2.83 — Learning guitar
+  - 3.16 — Build a miniature diorama
+  - 3.16 — Build a cardboard automaton
+  - 3.16 — One tiny game, finished, in Godot
+
+#### Section-hike a coastal path
+
+- **vector** Social 5 · Energy 8 · Creative 1 · Analytical 5 · Outdoors 10 · Novelty 7 · Stimulation 5
+- **tags** `long-term`, `weekend-blocks`, `5-hours-week`, `exertion`, `outside`, `in-nature`, `solo`, `couple`, `social`, `free`
+- **survives in** 86 of 192 answer cells
+- **WITNESS FOUND** — a cell leaves only 6 survivors, too few to fill the slots
+  - answers: *A few solid hours* · *Out in nature* · *Free to start* · *A solo pursuit*
+- **nearest competitors** (same pathway, by vector distance):
+  - 2.45 — Stand-up paddleboarding
+  - 3.16 — Trail running and hillwalking
+  - 3.32 — Fossil hunting on the coast
+  - 3.61 — Geocaching
+  - 3.61 — Hiking and hillwalking
+
+#### Natural navigation
+
+- **vector** Social 3 · Energy 4 · Creative 1 · Analytical 9 · Outdoors 10 · Novelty 10 · Stimulation 3
+- **tags** `long-term`, `1-2-hours-week`, `5-hours-week`, `outside`, `in-nature`, `solo`, `couple`, `free`
+- **survives in** 60 of 192 answer cells
+- **WITNESS FOUND** — a cell leaves only 6 survivors, too few to fill the slots
+  - answers: *A few solid hours* · *Out in nature* · *Free to start* · *A solo pursuit*
+- **nearest competitors** (same pathway, by vector distance):
+  - 3.16 — Foraging for wild plants
+  - 3.74 — Fossil hunting on the coast
+  - 3.87 — Amateur astronomy
+  - 4.00 — Urban beekeeping
+  - 4.47 — Churchyard and monument recording
+
+#### Fossil hunting on the coast
+
+- **vector** Social 4 · Energy 6 · Creative 1 · Analytical 7 · Outdoors 10 · Novelty 8 · Stimulation 4
+- **tags** `long-term`, `weekend-blocks`, `5-hours-week`, `exertion`, `outside`, `in-nature`, `solo`, `couple`, `social`, `free`
+- **survives in** 86 of 192 answer cells
+- **WITNESS FOUND** — a cell leaves only 6 survivors, too few to fill the slots
+  - answers: *A few solid hours* · *Out in nature* · *Free to start* · *A solo pursuit*
+- **nearest competitors** (same pathway, by vector distance):
+  - 2.45 — Geocaching
+  - 2.83 — Urban beekeeping
+  - 3.00 — Orienteering in the park
+  - 3.16 — Foraging for wild plants
+  - 3.32 — Section-hike a coastal path
 
 ---
 
