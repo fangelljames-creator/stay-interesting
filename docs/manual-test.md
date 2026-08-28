@@ -124,6 +124,50 @@ node scripts/validate-activity-seed.mjs
 - [ ] **The match percentage never lies.** A card pushed down by rotation still displays
       its true `% match`, not a penalised one.
 
+## C2. Wave 2 — the cells that used to be empty
+
+Added 2026-08-28 with content wave 2. **⚠️ Every check here needs
+`supabase/wave-2-activities.sql` to have been run against the live database.** Until then
+the deployed app has 134 rows and all of these will fail for a content reason rather than
+a code one — check `select count(*) from public.activities;` reads **190** before
+concluding anything is broken.
+
+These were all at **zero survivors** before wave 2, which means the relaxation ladder was
+bending something on every single run. Nothing on screen said so, which is exactly why
+they need clicking rather than measuring.
+
+- [ ] **Free indoor movement, on your own.** Quick path: 10-15 minutes / get me moving /
+      staying in / just me / keep it free. Three ranked cards, all genuinely indoor, all
+      genuinely free, all actually physical.
+      *Was 1 survivor. The single most-requested-looking combination on the quick path.*
+- [ ] **Free indoor movement, with a few of us.** Same but "a few of us", and again at
+      "about an hour". Both must fill three cards.
+      *Was 0. The hour-long version is why the wave's one generated row exists.*
+- [ ] **Free outdoors, with company, low-key.** Quick path: 10-15 minutes / something
+      low-key / heading out / a few of us / keep it free.
+      *Was 0 at every budget tier — calm, outdoors and social was empty across the board.*
+- [ ] **A free half-day.** Quick path: half a day or more / something low-key / heading
+      out / just me / keep it free.
+      *Was 0. `half-day` was ten rows, nearly all of them strenuous and outdoors.*
+- [ ] **A free club or venue.** Hobby path: any time answer / a place I go - club, gym,
+      studio / free to start / any company answer.
+      *Was 0 for EVERY combination — all 18 facility rows were paid. This one hole caused
+      fifteen of the thirty-one hobby zero-cells on its own.*
+- [ ] **Weekend blocks at home.** Hobby path: weekend blocks / at home / free to start.
+      *Was 0 to 2.*
+- [ ] **⚠️ The two re-tagged rows moved, and one of them must not have moved alone.**
+      `Ten minutes of mobility work` and `A walk with no destination` both lost
+      `exertion`. So: answering **"something low-key"** on the quick path must now be able
+      to surface them, and answering **"get me moving"** must not.
+      *Verifies the tag corrections landed. If the walk appears under "get me moving", the
+      update half of the SQL block did not run — the insert half can succeed alone.*
+- [ ] **And the intersection they vacated is still populated.** Quick path, 10-15 minutes /
+      get me moving / staying in / just me / keep it free must still give three cards.
+      *⚠️ This is the check that catches the one real hazard in wave 2. The mobility row
+      was the only ten-minute indoor exertion activity in the catalogue; if its correction
+      is ever applied WITHOUT the wave's indoor-movement content, this cell empties and
+      nothing anywhere reports it.*
+
 ## D. Reroll
 
 - [ ] **The counter matches the buttons.** "N rerolls remaining" appears above the cards,

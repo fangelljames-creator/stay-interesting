@@ -252,7 +252,7 @@ with seed (title, description, tags, vector) as (
 
   ('A walk with no destination',
    'Headphones in, something long-form playing, and no decision to make beyond which way to turn at the end of the road. Turn back whenever you feel like it.',
-   array['quick-fix','1-hour','half-day','exertion','outside','in-nature','solo','free'],
+   array['quick-fix','1-hour','half-day','outside','in-nature','solo','couple','social','free'],
    array[1,4,1,1,8,3,1]),
 
   ('Reset one single surface',
@@ -262,7 +262,7 @@ with seed (title, description, tags, vector) as (
 
   ('Ten minutes of mobility work',
    'Hips, shoulders, spine, ankles. No equipment, no floor space beyond a body length. The kind of thing that feels pointless right up until the week you stop doing it.',
-   array['quick-fix','10-mins','exertion','inside','at-home','solo','free'],
+   array['quick-fix','10-mins','inside','at-home','solo','free'],
    array[1,4,1,2,1,2,1]),
 
   ('Photo walk down your own street',
@@ -905,7 +905,291 @@ with seed (title, description, tags, vector) as (
   ('Tie a half-Windsor',
    'Stand at the mirror and tie it until the knot comes out symmetrical and the tip lands at your belt. Two minutes once it clicks, and it stays learned.',
    array['quick-fix','10-mins','inside','at-home','solo','free'],
-   array[1,2,2,3,1,4,2])
+   array[1,2,2,3,1,4,2]),
+
+-- --- WAVE 2 (2026-08-28) --- starvation repair, 56 rows, all free.
+-- Rendered from data/waves/wave-2.json by scripts/build-wave.mjs. Do not hand-edit:
+-- edit the wave file and regenerate, or the review file stops describing the seed.
+
+  ('Dance flat-out to three songs',
+   'Curtains shut, volume up, three songs end to end with no stopping between them. It is a genuine cardio session disguised as a private disco, and nobody ever has to see it.',
+   array['quick-fix','10-mins','exertion','inside','at-home','solo','couple','social','free'],
+   array[5,8,4,1,1,2,6]),
+
+  ('A deck-of-cards workout',
+   'Each suit is an exercise and the number on the card is the reps. Shuffle, turn them over one at a time, and let a pack of cards decide how hard the next twenty minutes are going to be.',
+   array['quick-fix','10-mins','1-hour','exertion','inside','at-home','solo','couple','social','free'],
+   array[3,9,1,3,1,4,6]),
+
+  ('Animal walks across the living room',
+   'Bear crawl to the far wall, crab walk back, then go again without laughing. It is a proper full-body workout that any child in the house will join in with immediately and every adult regrets starting.',
+   array['quick-fix','10-mins','exertion','inside','at-home','solo','couple','social','free'],
+   array[6,8,2,1,1,7,5]),
+
+  ('Keep a balloon off the floor for five minutes',
+   'One balloon, five minutes, and the carpet is lava. It is sillier and considerably sweatier than it sounds, and it turns any room with two people in it into a sport.',
+   array['quick-fix','10-mins','exertion','inside','at-home','solo','couple','social','free'],
+   array[7,7,1,2,1,4,6]),
+
+  ('Follow a fifteen-minute beginner yoga flow',
+   'A mat is optional and a folded towel does the job. Fifteen minutes of following along is enough to find out which side of your body has quietly been doing all of the work.',
+   array['quick-fix','10-mins','exertion','inside','at-home','solo','free'],
+   array[1,6,1,2,1,3,1]),
+
+  ('A commercial-break workout',
+   'Pick one show and move every time the adverts come on: press-ups, squats, whatever you can stand. An hour later you have done a surprising amount of exercise and still seen the programme.',
+   array['quick-fix','1-hour','exertion','inside','at-home','solo','couple','social','free'],
+   array[3,7,1,2,1,5,3]),
+
+  ('Three salsa steps, solo',
+   'Basic, side, back, counted out loud like nobody is listening. Ten minutes in your own kitchen is the whole difference between dancing at the next wedding and shuffling apologetically near the bar.',
+   array['quick-fix','10-mins','exertion','inside','at-home','solo','free'],
+   array[2,6,4,3,1,6,4]),
+
+  ('A hundred backpack swings',
+   'Load a rucksack with books, hinge at the hips, and swing it between your legs and up to chest height. A hundred of those in sets of twenty explains exactly why kettlebells cost money.',
+   array['quick-fix','10-mins','exertion','inside','outside','at-home','solo','free'],
+   array[1,9,1,2,3,5,6]),
+
+  ('Stand up from the floor without using your hands',
+   'The sit-to-stand test is a real predictor of how well you are ageing and almost nobody passes it first go. Ten minutes of trying is a workout for muscles you had entirely forgotten about.',
+   array['quick-fix','10-mins','exertion','inside','at-home','solo','free'],
+   array[1,6,1,4,1,6,3]),
+
+  ('Behind-the-back throw and catch',
+   'Throw a tennis ball behind your back and catch it in front, ten clean reps in a row. It looks like showing off, feels like neither showing off nor sport, and then suddenly works.',
+   array['quick-fix','10-mins','exertion','inside','outside','at-home','solo','couple','free'],
+   array[3,5,2,4,3,6,4]),
+
+  ('An obstacle course built from the furniture',
+   'Cushions, chairs, a broom across two stools, and a rule that the floor is lava. Building it takes as long as running it, and the timed second lap is where the competitive streak arrives.',
+   array['quick-fix','1-hour','exertion','inside','at-home','solo','couple','social','free'],
+   array[7,8,6,3,1,7,6]),
+
+  ('Full-commitment hopscotch',
+   'Chalk the grid on the pavement properly, all ten squares, and commit to the single-leg landings. Any adult who plays for ten minutes discovers their balance is not what it was in 1994.',
+   array['quick-fix','10-mins','exertion','outside','solo','couple','social','free'],
+   array[6,7,3,4,7,4,5]),
+
+  ('Relearn the cartwheel on grass',
+   'Soft ground, low expectations, and somebody on hand to tell you your legs were nowhere near straight. Most people can still just about manage one, and finding out which group you are in takes a minute.',
+   array['quick-fix','10-mins','exertion','outside','in-nature','solo','couple','social','free'],
+   array[5,8,1,2,8,6,6]),
+
+  ('First-touch drills against a wall',
+   'Any ball, any wall, both feet, and no goalkeeper to blame. Twenty minutes of this does more for your first touch than a whole game does, which is precisely why nobody bothers.',
+   array['quick-fix','10-mins','1-hour','exertion','outside','solo','couple','free'],
+   array[3,7,1,4,7,3,5]),
+
+  ('How far can you walk in exactly fifteen minutes?',
+   'Set a timer, walk in one direction until it goes off, then find where you got to on a map. It quietly redraws how big you thought your own neighbourhood was.',
+   array['quick-fix','10-mins','exertion','outside','solo','couple','social','free'],
+   array[4,5,1,5,7,6,3]),
+
+  ('Watch a sunset start to finish',
+   'Phone in your pocket, from the first change of colour to the last. Nobody ever watches the whole thing, and the order the colours arrive in is not the order anyone would guess.',
+   array['quick-fix','10-mins','1-hour','outside','in-nature','solo','couple','social','free'],
+   array[4,2,2,2,9,3,1]),
+
+  ('Catch tonight''s ISS pass',
+   'Look up when the space station crosses your postcode, stand outside at the right minute, and wave. It takes about four minutes to go over and there are people on board.',
+   array['quick-fix','10-mins','outside','in-nature','solo','couple','social','free'],
+   array[5,2,1,5,9,8,3]),
+
+  ('Take a smell walk',
+   'One lap of the block, cataloguing five distinct smells and noting where each one starts and stops. It is the sense nobody uses on purpose, and your street turns out to have a map of them.',
+   array['quick-fix','10-mins','1-hour','outside','solo','couple','free'],
+   array[3,3,4,3,7,8,2]),
+
+  ('Find north four ways without a compass',
+   'The sun, the moss, the satellite dishes, and after dark the stars. Four independent methods that ought to agree with each other, and a genuinely useful thing to know when a phone dies.',
+   array['quick-fix','10-mins','1-hour','outside','in-nature','solo','couple','social','free'],
+   array[4,2,1,9,8,7,1]),
+
+  ('Age a hedge by counting its species',
+   'Hooper''s rule reckons one woody species per thirty-yard stretch is roughly a century of hedge. Count along a lane and you can date a boundary that predates every building near it.',
+   array['quick-fix','1-hour','outside','in-nature','solo','couple','social','free'],
+   array[4,3,1,8,9,9,1]),
+
+  ('A phone-stays-home walk',
+   'One block is plenty. The distance is not the point; the point is that for once nothing in your pocket can interrupt, and you notice how often you reach for it anyway.',
+   array['quick-fix','10-mins','1-hour','outside','solo','couple','social','free'],
+   array[4,4,1,1,8,5,1]),
+
+  ('Storyboard last year''s photo album',
+   'Go through a year of camera roll and pick the forty pictures that actually tell the story. It takes a whole afternoon, and the ones you choose are almost never the ones you posted.',
+   array['quick-fix','half-day','inside','at-home','solo','couple','free'],
+   array[3,1,6,5,1,3,2]),
+
+  ('Programme a themed trilogy night',
+   'Three films with one real thread between them, and a snack matched to each. The programming is half the fun and the whole evening costs nothing you do not already have in the house.',
+   array['quick-fix','half-day','inside','at-home','solo','couple','social','free'],
+   array[7,1,5,4,1,5,3]),
+
+  ('The wardrobe truth audit',
+   'Turn every hanger backwards today; in six months anything still facing the wrong way has not been worn. Setting it up takes an afternoon and settles an argument with yourself permanently.',
+   array['quick-fix','half-day','inside','at-home','solo','couple','free'],
+   array[2,3,2,6,1,3,2]),
+
+  ('Plan next year''s garden on paper',
+   'Graph paper, a seed catalogue, and the garden you actually have rather than the one you want. Even with no garden yet, an afternoon of this is how people end up on an allotment waiting list.',
+   array['quick-fix','half-day','inside','at-home','solo','couple','free'],
+   array[2,2,7,8,2,5,2]),
+
+  ('Take one inbox to zero',
+   'One account, top to bottom, unsubscribing as you go rather than archiving and hoping. It is a genuinely unpleasant afternoon and the quiet afterwards lasts about three months.',
+   array['quick-fix','half-day','inside','at-home','solo','free'],
+   array[1,1,1,6,1,1,2]),
+
+  ('Rank your top ten films, definitively',
+   'Not a list of good films but a ranked ten, with the arguments settled and the painful cuts made. Do it with somebody else and you will learn things about them you would rather not know.',
+   array['quick-fix','1-hour','half-day','inside','at-home','solo','couple','social','free'],
+   array[6,1,4,8,1,3,3]),
+
+  ('Design a no-spend weekend worth having',
+   'Zero pounds, a full schedule, and every item something you would genuinely look forward to. The constraint is the exercise: it turns out most of the good weekends were never the expensive ones.',
+   array['quick-fix','half-day','inside','at-home','solo','couple','social','free'],
+   array[6,2,6,6,4,6,2]),
+
+  ('Find your nearest trig point',
+   'Ordnance Survey left concrete pillars and small brass marks all over the country and there is one nearer to you than you think. Finding it is a treasure hunt that comes with an official answer sheet.',
+   array['quick-fix','half-day','outside','in-nature','solo','couple','social','free'],
+   array[4,5,1,6,9,8,4]),
+
+  ('Postbox spotting by royal cipher',
+   'Every British postbox carries the cipher of whoever was on the throne when it was cast, and a few Victorian ones are still in daily use. An afternoon''s walk turns your area into a timeline.',
+   array['quick-fix','1-hour','half-day','outside','solo','couple','social','free'],
+   array[5,4,1,7,6,9,1]),
+
+  ('Beachcombing and sea glass',
+   'Work a tideline slowly and keep whatever the sea has finished with: frosted glass, worn pottery, the odd fossil. Weeks of it fills a jar, and the good things only turn up after a storm.',
+   array['quick-fix','half-day','long-term','1-2-hours-week','outside','in-nature','solo','couple','social','free'],
+   array[3,4,3,5,10,6,2]),
+
+  ('Three card games you can teach anyone',
+   'Rummy, cheat, and whichever one your family plays badly. Ten minutes each to teach, and it means you are never again the person in the room who cannot join in.',
+   array['quick-fix','10-mins','1-hour','inside','at-home','couple','social','free'],
+   array[8,1,2,6,1,4,4]),
+
+  ('Count to ten in three new languages',
+   'Ten minutes gets you counting in three languages you do not speak, which is a party trick and, oddly, the thing that makes a foreign menu stop being frightening.',
+   array['quick-fix','10-mins','inside','at-home','solo','couple','social','free'],
+   array[4,1,1,6,1,8,2]),
+
+  ('Finally understand the offside rule',
+   'Either code, diagrams allowed, ten minutes with somebody who already knows. It is not actually complicated, and afterwards you can stop nodding vaguely during matches.',
+   array['quick-fix','10-mins','inside','at-home','solo','couple','social','free'],
+   array[5,1,1,8,1,6,2]),
+
+  ('Volunteer at parkrun before you race it',
+   'Marshalling a corner, scanning barcodes or handing out finish tokens, every Saturday morning. It is free, it is genuinely needed, and it is the least intimidating way into a running club there is.',
+   array['long-term','1-2-hours-week','outside','facility','in-nature','solo','couple','social','free'],
+   array[9,3,1,3,8,5,4]),
+
+  ('Chase a parkrun personal best',
+   'The same five kilometres, the same course, every Saturday, and a time that is yours to beat. It is free, weirdly emotional, and the gap between your first run and your tenth is bigger than you expect.',
+   array['long-term','1-2-hours-week','exertion','outside','facility','in-nature','solo','social','free'],
+   array[7,9,1,5,8,4,8]),
+
+  ('Join the repair cafe',
+   'A monthly session where people bring broken things and other people fix them, for nothing. Turn up as the fixer or the apprentice; either way you leave knowing something you did not that morning.',
+   array['long-term','1-2-hours-week','inside','facility','social','free'],
+   array[8,3,4,8,1,7,3]),
+
+  ('Litter-picking with a local group',
+   'Gloves, grabbers, and a river bank or verge that looks completely different two hours later. Councils lend the kit free, and the before-and-after photographs are more satisfying than they should be.',
+   array['long-term','1-2-hours-week','exertion','outside','facility','in-nature','social','free'],
+   array[8,6,1,3,9,4,2]),
+
+  ('Dog-walking at an animal shelter',
+   'Shelters are permanently short of people who will walk dogs and the induction takes an afternoon. You get the exercise, the dog gets the exercise, and neither of you has to talk about work.',
+   array['long-term','1-2-hours-week','5-hours-week','exertion','outside','facility','in-nature','solo','social','free'],
+   array[5,7,1,2,8,5,4]),
+
+  ('A book club that actually finishes books',
+   'Either find one or start one with that single rule written down. Libraries and pubs host them for nothing, and the difference between a book club and a wine night is entirely whether anyone read it.',
+   array['long-term','1-2-hours-week','inside','at-home','facility','social','free'],
+   array[9,1,3,6,1,4,3]),
+
+  ('Become a heritage volunteer guide',
+   'Pick one building, a chapel or a mill or a lighthouse, and learn it well enough to walk strangers round it. The training is free and given gladly, because these places are always short of guides.',
+   array['long-term','1-2-hours-week','weekend-blocks','inside','outside','facility','solo','social','free'],
+   array[8,3,2,7,4,8,3]),
+
+  ('Befriend an isolated neighbour through a charity',
+   'A weekly call or a visit, arranged and supported by a befriending charity so that neither of you goes in cold. It costs an hour, and it is one of the few things here that somebody is waiting for.',
+   array['long-term','1-2-hours-week','inside','at-home','facility','couple','free'],
+   array[8,1,2,2,1,6,2]),
+
+  ('Conservation workdays with a local trust',
+   'River cleans, coppicing, hedge-laying and scrub clearance, with every tool provided and somebody to show you how. A Sunday of it leaves you filthy, aching and unreasonably pleased with yourself.',
+   array['long-term','weekend-blocks','5-hours-week','exertion','outside','facility','in-nature','solo','couple','social','free'],
+   array[8,8,1,5,10,7,3]),
+
+  ('Churchyard and monument recording',
+   'Local history societies need stones read, photographed and transcribed before the lettering weathers away. It is slow, free and outdoors, and the record outlasts the thing you recorded.',
+   array['long-term','1-2-hours-week','weekend-blocks','outside','facility','in-nature','solo','couple','social','free'],
+   array[5,3,1,8,7,9,1]),
+
+  ('Adopt a local museum, room by room',
+   'One museum, every room, properly, across a whole season rather than in a single exhausted afternoon. Most local museums are free and almost nobody has ever read all the labels in one.',
+   array['long-term','1-2-hours-week','weekend-blocks','inside','facility','solo','couple','free'],
+   array[4,2,1,6,1,6,2]),
+
+  ('Storytelling and spoken-word nights',
+   'Write it, time it to five minutes, and tell it to a room. Open-mic nights are free to enter and free to watch, and the first one is terrifying in a way that turns out to be useful.',
+   array['long-term','1-2-hours-week','inside','facility','solo','social','free'],
+   array[8,2,9,4,1,8,7]),
+
+  ('Become a school governor',
+   'Termly meetings, a real vote, and shared responsibility for a budget and a headteacher. Schools are chronically short of governors, the training is free, and nobody expects you to know education.',
+   array['long-term','1-2-hours-week','inside','facility','social','free'],
+   array[8,1,2,9,1,7,3]),
+
+  ('Propagate and trade houseplant cuttings',
+   'Take cuttings, root them in water on the windowsill, and swap the survivors with other people doing the same. It costs nothing, it works, and plant people give things away with alarming generosity.',
+   array['long-term','1-2-hours-week','inside','at-home','solo','couple','social','free'],
+   array[6,2,4,5,2,6,2]),
+
+  ('Escape-room puzzles, built for your friends',
+   'Ciphers, locks, a story and a one-hour limit, run in your own front room. Being the villain is most of the appeal, and paper-and-string puzzles beat anything you can buy in a box.',
+   array['long-term','1-2-hours-week','5-hours-week','inside','at-home','solo','social','free'],
+   array[8,1,9,9,1,8,6]),
+
+  ('Trace the family tree past 1900',
+   'Free census indexes, birth records and parish registers get most people back to the 1830s without paying anybody. Expect at least one surprise and at least one ancestor who lied on a form.',
+   array['long-term','1-2-hours-week','weekend-blocks','inside','at-home','solo','couple','free'],
+   array[5,1,4,8,1,7,3]),
+
+  ('Resurrect an old laptop with Linux',
+   'A machine too slow for Windows is usually perfectly quick under Linux, and the install is a free download and one afternoon. You end up with a working laptop and a skill that keeps.',
+   array['long-term','weekend-blocks','1-2-hours-week','inside','at-home','solo','free'],
+   array[1,1,2,10,1,8,2]),
+
+  ('One tiny game, finished, in Godot',
+   'The engine is free and the tutorials are endless; the hard part is stopping. Aim at something playable in a weekend, one mechanic and one screen, because finished beats ambitious every single time.',
+   array['long-term','5-hours-week','weekend-blocks','inside','at-home','solo','free'],
+   array[2,1,9,8,1,8,4]),
+
+  ('Video editing, properly, on free software',
+   'DaVinci Resolve costs nothing and does what the film industry does. Cut something real, a holiday or a friend''s band, because tutorials teach the buttons and only projects teach the timing.',
+   array['long-term','5-hours-week','weekend-blocks','inside','at-home','solo','couple','free'],
+   array[3,1,9,6,1,6,3]),
+
+  ('Section-hike a coastal path',
+   'One stretch at a time, ticked off on a map over a year or three, ending wherever the bus goes from. The walking is free; the only real cost is getting yourself back to where you stopped.',
+   array['long-term','weekend-blocks','5-hours-week','exertion','outside','in-nature','solo','couple','social','free'],
+   array[5,8,1,5,10,7,5]),
+
+  ('Natural navigation',
+   'Finding your way by the sun, the stars, wind-shaped trees and which side of the trunk the moss is on. It is free, it is very old, and it turns an ordinary walk into an exam you set yourself.',
+   array['long-term','1-2-hours-week','5-hours-week','outside','in-nature','solo','couple','free'],
+   array[3,4,1,9,10,10,3]),
+
+  ('Fossil hunting on the coast',
+   'Jurassic beaches give up ammonites to anybody who turns up after a storm and looks at the right layer of the cliff fall. Free, legal on most beaches, and you are the first person ever to see it.',
+   array['long-term','weekend-blocks','5-hours-week','exertion','outside','in-nature','solo','couple','social','free'],
+   array[4,6,1,7,10,8,4])
 
 )
 insert into public.activities (title, description, tags, vector)
