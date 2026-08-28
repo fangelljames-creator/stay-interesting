@@ -363,15 +363,31 @@ happen inside one results view; that key is about what to push down on the user'
 results really can be reached with no vector. Nothing can rank then, so the survivors are shown
 unordered with no `matchPercent` and the page says why. Do not "tidy" this into an empty state.
 
-**Coverage today (re-measured 2026-08-26, after wave 1):** the quick path starts below 3 survivors
-on **33%** of its 324 answer combinations (57 at zero), the hobby path on **34%** of 192 (31 at
-zero). Before wave 1 those were 44% and 43% over a 20-activity pool; the catalogue tripling to 134
-took roughly ten points off each, which is exactly the "it solves itself as the catalogue grows"
-prediction being borne out. Still not a tagging fault — five simultaneous hard filters cannot do
-much better — and relaxation absorbs it (no combination ends up empty at runtime).
-`scripts/validate-activity-seed.mjs` reports it.
-**Not being padded with hand-written activities**: the catalogue is heading for thousands, at
-which point starvation largely evaporates on its own.
+**Coverage today (re-measured 2026-08-28, after wave 2):** the quick path starts below 3 survivors
+on **3%** of its 324 answer combinations (7 at zero), the hobby path on **7%** of 192 (3 at zero).
+
+The trajectory is the whole story, and it settles an argument this file used to hedge:
+
+| | pool | quick | hobby |
+|---|---|---|---|
+| before wave 1 | 37 | 44% | 43% |
+| after wave 1 | 134 | 33% | 34% |
+| after wave 2 | 191 | **3%** | **7%** |
+
+⚠️ **Wave 1's ten points came from sheer size; wave 2's thirty came from AIM.** Wave 1 tripled the
+catalogue and moved starvation about ten points, which looked like "it solves itself as the
+catalogue grows". Wave 2 added 43% more rows and took another thirty points off — because it was
+the first wave authored against `scripts/report-starvation.mjs` and the tag-intersection grid
+rather than against an even spread of topics. Growth helps; growth **pointed at the empty
+intersections** helps an order of magnitude more. Do not read the remaining few percent as
+something the next wave will incidentally mop up.
+
+Still not a tagging fault — five simultaneous hard filters cannot do much better — and relaxation
+absorbs the remainder (no combination ends up empty at runtime).
+`scripts/validate-activity-seed.mjs` reports the headline; `scripts/report-starvation.mjs` reports
+which cells, which is what a wave should actually be authored from.
+**Not being padded with hand-written filler**: every row is a real activity a real person could do
+this week.
 ### 2. Vector quiz — `components/PersonalityQuiz.tsx`
 
 - Axis order is a fixed invariant everywhere:
@@ -879,13 +895,14 @@ which case the starved cells choose the topics and the map is a tiebreaker, not 
   is that a tag no filter reads must not exist — but if waves 2+ bring more urban-outdoor
   activities, this becomes a real hole in the hobby path's setting question.
 
-### The live database — wave 1 confirmed present, 2026-08-26; ⚠️ wave 2 NOT yet run
+### The live database — in step with the seed at 191 rows, 2026-08-28
 
-⚠️ **The seed SQL holds 191 rows as of wave 2 (2026-08-28) and the live database holds 134.** They
-are out of step until `supabase/wave-2-activities.sql` is pasted into the Supabase SQL editor. That
-file is idempotent and carries both the 57 new rows and the two tag corrections in **one** block —
-see the mobility-work warning in the wave-2 entry for why those must not be separated. The
-verification queries are at the bottom of the file: expect **191 rows, 0 missing_vector**.
+**Wave 1 run 2026-08-26, wave 2 run 2026-08-28**, both confirmed by Owen. The seed SQL and the live
+database both hold **191 rows**. `supabase/wave-1-activities.sql` and
+`supabase/wave-2-activities.sql` are both idempotent, so re-running either is safe if a count ever
+comes back short, and the verification queries sit at the bottom of each. Wave 2's block carries its
+57 new rows **and** the two tag corrections together — see the mobility-work warning in the wave-2
+entry for why those must never be separated.
 
 The **canonical seed SQL is the source of truth**, and `content-wave-1` was
 merged into `main` on 2026-08-26 so the repo matched what was deployed at that point. This section
@@ -1115,17 +1132,29 @@ Median relaxed pool is 6 (quick) and 7 (hobby), so most searches end on their fi
 in the row's favour, which can only ever find *more* witnesses — so anything still called fully dark
 really is.
 
-**First run, against the 134-row seed, fit-only:** 24 MERIT-DARK rows (6 quick-fix, 18 long-term),
-of which **3 are fully dark** — no real cell and no achievable user places them in the earned 8:
+**Latest run, against the 191-row seed after wave 2, fit-only:** **41 MERIT-DARK rows** (11
+quick-fix, 30 long-term), of which the same **3 are fully dark** — no real cell and no achievable
+user places them in the earned 8:
 
-| activity | best placing ever | nearest competitor |
+| activity | best placing, 134 rows | best placing, 191 rows |
 |---|---|---|
-| Build a mechanical keyboard | rank 9, one short | 2.00 — Fermenting and kombucha brewing |
-| Sport lockpicking | rank 13 | — |
-| Build a cardboard automaton | rank 21 | — |
+| Build a mechanical keyboard | rank 9, one short | **rank 10** |
+| Sport lockpicking | rank 13 | **rank 15** |
+| Build a cardboard automaton | rank 21 | **rank 22** |
 
-All three are long-term, and the keyboard is one slot short. **Nothing has been done about them —
-that is Owen's decision.**
+All three are long-term. **Nothing has been done about them — that is Owen's decision.**
+
+⚠️ **DARKNESS GETS WORSE WITH EVERY WAVE, BY CONSTRUCTION, AND THAT IS NOT A REGRESSION.**
+MERIT-DARK went 24 → 41 across wave 2 and all three fully-dark rows slipped a place or two. "Earned"
+means inside the top 8 **on fit**, and 57 new rows are 57 new competitors for the same eight slots.
+Expect a large fraction of the catalogue to be merit-dark at ~500 rows.
+
+⚠️ **Do not read this alongside the starvation numbers as one health metric — they move in
+opposite directions on purpose.** Starvation asks *can this user be answered honestly at all*, and
+falls as the catalogue grows (3% and 7% after wave 2). Darkness asks *does this row ever win on
+fit*, and rises. A wave that improved both would be suspicious. Nothing goes invisible either way:
+the wildcard draws at random from the raw pathway pool and obeys no ranking, no filter and no budget
+answer.
 
 ## Personality quiz scoring
 
@@ -1495,11 +1524,9 @@ stays publicly readable with no write policy.
 corrections, taking the canonical seed from 134 to 191 rows — 100 quick-fix, 99 long-term, 8
 carrying both.** Approved by Owen at both gates. Full campaign context under **The campaign** above.
 
-⚠️ **NOT YET RUN AGAINST THE LIVE DATABASE.** `supabase/wave-2-activities.sql` is written and
-idempotent but has to be pasted into the Supabase SQL editor by hand. Until it is, the deployed app
-serves 134 rows and the two mis-tagged rows are still mis-tagged. The post-run ritual — starvation
-report, axis histogram, `audit-activity-reachability.mjs` — is **outstanding** and its deltas belong
-in this entry once Owen confirms the run.
+**Run against the live database 2026-08-28**, confirmed by Owen. `supabase/wave-2-activities.sql`
+is idempotent and re-runnable if the count ever comes back short. The post-run ritual is done and
+its deltas are at the end of this entry.
 
 - **Aimed at starvation, not at topic coverage**, and it is the first wave with the instrument to do
   that. `scripts/report-starvation.mjs` and `scripts/lib/starvation.mjs` were built first.
@@ -1562,6 +1589,43 @@ as a tidy-up on its own, they will regress the quick path and nothing will repor
   **5.0% → 2.4%**, nowhere near the 10% line at which a threshold stops de-duplicating and starts
   thinning. The closest surviving pairs are all pre-existing seed rows.
 - **Axis balance: Social 12 → 22, Outdoors 16 → 29, Energy 17 → 30.** All seven dev scripts pass.
+
+### Post-run deltas, measured 2026-08-28 after the SQL landed
+
+| | Before (134 rows) | After (191 rows) |
+|---|---|---|
+| quick starved cells | 106 of 324 (33%), 57 at zero | **11 of 324 (3%), 7 at zero** |
+| hobby starved cells | 66 of 192 (34%), 31 at zero | **14 of 192 (7%), 3 at zero** |
+| P1 / P2 / P3 cells | 60 / 21 / 91 | **9 / 4 / 12** — P2 has none left at zero |
+| dominant Social | 12 (9.0%) | **22 (11.5%)** |
+| dominant Outdoors | 16 (11.9%) | **29 (15.2%)** |
+| dominant Energy | 17 (12.7%) | **30 (15.7%)** |
+| dominant Stimulation | 3 (2.2%) | **3 (1.6%)** — see the wave-3 brief |
+| pairs merged by D = 3.0 | quick 5.0%, long 2.1% | **quick 2.4%, long 1.5%** |
+| cost-ceiling monotonicity | — | OK over all 344 adjacent pairs |
+
+**D is healthier, not strained.** The share of pairs it merges nearly halved, which is the opposite
+of what a wave full of twins would do, and it stays far below the 10% line at which a threshold
+stops de-duplicating and starts thinning. The closest surviving pairs are all pre-existing seed rows.
+
+⚠️ **REACHABILITY WENT THE OTHER WAY, AND THIS IS THE FINDING WORTH KEEPING.** MERIT-DARK rows rose
+**24 → 41** (quick-fix 6 → 11, long-term 18 → 30), and the three fully-dark rows are still dark with
+their best placings *worse*: `Build a mechanical keyboard` rank 9 → 10, `Sport lockpicking` 13 → 15,
+`Build a cardboard automaton` 21 → 22.
+
+That is arithmetic, not a defect: "earned" means inside the top 8 **on fit**, and adding 57 rows
+adds 57 more competitors for the same eight slots. The median relaxed pool also grew — quick 6 →
+10.5, hobby 7 → 11 — which is exactly what the starvation numbers are reporting from the other side.
+
+⚠️ **So do not carry the starvation prediction across to reachability.** `CLAUDE.md` says
+starvation "mostly solves itself" as the catalogue grows, and wave 2 confirms that emphatically.
+**Darkness does the opposite and gets worse with every wave**, by construction. At ~500 rows a large
+fraction of the catalogue will be merit-dark, and that will be normal rather than alarming — nothing
+is invisible, because the wildcard draws from the raw pathway pool and obeys no ranking at all. The
+two numbers move in opposite directions and must not be read as one health metric.
+
+The audit is still the **fit-only, no-`diverseSelect`** regime the script's own header flags, so
+this dark list remains a lower bound. Teaching it about the greedy pass is still outstanding work.
 
 ### ⚠️ The brief for wave 3
 
