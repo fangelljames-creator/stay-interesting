@@ -26,13 +26,16 @@ click-through:
 
 ```bash
 npx tsc --noEmit
-npm run lint                              # 7 known errors in app/page.tsx, no more
+npm run lint                              # 6 known errors in app/page.tsx, no more
 node scripts/verify-taste-radar.mjs
 node scripts/verify-activity-matching.mjs
 node scripts/analyze-quiz-balance.mjs
 node scripts/verify-results-selection.mjs
 node scripts/validate-activity-seed.mjs
 ```
+
+*The lint count was 7 until `personality-types` moved the selection pipeline out of
+`app/page.tsx`, which took one `any` with it.*
 
 ---
 
@@ -355,3 +358,97 @@ that hybrid; else the pure dominant axis. Judged on raw sums, never averages.
       `data/personality-types-review.md`. The Detour-Taker sits at Energy 18, so nothing in
       its copy may promise anything strenuous; The League Secretary sits at Outdoors 11, so
       nothing outdoors. This is the check no script can do.
+
+---
+
+# Part 3 — Viewport fit
+
+**The rule: every interactive stage — hero, personality quiz, chooser, feasibility questions —
+fits one viewport, and the page itself never scrolls.** Results is the one deliberate exception;
+it keeps full descriptions and is allowed to scroll on a phone.
+
+How the layout holds that, so a failure can be read rather than guessed at:
+
+- The shell is `100dvh` (not `vh`, so a collapsing mobile URL bar cannot leave a stage short)
+  and a flex column: header band pinned, stage filling the middle, footer pinned.
+- **Vertical density is keyed to viewport HEIGHT**, through the `tall` (>= 700px) and
+  `taller` (>= 1000px) variants in `app/globals.css` — not to `sm`/`md`, which are width. This
+  was found by measuring: keyed to width, a 1440x900 laptop took the roomiest tier and the quiz's
+  Q4 overflowed by 151px. Type SIZE stays on width tiers, because it decides line wrapping.
+- Each options list is its own `overflow-y-auto` region. When everything fits it does nothing
+  and no scrollbar appears; when it does not, **the list scrolls and the page still does not**.
+
+Use the browser's device toolbar (F12 -> Ctrl+Shift+M) and set the sizes exactly.
+
+## O. Zero page scroll on every interactive stage
+
+- [ ] **360 x 640 — the binding case.** Walk hero -> quiz -> chooser -> feasibility. At no point
+      does the page scroll, and no stage has a scrollbar. Check the browser never shows a
+      horizontal scrollbar either.
+- [ ] **Q4 of the personality quiz shows all five options at 360 x 640**, the fifth one
+      ("Sketch your way in", the longest description in the quiz) fully readable without
+      scrolling anything. *This is the tightest thing in the product; if any single check here
+      earns its place it is this one.*
+- [ ] **390 x 844.** Same walk, same result, with visibly more breathing room — this is above the
+      700px line so padding and type step up a tier.
+- [ ] **320 x 568.** The narrow floor. Nothing is clipped and nothing overflows sideways. The
+      options list may scroll internally here; the page must not.
+- [ ] **`/quiz` standalone holds the same rule.** Open `localhost:3000/quiz` directly at
+      360 x 640 and check Q4 the same way. This page pays for a title and subtitle the funnel
+      does not, so its heading block compresses harder — and below 800px of height its subtitle
+      is hidden. That is the one place in this work where readable text is dropped rather than
+      compressed: it is the page's own preamble, never any part of the quiz, and it returns above
+      800px.
+- [ ] **Every option description is complete** at every size above. Compression is padding, gaps
+      and type scale only — no truncation, no ellipsis, no "..." anywhere.
+
+## P. The landscape floor
+
+- [ ] **640 x 360 (phone on its side).** The question and the progress bar stay pinned at the top
+      while the options list scrolls under them. The page itself still does not scroll.
+- [ ] **The hero at 640 x 360** scrolls inside its own area rather than the page. This is the one
+      stage that cannot fit that height: the hero radar is held at 288px because `demo` mode
+      draws axis labels that scale with it, and below ~280px the axis names stop being legible.
+      Shrinking it to fit would cost the hero the thing it uses the chart to say.
+
+## Q. Scroll discipline
+
+- [ ] **Every stage transition lands at the top.** The reliable way to see this fail: get to
+      results on a phone size, scroll to the bottom, click "Try a different path". The chooser
+      must appear from its top, not mid-page.
+- [ ] **Landing on results starts at the top with the first card fully visible** — including the
+      slower case where the Supabase fetch takes a moment, since the reset also runs when
+      loading finishes.
+- [ ] **Question 4 never opens at question 3's scroll position.** At a size small enough that the
+      options list scrolls (320 x 568, or landscape), scroll the list to the bottom, answer, and
+      confirm the next question's list starts at its top.
+
+## R. Desktop results in one screen
+
+- [ ] **1440 x 900.** The three ranked cards sit in one row with the wildcard full-width beneath.
+      *Measured honestly: at 1440x900 this is still about **87px** short of one screen, and it is
+      one screen from roughly **980px** of viewport height. The remaining 87px is the three cards'
+      full descriptions, which stay. Going from 238px over to 87px came from slimming the profile
+      strip, dropping the duplicate `<h1>` on this stage, and — the big one — letting the
+      full-width wildcard keep the roomy badge cap instead of the grid's narrow one.*
+- [ ] **The badge cluster is still pinned top-right on all four cards**, including the wildcard
+      with its 57-character sentence. In the three-up grid each card is only ~330px wide, so the
+      cluster's width cap tightens again at `lg` — if a title is being squeezed to one word per
+      line, that cap is the thing to look at.
+- [ ] **The profile card is the slim strip on desktop** — small radar, title, full description —
+      and still reads as the thing the match percentages were measured against.
+- [ ] **Mobile results still stack vertically** with full descriptions, and scrolling them is
+      expected.
+
+## S. The collapsed mobile header
+
+- [ ] **Below 640px wide the auth form is a single "Log in" button.** Tapping it opens a panel
+      under the band; tapping "Close" dismisses it. *This exists because the inline form was
+      ~342px of non-wrapping content against the 328px a 360px phone has — it overflowed
+      sideways on every stage.*
+- [ ] **Opening the panel does not move the stage underneath it.** It is absolutely positioned
+      precisely so it costs no height.
+- [ ] **The small "STAY INTERESTING" wordmark restarts the funnel** when clicked. On a phone the
+      large `<h1>` is hidden — it cost ~72px, which is most of what Q4 needed — so the wordmark
+      is the only restart affordance there.
+- [ ] **At 640px wide and up the inline email/password form is back**, unchanged.

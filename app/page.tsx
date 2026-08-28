@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useReducer, SubmitEvent } from "react";
+import { useState, useEffect, useReducer, useRef, SubmitEvent } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import PersonalityQuiz from "@/components/PersonalityQuiz";
 import TasteRadar from "@/components/TasteRadar";
@@ -25,6 +25,7 @@ import {
   rerollsRemaining,
   resultCardsOf,
   EMPTY_REROLL_STATE,
+  type RerollActivity,
 } from "@/lib/rerollMachine";
 
 /**
@@ -78,6 +79,14 @@ export default function Home() {
   const [authPassword, setAuthPassword] = useState("");
   const [isSigningUp, setIsSigningUp] = useState(false);
   const [authMessage, setAuthMessage] = useState("");
+  /**
+   * Mobile only. The inline auth form is two inputs and two buttons in a
+   * non-wrapping row — about 342px against the 328px a 360px phone actually
+   * has — so below `sm` it collapses to a single "Log in" button and opens
+   * from here. The panel is absolutely positioned, so opening it costs the
+   * stage no height at all.
+   */
+  const [showAuthPanel, setShowAuthPanel] = useState(false);
 
   const [stage, setStage] = useState<FunnelStage>("loading");
   const [quizSession, setQuizSession] = useState<QuizSession | null>(null);
@@ -98,6 +107,17 @@ export default function Home() {
   const { shown: shownActivities, wildcard } = results;
   const rerollsLeft = rerollsRemaining(results);
   const [isLoading, setIsLoading] = useState(false);
+
+  /**
+   * The feasibility options are their own scroll region, exactly as the
+   * personality quiz's are, so they carry their own scroll position that
+   * window.scrollTo cannot reach. Reset on every question so question 4 never
+   * opens at question 3's offset.
+   */
+  const questionOptionsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    questionOptionsRef.current?.scrollTo({ top: 0 });
+  }, [currentStep]);
   
   // Activity ids are uuid strings (activities.id defaults to gen_random_uuid()),
   // not integers. These were typed as number and happened to work only because
@@ -138,6 +158,30 @@ export default function Home() {
     setQuizSession(stored);
     setStage(stored ? "chooser" : "hero");
   }, []);
+
+  /**
+   * SCROLL DISCIPLINE. No stage ever inherits the previous stage's scroll
+   * position.
+   *
+   * This is not belt-and-braces. "results" is the one stage that scrolls the
+   * document, and every other stage is a fixed-height shell — so leaving
+   * results scrolled halfway down and returning to the chooser would leave
+   * the window offset with a 100dvh stage that has nothing below the fold to
+   * show for it.
+   *
+   * `isLoading` is in the deps because results arrive asynchronously: the
+   * stage flips to "results" while the fetch is still in flight, so resetting
+   * only on `stage` would run against a spinner and leave the real list to
+   * appear wherever the user happened to be. Landing on results has to put the
+   * first card at the top.
+   *
+   * The options lists inside the quiz and the feasibility questions carry
+   * their own scroll positions, which the window cannot reach; those are reset
+   * by ref where they live.
+   */
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [stage, isLoading]);
 
   const fetchSavedActivities = async (userId: string) => {
     const { data: savedData, error: savedError } = await supabase
@@ -183,6 +227,7 @@ export default function Home() {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     setShowSavedModal(false);
+    setShowAuthPanel(false);
   };
 
   const toggleSaveActivity = async (activityId: string) => {
@@ -221,6 +266,20 @@ export default function Home() {
   const progress = path ? Math.round((currentStep / activeQuiz.length) * 100) : 0;
 
   const resultCards = resultCardsOf(results);
+
+  /**
+   * The same cards, split by kind, because they are laid out differently on a
+   * desktop: the three ranked ones go in a row and the wildcard runs full-width
+   * beneath them.
+   *
+   * ⚠️ `filter` PRESERVES ORDER, and that is what keeps this safe.
+   * resultCardsOf returns [...shown, wildcard], so dropping the wildcard leaves
+   * the ranked cards at exactly the indices they had before — which is what
+   * rerollCard(index) and the medal helpers read. Sorting or rebuilding this
+   * list would silently reroll the wrong card.
+   */
+  const rankedCards = resultCards.filter((activity) => !activity.isWildcard);
+  const wildcardCard = resultCards.find((activity) => activity.isWildcard);
 
   // The profile behind the ranking, for the card at the top of the results.
   // Null when storage is blocked and there is no session — the same condition
@@ -470,8 +529,181 @@ export default function Home() {
     }
   };
 
+  /**
+   * One result card. Extracted from the results JSX purely so the three ranked
+   * cards and the wildcard can be rendered in two different places — a grid on
+   * `lg` and a full-width row beneath it — without the card's markup existing
+   * twice. Nothing about a card changed in the move.
+   *
+   * ⚠️ `index` MEANS RANK, and both of its consumers depend on that:
+   * rerollCard(index) dispatches against results.shown by position, and
+   * getMedalStyles/getMedalText read it as 1st/2nd/3rd. The wildcard is passed
+   * an index past the end, which both medal helpers ignore because they branch
+   * on isWildcard first.
+   */
+  const renderResultCard = (activity: RerollActivity, index: number) => {
+    const isSaved = savedActivityIds.includes(activity.id);
+    return (
+      <div
+        key={`${activity.id}-${index}`}
+        className={`p-4 tall:p-5 taller:p-6 rounded-2xl shadow-sm border transition-all transform hover:-translate-y-1 relative overflow-hidden
+          ${activity.isWildcard ? 'bg-white border-purple-200' : 'bg-white border-slate-200 hover:shadow-md'}
+        `}
+      >
+        {/*
+          THE BADGE CLUSTER IS PINNED TOP-RIGHT ON EVERY CARD.
+          It used to sit in a `flex-wrap justify-between` row, so
+          a long title pushed it onto its own line and a short
+          one left it beside the title -- the position moved
+          with the content, which reads as a layout bug when two
+          cards in the same list disagree.
+
+          ⚠️ Pinned with flex, NOT with `absolute top-6 right-6`,
+          and the difference matters at the sizes this app is
+          actually used at. An absolutely positioned cluster does
+          not participate in the card's height, and it cannot
+          reserve space for itself: the title would need a fixed
+          right padding matched to a cluster whose width varies
+          by card. On the WILDCARD card that breaks outright --
+          its badge is a 57-character sentence, so at 375px the
+          cluster is taller than the header and would lie across
+          the description.
+
+          Here the two are siblings in a non-wrapping row, so
+          they share the width instead of competing for it:
+          `shrink-0` plus a max-width keeps the cluster's corner
+          fixed and lets it wrap INTERNALLY when narrow, while
+          `min-w-0 flex-1` gives the title whatever is left and
+          lets it wrap. Overlap is impossible and the row grows
+          to fit the taller of the two.
+        */}
+        <div className="flex flex-nowrap justify-between items-start gap-3 mb-3 sm:mb-4">
+          <h3 className={`text-lg sm:text-xl font-bold min-w-0 flex-1 ${activity.isWildcard ? 'text-purple-900' : 'text-slate-900'}`}>
+            {activity.title}
+          </h3>
+
+          {/*
+            max-w-32 (128px) and text-lg below `sm` are MEASURED,
+            not guessed. At a 371px viewport the card gives the
+            header 276px, and the split decides how tall the card
+            gets: the longest catalogue title ("Learn a
+            two-player card game neither of you knows", 49 chars)
+            runs to 8 lines and a 224px header if the cluster
+            takes 168px, against 4 lines and 118px at 128px.
+            Above `sm` the cluster fits on one row well inside
+            20rem, so the cap stops constraining and the title
+            takes the rest.
+
+            ⚠️ AND THE CAP COMES BACK AT `lg` FOR THE RANKED CARDS ONLY,
+            because that is where the three of them go into a row. A card in
+            that grid is about 330px wide inside its padding — near enough the
+            371px phone the 128px cap was measured against, and nowhere near
+            the full-width card the 20rem cap assumes. Left at 20rem the
+            cluster would take the whole header row and squeeze the title to
+            nothing.
+
+            ⚠️ THE WILDCARD IS EXCLUDED FROM THAT, and it is not a detail. It
+            renders full-width BENEATH the grid, so it has the room the 20rem
+            cap assumes — and it is the one card whose badge is a 57-character
+            sentence. Capped at 128px that badge stacked into a four-row
+            cluster and the card grew to 300px, on its own about two thirds of
+            what the desktop results view was over budget by.
+          */}
+          <div className={`flex flex-wrap items-center justify-end gap-2 shrink-0 max-w-32 sm:max-w-[20rem] ${activity.isWildcard ? '' : 'lg:max-w-32'}`}>
+            {typeof activity.matchPercent === "number" && (
+              <span
+                title="How closely this matches your personality vector"
+                className="border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap"
+              >
+                {Math.round(activity.matchPercent)}% match
+              </span>
+            )}
+            <span className={`border text-xs font-bold px-4 py-1.5 rounded-full ${activity.isWildcard ? '' : 'whitespace-nowrap'} ${getMedalStyles(index, activity.isWildcard)}`}>
+              {getMedalText(index, activity.isWildcard)}
+            </span>
+
+            {/*
+              REMOVED, not disabled, when the counter hits 0 --
+              and all three go together, because they share one
+              counter. The wildcard is not part of this system:
+              it keeps its own independent refresh below, which
+              costs no reroll.
+            */}
+            {!activity.isWildcard && rerollsLeft > 0 && (
+              <button
+                onClick={() => rerollCard(index)}
+                title={`Swap this one out for good. ${rerollsLeft} reroll${rerollsLeft === 1 ? "" : "s"} left.`}
+                className="border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-900 text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap transition-colors"
+              >
+                ↻ Reroll
+              </button>
+            )}
+
+            {activity.isWildcard && wildcardRefreshAvailable && (
+              <button
+                onClick={refreshWildcard}
+                title="Draw another one at random. This one will not come back."
+                className="border border-purple-200 bg-purple-50 text-purple-600 hover:bg-purple-100 hover:text-purple-900 text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap transition-colors"
+              >
+                ↻ Another
+              </button>
+            )}
+
+            <button
+              onClick={() => toggleSaveActivity(activity.id)}
+              title={isSaved ? "Saved!" : "Save to list"}
+              className={`p-2 rounded-full border transition-all ${
+                isSaved
+                  ? 'bg-rose-50 border-rose-200 text-rose-600'
+                  : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-rose-500'
+              }`}
+            >
+              {isSaved ? "♥" : "♡"}
+            </button>
+          </div>
+        </div>
+
+        {/*
+          FULL DESCRIPTION, at every size. The results list is the one place
+          allowed to be taller than the screen on a phone, precisely so this
+          does not have to be truncated to fit.
+        */}
+        <p className="text-slate-600 leading-relaxed text-sm md:text-base">
+          {activity.description}
+        </p>
+      </div>
+    );
+  };
+
+  /**
+   * TWO SHELL REGIMES.
+   *
+   * Every stage but the results is FITTED: a fixed `100dvh` flex column that
+   * cannot scroll, with the stage filling what is left between the header band
+   * and the footer. `dvh` rather than `vh` because a mobile URL bar collapsing
+   * must not leave the stage short of the screen it was sized against.
+   *
+   * The results stage is the one deliberate exception. Its cards keep their
+   * full descriptions, so on a phone that list is honestly taller than the
+   * screen and scrolling it is the accepted trade — see docs/manual-test.md.
+   *
+   * ⚠️ `overflow-hidden` below is a BACKSTOP, not the fitting mechanism.
+   * Clipping is a silent failure: nothing throws, nothing warns, the content
+   * is simply not there — the same trap the radar's axis labels fell into when
+   * LABEL_SPACE was too small and they read "imulation". What actually absorbs
+   * a stage that does not fit is the `overflow-y-auto` options region inside
+   * it, which scrolls the list instead of losing it.
+   */
+  const isFitted = stage !== "results";
+
   return (
-    <main className="min-h-screen bg-slate-50 flex flex-col items-center justify-between p-4 md:p-8 relative">
+    <main
+      className={`bg-slate-50 flex flex-col items-center px-3 sm:px-4 md:px-8 relative ${
+        isFitted
+          ? "h-[100dvh] overflow-hidden py-2 tall:py-4 taller:py-8"
+          : "min-h-[100dvh] py-4 taller:py-8"
+      }`}
+    >
       
       {/* Saved Modal Overlay */}
       {showSavedModal && (
@@ -516,9 +748,23 @@ export default function Home() {
       )}
 
       {/* Top Header with Auth & Saved List Button */}
-      <div className="w-full max-w-2xl flex justify-between items-center mb-4">
-        <div className="flex items-center gap-3">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">Stay Interesting</h2>
+      <div className="shrink-0 w-full max-w-2xl flex justify-between items-center gap-2 mb-2 sm:mb-4 relative">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          {/*
+            THE WORDMARK IS THE RESTART AFFORDANCE ON MOBILE. The large <h1>
+            below is hidden under `sm` on every stage but the hero — it cost
+            about 72px, which is most of what Q4's five options needed to fit a
+            360x640 screen — so the click target it carried has to live
+            somewhere. It lives here, on the name that is on screen anyway.
+            Above `sm` both exist and both restart; the duplication is harmless
+            because they say the same thing.
+          */}
+          <h2
+            onClick={restart}
+            className="text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-blue-600 cursor-pointer transition-colors whitespace-nowrap"
+          >
+            Stay Interesting
+          </h2>
           {user && (
             <button
               onClick={() => setShowSavedModal(true)}
@@ -538,75 +784,167 @@ export default function Home() {
               </button>
             </div>
           ) : (
-            <form onSubmit={handleAuth} className="flex gap-2 items-center">
-              <input
-                type="email"
-                placeholder="Email"
-                value={authEmail}
-                onChange={(e) => setAuthEmail(e.target.value)}
-                required
-                className="px-2.5 py-1 text-xs border rounded-lg bg-white text-slate-800 w-28 sm:w-36 focus:outline-blue-500"
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                value={authPassword}
-                onChange={(e) => setAuthPassword(e.target.value)}
-                required
-                className="px-2.5 py-1 text-xs border rounded-lg bg-white text-slate-800 w-24 sm:w-28 focus:outline-blue-500"
-              />
-              <button type="submit" className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1 text-xs font-bold rounded-lg transition-colors">
+            <>
+              {/*
+                MOBILE: one button. The inline form below is four controls in a
+                row that will not wrap — two inputs at w-28 and w-24, a submit
+                and a toggle, about 342px of content against the 328px a 360px
+                phone leaves after the page padding. Inputs will not shrink
+                below their intrinsic size, so that was a real horizontal
+                overflow on the narrowest phones, on every stage, before any of
+                the vertical work here.
+              */}
+              <button
+                type="button"
+                onClick={() => setShowAuthPanel((open) => !open)}
+                className="sm:hidden bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap"
+              >
+                {showAuthPanel ? "Close" : "Log in"}
+              </button>
+
+              <form onSubmit={handleAuth} className="hidden sm:flex gap-2 items-center">
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  required
+                  className="px-2.5 py-1 text-xs border rounded-lg bg-white text-slate-800 w-28 sm:w-36 focus:outline-blue-500"
+                />
+                <input
+                  type="password"
+                  placeholder="Password"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  required
+                  className="px-2.5 py-1 text-xs border rounded-lg bg-white text-slate-800 w-24 sm:w-28 focus:outline-blue-500"
+                />
+                <button type="submit" className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1 text-xs font-bold rounded-lg transition-colors">
+                  {isSigningUp ? "Sign Up" : "Log In"}
+                </button>
+                <button type="button" onClick={() => setIsSigningUp(!isSigningUp)} className="text-[10px] text-blue-600 underline whitespace-nowrap">
+                  {isSigningUp ? "Have account?" : "New user?"}
+                </button>
+              </form>
+            </>
+          )}
+        </div>
+
+        {/*
+          The mobile panel. ABSOLUTELY POSITIONED on purpose: it has to cost the
+          stage below it no height at all, or opening it would push a fitted
+          stage past the bottom of the screen — the one thing this layout is
+          for. z-40 keeps it above the stage and below the saved-list modal.
+        */}
+        {!user && showAuthPanel && (
+          <form
+            onSubmit={handleAuth}
+            className="sm:hidden absolute top-full right-0 mt-2 z-40 w-64 bg-white border border-slate-200 rounded-xl shadow-xl p-3 flex flex-col gap-2 animate-in fade-in slide-in-from-top-2 duration-200"
+          >
+            <input
+              type="email"
+              placeholder="Email"
+              value={authEmail}
+              onChange={(e) => setAuthEmail(e.target.value)}
+              required
+              className="px-2.5 py-1.5 text-xs border rounded-lg bg-white text-slate-800 w-full focus:outline-blue-500"
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={authPassword}
+              onChange={(e) => setAuthPassword(e.target.value)}
+              required
+              className="px-2.5 py-1.5 text-xs border rounded-lg bg-white text-slate-800 w-full focus:outline-blue-500"
+            />
+            <div className="flex items-center justify-between gap-2">
+              <button type="submit" className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 text-xs font-bold rounded-lg transition-colors">
                 {isSigningUp ? "Sign Up" : "Log In"}
               </button>
               <button type="button" onClick={() => setIsSigningUp(!isSigningUp)} className="text-[10px] text-blue-600 underline whitespace-nowrap">
                 {isSigningUp ? "Have account?" : "New user?"}
               </button>
-            </form>
-          )}
-        </div>
+            </div>
+            {/*
+              The message renders INSIDE the panel on mobile. It used to sit
+              under the header band, where it pushed every stage down by its own
+              height the moment a sign-up succeeded.
+            */}
+            {authMessage && <p className="text-[11px] text-amber-600 font-medium">{authMessage}</p>}
+          </form>
+        )}
       </div>
-      {authMessage && <p className="text-xs text-center text-amber-600 font-medium mb-2">{authMessage}</p>}
+      {authMessage && <p className="hidden sm:block shrink-0 text-xs text-center text-amber-600 font-medium mb-2">{authMessage}</p>}
 
-      <div className="max-w-2xl w-full text-center space-y-8 my-auto">
+      <div
+        className={`w-full text-center ${
+          stage === "results" ? "max-w-2xl lg:max-w-6xl" : "max-w-2xl"
+        } ${isFitted ? "flex min-h-0 flex-1 flex-col" : "my-auto"}`}
+      >
         {/*
           Hidden on the hero, which sets the name itself and at hero scale.
           Two "Stay Interesting" headings stacked on one screen reads as a bug
           rather than as branding.
+
+          AND HIDDEN BELOW `sm` EVERYWHERE. At 36px of type plus its margin it
+          cost about 72px, which is most of the gap between Q4's five options
+          and a 640px screen — and it is the purest chrome on the page, since
+          the wordmark in the band above says the same word and now carries the
+          same restart click. `space-y-8` went with it: it was stacking a 32px
+          gap on top of this heading's own mb-8, for 64px between the name and
+          the stage.
         */}
         {stage !== "hero" && (
-          <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight mb-8 cursor-pointer hover:text-blue-600 transition-colors" onClick={restart}>
+          <h1 className={`${stage === "results" ? "hidden taller:block" : "hidden sm:block"} shrink-0 text-2xl tall:text-3xl taller:text-5xl font-extrabold text-slate-900 tracking-tight mb-3 tall:mb-4 taller:mb-8 cursor-pointer hover:text-blue-600 transition-colors`} onClick={restart}>
             Stay Interesting
           </h1>
         )}
 
         {stage === "loading" && (
-          <div className="flex flex-col items-center justify-center py-16 space-y-4">
+          <div className="flex flex-1 flex-col items-center justify-center py-16 space-y-4">
             <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin" />
           </div>
         )}
 
         {stage === "hero" && (
-          <div className="animate-in fade-in duration-700 text-left">
-            <div className="flex flex-col md:flex-row md:items-center gap-8 md:gap-12">
+          /*
+            `overflow-y-auto` on the column with `my-auto` on the child is the
+            centring pattern that survives overflow: auto margins collapse to
+            zero when there is no free space, so at the floor tier the hero
+            scrolls from its true top instead of having its head cut off, which
+            is what `justify-center` would do.
+          */
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          <div className="w-full my-auto animate-in fade-in duration-700 text-left">
+            <div className="flex flex-col md:flex-row md:items-center gap-y-3 tall:gap-y-6 gap-x-0 md:gap-x-12">
               <div className="flex-1">
-                <h1 className="text-5xl md:text-6xl font-extrabold text-slate-900 tracking-tight">
+                <h1 className="text-3xl sm:text-4xl md:text-6xl font-extrabold text-slate-900 tracking-tight">
                   Stay Interesting
                 </h1>
 
-                <p className="text-lg md:text-xl text-slate-700 font-medium mt-4 leading-snug">
+                <p className="text-base sm:text-lg md:text-xl text-slate-700 font-medium mt-2 tall:mt-3 taller:mt-4 leading-snug">
                   Beat the boredom you are in right now, or find a hobby that actually sticks.
                 </p>
 
-                <p className="text-slate-500 mt-3 leading-relaxed">
+                <p className="text-xs sm:text-sm md:text-base text-slate-500 mt-2 taller:mt-3 leading-relaxed">
                   First answer a few quick scenarios so we can learn what would best suit you as
                   a person, and then we will give you the ability to outline some key conditions.
                 </p>
 
-                <div className="flex flex-wrap gap-2 mt-6">
+                {/*
+                  ⚠️ THE THREE CHIPS MUST STAY ON ONE ROW AT 360px, and the
+                  padding here is what buys that. Measured: at px-3 they come to
+                  340px against the 321px a 360px phone leaves, so they wrapped
+                  to a second row — 34px of pure whitespace, which was over half
+                  the hero's overrun at 360x640. At px-2 with gap-1.5 they total
+                  ~312px and sit on one line. Widening either of these, or
+                  lengthening a chip's text, puts the second row back.
+                */}
+                <div className="flex flex-wrap gap-1.5 sm:gap-2 mt-3 tall:mt-4 taller:mt-6">
                   {["~2 minutes", "no wrong answers", "skip anything"].map((chip) => (
                     <span
                       key={chip}
-                      className="text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-full px-3 py-1.5"
+                      className="text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-full px-2 sm:px-3 py-1 tall:py-1.5"
                     >
                       {chip}
                     </span>
@@ -621,32 +959,47 @@ export default function Home() {
                 */}
                 <button
                   onClick={() => setStage("quiz")}
-                  className="w-full sm:w-auto mt-8 px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-200 hover:-translate-y-0.5"
+                  className="w-full sm:w-auto mt-3 tall:mt-6 taller:mt-8 px-8 py-3 tall:py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-200 hover:-translate-y-0.5"
                 >
                   Find out what suits you →
                 </button>
               </div>
 
               {/*
-                The motif, selling itself. Four example shapes on a loop: the
+                The motif, selling itself. Fifteen example shapes on a loop: the
                 point being made is that this measures something specific about
                 a person, which a static chart cannot say.
+
+                ⚠️ THIS IS THE ONE RADAR THAT CANNOT BE SHRUNK TO BUY HEIGHT,
+                and the reason is in lib/radarGeometry.ts rather than in taste.
+                `demo` mode draws axis labels, so its viewBox is
+                (RADIUS + LABEL_SPACE) * 2 = 368 units around a 200-unit ring,
+                and the 11-unit label text scales with the box: ~9.6px rendered
+                at 320px wide, ~7.2px at 240, ~4.8px at 160. Below roughly 280px
+                the axis names stop being readable, and the names are the entire
+                reason the hero shows a chart at all — a shape with unreadable
+                labels says nothing about what is being measured.
+
+                So it holds at 288px on a phone and the hero's height comes out
+                of the copy's type scale above instead.
               */}
-              <div className="shrink-0 self-center">
+              <div className="shrink-0 self-center w-72 sm:w-80 md:w-[320px]">
                 <TasteRadar mode="demo" />
               </div>
             </div>
           </div>
+          </div>
         )}
 
         {stage === "quiz" && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="flex min-h-0 flex-1 flex-col animate-in fade-in slide-in-from-bottom-4 duration-500">
             <PersonalityQuiz onContinue={handleQuizComplete} />
           </div>
         )}
 
         {stage === "chooser" && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          <div className="w-full my-auto space-y-4 tall:space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/*
               THE RETURNING-VISITOR BANNER. Someone reaching the chooser has
               already earned a vector, so the hero's pitch is spent on them --
@@ -660,15 +1013,15 @@ export default function Home() {
               thing it would undo.
             */}
             {quizSession && (
-              <div className="flex items-center gap-4 text-left bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-                <div className="shrink-0">
+              <div className="flex items-center gap-3 sm:gap-4 text-left bg-white border border-slate-200 rounded-2xl p-3 tall:p-4 shadow-sm">
+                <div className="shrink-0 w-14 sm:w-[72px]">
                   <TasteRadar mode="building" vector={sessionUserVector(quizSession)} size={72} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                     Your taste map
                   </p>
-                  <p className="text-lg font-bold text-slate-900 leading-tight truncate">
+                  <p className="text-base sm:text-lg font-bold text-slate-900 leading-tight truncate">
                     {determinePersonalityType(quizSession.totals).title}
                   </p>
                   <button
@@ -681,16 +1034,16 @@ export default function Home() {
               </div>
             )}
 
-            <h2 className="text-2xl font-bold text-slate-800 mb-8">What brings you here today?</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <button onClick={() => choosePath("bored")} className="bg-white p-8 rounded-2xl shadow-sm border-2 border-slate-100 hover:border-blue-500 hover:shadow-md transition-all text-left group">
-                <h3 className="text-xl font-bold text-slate-900 mb-2 group-hover:text-blue-600">I'm Bored</h3>
-                <p className="text-slate-500 text-sm leading-relaxed">Quick tasks, micro-productivity, and immediate activities to do right now.</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-800 mb-4 tall:mb-6 taller:mb-8">What brings you here today?</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 tall:gap-4">
+              <button onClick={() => choosePath("bored")} className="bg-white p-5 tall:p-6 taller:p-8 rounded-2xl shadow-sm border-2 border-slate-100 hover:border-blue-500 hover:shadow-md transition-all text-left group">
+                <h3 className="text-lg sm:text-xl font-bold text-slate-900 mb-1 tall:mb-2 group-hover:text-blue-600">I'm Bored</h3>
+                <p className="text-slate-500 text-xs sm:text-sm leading-relaxed">Quick tasks, micro-productivity, and immediate activities to do right now.</p>
               </button>
 
-              <button onClick={() => choosePath("hobby")} className="bg-white p-8 rounded-2xl shadow-sm border-2 border-slate-100 hover:border-green-500 hover:shadow-md transition-all text-left group">
-                <h3 className="text-xl font-bold text-slate-900 mb-2 group-hover:text-green-600">Find a Hobby</h3>
-                <p className="text-slate-500 text-sm leading-relaxed">Discover a new ongoing passion tailored to your schedule, domain, and budget.</p>
+              <button onClick={() => choosePath("hobby")} className="bg-white p-5 tall:p-6 taller:p-8 rounded-2xl shadow-sm border-2 border-slate-100 hover:border-green-500 hover:shadow-md transition-all text-left group">
+                <h3 className="text-lg sm:text-xl font-bold text-slate-900 mb-1 tall:mb-2 group-hover:text-green-600">Find a Hobby</h3>
+                <p className="text-slate-500 text-xs sm:text-sm leading-relaxed">Discover a new ongoing passion tailored to your schedule, domain, and budget.</p>
               </button>
             </div>
 
@@ -710,45 +1063,66 @@ export default function Home() {
               </button>
             )}
           </div>
+          </div>
         )}
 
         {stage === "questions" && path !== null && (
-          <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 relative animate-in fade-in zoom-in-95 duration-300">
+          <div className="flex min-h-0 flex-1 flex-col bg-white p-4 tall:p-6 taller:p-8 rounded-3xl shadow-sm border border-slate-100 relative overflow-hidden animate-in fade-in zoom-in-95 duration-300">
             <div className="absolute top-0 left-0 w-full h-1.5 bg-slate-100 rounded-t-3xl overflow-hidden">
               <div className={`h-full transition-all duration-500 ease-out ${path === 'bored' ? 'bg-blue-500' : 'bg-green-500'}`} style={{ width: `${progress}%` }} />
             </div>
 
-            <button onClick={handleBack} className="absolute top-6 left-6 text-slate-400 hover:text-slate-900 font-semibold text-sm flex items-center transition-colors">
-              ← Back
-            </button>
-
-            <p className={`text-sm font-bold uppercase tracking-wider mb-3 mt-8 ${path === 'bored' ? 'text-blue-500' : 'text-green-500'}`}>
-              Question {currentStep + 1} of {activeQuiz.length}
-            </p>
-            
-            <h2 className="text-2xl md:text-3xl font-bold text-slate-800 mb-8 leading-tight">
-              {activeQuiz[currentStep].question}
-            </h2>
-
-            <div className="flex flex-col space-y-3">
-              {activeQuiz[currentStep].options.map((option, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleAnswer(option.action)}
-                  className={`w-full text-left px-6 py-4 rounded-xl border-2 border-slate-100 transition-all font-medium text-slate-700
-                    ${path === 'bored' ? 'hover:border-blue-500 hover:bg-blue-50' : 'hover:border-green-500 hover:bg-green-50'}
-                  `}
-                >
-                  {option.text}
+            {/*
+              The header band, pinned. Back used to be `absolute top-6 left-6`
+              with the counter carrying `mt-8` to clear it — which meant the
+              card reserved a whole row of height for a button that was not in
+              the flow, and the clearance had to be re-guessed every time the
+              padding changed. As a normal row it costs nothing extra and
+              matches the personality quiz's band exactly.
+            */}
+            <div className="shrink-0">
+              <div className="flex items-center justify-between gap-4 mt-2">
+                <p className={`text-xs sm:text-sm font-bold uppercase tracking-wider ${path === 'bored' ? 'text-blue-500' : 'text-green-500'}`}>
+                  Question {currentStep + 1} of {activeQuiz.length}
+                </p>
+                <button onClick={handleBack} className="text-sm font-semibold text-slate-400 hover:text-slate-900 transition-colors">
+                  ← Back
                 </button>
-              ))}
+              </div>
+
+              <h2 className="text-lg sm:text-2xl md:text-3xl font-bold text-slate-800 mt-2 mb-3 tall:mb-5 taller:mb-8 leading-tight text-left">
+                {activeQuiz[currentStep].question}
+              </h2>
+            </div>
+
+            {/*
+              The same scroll region the personality quiz uses. These options
+              are short — four at most, none over 36 characters — so this never
+              scrolls on a phone in portrait. It is here for the landscape
+              floor, where the question and the progress bar stay pinned and
+              only the list moves.
+            */}
+            <div ref={questionOptionsRef} className="min-h-0 flex-1 overflow-y-auto -mx-1 px-1">
+              <div className="flex flex-col space-y-2 tall:space-y-3">
+                {activeQuiz[currentStep].options.map((option, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleAnswer(option.action)}
+                    className={`w-full text-left px-4 sm:px-6 py-3 tall:py-4 rounded-xl border-2 border-slate-100 transition-all font-medium text-sm sm:text-base text-slate-700
+                      ${path === 'bored' ? 'hover:border-blue-500 hover:bg-blue-50' : 'hover:border-green-500 hover:bg-green-50'}
+                    `}
+                  >
+                    {option.text}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
 
         {stage === "results" && (
-          <div className="space-y-6 text-left animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h2 className="text-3xl font-bold text-slate-900 text-center">Your Curated Results</h2>
+          <div className="space-y-3 tall:space-y-4 text-left animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 text-center">Your Curated Results</h2>
 
             {/*
               WHY THE PROFILE IS REPEATED HERE. The user met their type once, on
@@ -765,8 +1139,20 @@ export default function Home() {
               Claiming a personality type in that state would be inventing one.
             */}
             {quizSession && profile && (
-              <div className="flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-7 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
-                <div className="shrink-0 self-center">
+              /*
+                SLIMMER ON `lg`, because that is where the three ranked cards
+                sit in a row and the whole results view is meant to land on one
+                screen. At its full size this card is ~230px of the ~900px a
+                laptop has, which is most of the reason it did not fit.
+
+                The copy is NOT cut — every word of the type description is
+                still here, at a smaller size. The radar drops from 210px to
+                110px, which `final` mode can afford far better than the hero's
+                `demo` can: see the note on the hero radar above for why that
+                one has a hard floor and this one does not.
+              */
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-7 lg:gap-5 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 tall:p-5">
+                <div className="shrink-0 self-center w-[180px] sm:w-[210px] lg:w-20">
                   <TasteRadar
                     mode="final"
                     vector={sessionUserVector(quizSession)}
@@ -778,10 +1164,10 @@ export default function Home() {
                   <p className="text-xs font-bold uppercase tracking-wider text-indigo-500 mb-1">
                     Ranked against
                   </p>
-                  <h3 className="text-2xl font-extrabold text-slate-900 leading-tight mb-2">
+                  <h3 className="text-xl sm:text-2xl lg:text-xl font-extrabold text-slate-900 leading-tight mb-1 sm:mb-2">
                     {profile.title}
                   </h3>
-                  <p className="text-slate-600 leading-relaxed">{profile.description}</p>
+                  <p className="text-sm sm:text-base lg:text-sm text-slate-600 leading-relaxed">{profile.description}</p>
                 </div>
               </div>
             )}
@@ -823,7 +1209,7 @@ export default function Home() {
                 <p className="text-slate-500 font-medium">Curating rotating matches...</p>
               </div>
             ) : (
-              <div className="space-y-5">
+              <div className="space-y-3 tall:space-y-4">
                 {/*
                   ONE SHARED COUNTER for all three ranked cards. It exists
                   because the reroll pool is usually smaller than five: the
@@ -859,121 +1245,26 @@ export default function Home() {
                   </div>
                 )}
 
-                {resultCards.map((activity, index) => {
-                  const isSaved = savedActivityIds.includes(activity.id);
-                  return (
-                    <div
-                      key={`${activity.id}-${index}`} 
-                      className={`p-6 rounded-2xl shadow-sm border transition-all transform hover:-translate-y-1 relative overflow-hidden
-                        ${activity.isWildcard ? 'bg-white border-purple-200' : 'bg-white border-slate-200 hover:shadow-md'}
-                      `}
-                    >
-                      {/*
-                        THE BADGE CLUSTER IS PINNED TOP-RIGHT ON EVERY CARD.
-                        It used to sit in a `flex-wrap justify-between` row, so
-                        a long title pushed it onto its own line and a short
-                        one left it beside the title -- the position moved
-                        with the content, which reads as a layout bug when two
-                        cards in the same list disagree.
+                {/*
+                  THREE RANKED CARDS IN A ROW ON `lg`, WILDCARD FULL-WIDTH
+                  BENEATH — which is what makes the desktop results one screen.
+                  Below `lg` it is the same vertical list it has always been.
 
-                        ⚠️ Pinned with flex, NOT with `absolute top-6 right-6`,
-                        and the difference matters at the sizes this app is
-                        actually used at. An absolutely positioned cluster does
-                        not participate in the card's height, and it cannot
-                        reserve space for itself: the title would need a fixed
-                        right padding matched to a cluster whose width varies
-                        by card. On the WILDCARD card that breaks outright --
-                        its badge is a 57-character sentence, so at 375px the
-                        cluster is taller than the header and would lie across
-                        the description.
+                  ⚠️ The index passed to renderResultCard is the card's position
+                  among the RANKED cards, and it has to stay that way:
+                  rerollCard(index) dispatches against results.shown, and
+                  getMedalStyles/getMedalText read it as the medal rank.
+                  resultCardsOf returns [...shown, wildcard] and filter
+                  preserves order, so ranked cards keep indices 0-2 exactly as
+                  they had when the wildcard was the last element of one list.
+                */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 tall:gap-4 items-start">
+                  {rankedCards.map((activity, index) => renderResultCard(activity, index))}
+                </div>
 
-                        Here the two are siblings in a non-wrapping row, so
-                        they share the width instead of competing for it:
-                        `shrink-0` plus a max-width keeps the cluster's corner
-                        fixed and lets it wrap INTERNALLY when narrow, while
-                        `min-w-0 flex-1` gives the title whatever is left and
-                        lets it wrap. Overlap is impossible and the row grows
-                        to fit the taller of the two.
-                      */}
-                      <div className="flex flex-nowrap justify-between items-start gap-3 mb-4">
-                        <h3 className={`text-lg sm:text-xl font-bold min-w-0 flex-1 ${activity.isWildcard ? 'text-purple-900' : 'text-slate-900'}`}>
-                          {activity.title}
-                        </h3>
+                {wildcardCard && renderResultCard(wildcardCard, rankedCards.length)}
 
-                        {/*
-                          max-w-32 (128px) and text-lg below `sm` are MEASURED,
-                          not guessed. At a 371px viewport the card gives the
-                          header 276px, and the split decides how tall the card
-                          gets: the longest catalogue title ("Learn a
-                          two-player card game neither of you knows", 49 chars)
-                          runs to 8 lines and a 224px header if the cluster
-                          takes 168px, against 4 lines and 118px at 128px.
-                          Above `sm` the cluster fits on one row well inside
-                          20rem, so the cap stops constraining and the title
-                          takes the rest.
-                        */}
-                        <div className="flex flex-wrap items-center justify-end gap-2 shrink-0 max-w-32 sm:max-w-[20rem]">
-                          {typeof activity.matchPercent === "number" && (
-                            <span
-                              title="How closely this matches your personality vector"
-                              className="border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap"
-                            >
-                              {Math.round(activity.matchPercent)}% match
-                            </span>
-                          )}
-                          <span className={`border text-xs font-bold px-4 py-1.5 rounded-full ${activity.isWildcard ? '' : 'whitespace-nowrap'} ${getMedalStyles(index, activity.isWildcard)}`}>
-                            {getMedalText(index, activity.isWildcard)}
-                          </span>
-                          
-                          {/*
-                            REMOVED, not disabled, when the counter hits 0 --
-                            and all three go together, because they share one
-                            counter. The wildcard is not part of this system:
-                            it keeps its own independent refresh below, which
-                            costs no reroll.
-                          */}
-                          {!activity.isWildcard && rerollsLeft > 0 && (
-                            <button
-                              onClick={() => rerollCard(index)}
-                              title={`Swap this one out for good. ${rerollsLeft} reroll${rerollsLeft === 1 ? "" : "s"} left.`}
-                              className="border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-900 text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap transition-colors"
-                            >
-                              ↻ Reroll
-                            </button>
-                          )}
-
-                          {activity.isWildcard && wildcardRefreshAvailable && (
-                            <button
-                              onClick={refreshWildcard}
-                              title="Draw another one at random. This one will not come back."
-                              className="border border-purple-200 bg-purple-50 text-purple-600 hover:bg-purple-100 hover:text-purple-900 text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap transition-colors"
-                            >
-                              ↻ Another
-                            </button>
-                          )}
-
-                          <button
-                            onClick={() => toggleSaveActivity(activity.id)}
-                            title={isSaved ? "Saved!" : "Save to list"}
-                            className={`p-2 rounded-full border transition-all ${
-                              isSaved 
-                                ? 'bg-rose-50 border-rose-200 text-rose-600' 
-                                : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-rose-500'
-                            }`}
-                          >
-                            {isSaved ? "♥" : "♡"}
-                          </button>
-                        </div>
-                      </div>
-                      
-                      <p className="text-slate-600 leading-relaxed text-sm md:text-base">
-                        {activity.description}
-                      </p>
-                    </div>
-                  );
-                })}
-
-                <button onClick={restart} className="w-full bg-slate-900 text-white py-4 mt-8 rounded-xl font-bold hover:bg-slate-800 transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+                <button onClick={restart} className="w-full bg-slate-900 text-white py-3 tall:py-4 mt-3 tall:mt-4 rounded-xl font-bold hover:bg-slate-800 transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
                   Try a different path
                 </button>
 
@@ -991,7 +1282,12 @@ export default function Home() {
         )}
       </div>
       
-      <div className="text-xs text-slate-400 mt-8">
+      {/*
+        Pure chrome, so it only appears where there is height to spare — which
+        is a taller viewport, not a wider one. A 1440x900 laptop does not have
+        the room; a 1440x1200 monitor does.
+      */}
+      <div className="hidden taller:block shrink-0 text-xs text-slate-400 mt-4 taller:mt-8">
         Stay Interesting • Powered by Supabase & Next.js
       </div>
     </main>
