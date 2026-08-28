@@ -1376,13 +1376,17 @@ deployed 2026-08-28 on Owen's instruction — the click-through had NOT happened
 changes, both Owen's decisions, both reversals of things this file previously argued for - so the
 reasoning that is now superseded is recorded beside them rather than deleted.
 
-⚠️ **THAT IS NOW THREE CONSECUTIVE BRANCHES SHIPPED WITHOUT THE CLICK-THROUGH** — `result-diversity`,
-`personality-types`, `viewport-fit` and this one. `docs/manual-test.md` describes itself as the
-thing every feature branch extends in its final stage, and it has been extended four times and run
-zero. The backlog it now represents is real and it is cumulative: the 15 type descriptions are still
-unreviewed first-pass copy, the whole viewport density pass has never been seen on a physical
-handset, and these two amendments change what the results page says at exactly the moment a user
-reads it. None of that is visible as an error anywhere.
+**CLICK-THROUGH BACKLOG CLEARED, 2026-08-28.** Four branches had shipped ahead of it —
+`result-diversity`, `personality-types`, `viewport-fit` and this one — leaving
+`docs/manual-test.md` extended four times and run zero. Owen has now walked the app and confirmed
+he is happy with everything to this point, which retires that backlog in one go.
+
+⚠️ **WHAT THAT APPROVAL DOES AND DOES NOT COVER.** It covers the funnel as it behaves and looks
+on a real device: the viewport work, the one-line attribution, the absent relaxation banner. It is
+an approval of the shipped result, NOT a line edit — in particular nobody went through
+`data/personality-types-review.md` making changes, so the 15 type descriptions are **approved as
+written rather than revised**. That is a materially different thing from "reviewed and edited", and
+the distinction is worth keeping if the copy is ever reopened.
 
 - **Type attribution is one line.** "Matched to <title>", centred, `text-sm`, slate-500, on every
   viewport. No description, no radar, no card. It was the full payoff repeated - eyebrow, title,
@@ -1411,14 +1415,14 @@ reads it. None of that is visible as an error anywhere.
 Owen's instruction — the click-through on a real phone had NOT happened first**). Full design under
 **Viewport fit** above.
 
-⚠️ **THE ONE THING NO SCRIPT AND NO HEADLESS MEASUREMENT COULD CHECK IS EXACTLY THE THING THAT WENT
-UNCHECKED.** Every number below was taken by driving Chrome and reading `scrollHeight` against
-`innerHeight`, which proves the geometry and nothing else. It does not prove that `p-2.5` option
-cards with `text-xs` descriptions are comfortable to read at arm's length, that a 64px radar still
-reads as a shape on a real screen, or that 288px of hero radar has legible axis labels on a phone
-rather than in a 288px iframe on a desktop monitor. Those are judgement calls about a physical
-device, they are the reason `docs/manual-test.md` exists, and they are still outstanding. Part 3,
-sections O-S.
+⚠️ **THE NUMBERS BELOW PROVE GEOMETRY, NOT LEGIBILITY — AND THE LEGIBILITY HALF HAS NOW BEEN
+CHECKED SEPARATELY.** Every measurement here came from driving Chrome and reading `scrollHeight`
+against `innerHeight`. That says nothing about whether `p-2.5` option cards with `text-xs`
+descriptions are comfortable at arm's length, whether a 64px radar still reads as a shape, or
+whether 288px of hero radar has legible axis labels on a phone rather than in a 288px iframe on a
+desktop monitor. Owen confirmed all of that by hand on 2026-08-28. **Keep the two kinds of evidence
+distinct**: if the density is ever tightened again, the headless sweep will keep passing and will
+not notice.
 
 - **Every interactive stage now fits one viewport with no page scroll**, verified by driving Chrome
   against the dev server and asserting `scrollHeight <= innerHeight` and `scrollWidth <= innerWidth`
@@ -1486,12 +1490,13 @@ at the end of this entry**). Full design under **The
   clean, `next build` clean, all four routes still statically prerendered, all seven dev scripts pass.
 - **Untouched by instruction:** `data/personalityQuiz.ts`. No option vector moved, and the two
   deliberately-red ceiling gates report exactly what they did before (Energy 6.88, Novelty 6.50).
-- ⚠️ **THE 15 TYPE DESCRIPTIONS IN `PERSONALITY_TYPES` ARE UNREVIEWED FIRST-PASS COPY.**
-  `data/personality-types-review.md` was rendered for Owen's edit pass and says his edits are
-  final; that pass had not happened when this was deployed. The copy is live on every profile card
-  and every results page. It is one table in one file, so revising it is a low-risk follow-up
-  commit — but until that happens, **this is the most user-visible unreviewed text in the
-  product**, and it should not be mistaken for approved copy.
+- **The 15 type descriptions in `PERSONALITY_TYPES` shipped as first-pass copy and were approved
+  as written, 2026-08-28.** `data/personality-types-review.md` was rendered for Owen's edit pass;
+  that pass never happened as a line edit, and he signed the product off with the copy as it
+  stands. ⚠️ **So it is approved, not revised** — no sentence in that table has been through the
+  voice standard as an editing pass, and the exemplars under **The voice standard** are still the
+  only copy in the product that demonstrably meets it. Reopening the table is a low-risk one-file
+  commit whenever anyone wants to.
 
 
 **Result diversity, 2026-08-26** (branch `result-diversity`, **merged into `main` and deployed
@@ -1514,8 +1519,8 @@ at the end of this entry**). Full design under **The
 - `landing-flow` was merged into `main` at the start of this branch (not pushed) — the brief
   assumed it already had been.
 
-**Landing flow and visual identity, 2026-08-26** (branch `landing-flow`, **merge held for Owen's
-click-through**):
+**Landing flow and visual identity, 2026-08-26** (branch `landing-flow`, **merged as `947a9b3`**;
+the "merge held" note this entry used to carry was true when written and went stale on the merge):
 
 - **The hero.** A new visitor used to land on question 1 of the personality quiz — eight abstract
   scenarios asked of someone who had not been told what the site does. `"hero"` is now the opening
@@ -1568,7 +1573,8 @@ click-through**):
   option vector moved, and the balance gate reports exactly what it did before (4/5, purist 7/7,
   Energy 6.88 and Novelty 6.50 still red).
 
-**Reroll fix and respec, 2026-08-26** (branch `reroll-fix`, **merge held for Owen's click-through**):
+**Reroll fix and respec, 2026-08-26** (branch `reroll-fix`, **merged as `2f3ac23`**; the
+"merge held" note this entry used to carry was true when written and went stale on the merge):
 
 Diagnosed before anything changed. Four faults, and the severity order was the opposite of what it
 looked like:
@@ -1589,8 +1595,8 @@ queue moved — on the same reasoning that deleted `wildcardEligible`. `verify-r
 CHECK D and E now drive the real reducer, including the rapid double-dispatch that used to lose a
 rank. eslint errors in `app/page.tsx` fell 11 → 7 as four `any` state declarations disappeared.
 
-**Vector rebalance, 2026-08-26** (branch `vector-rebalance`, **merge held until Owen has read the
-report and taken the quiz**):
+**Vector rebalance, 2026-08-26** (branch `vector-rebalance`, **merged as `bbd4d88`**; the
+"merge held" note this entry used to carry was true when written and went stale on the merge):
 
 - **The 7-axis rubric** recorded as the canonical standard for both quiz options and activities,
   with the scoring principle that does the real work: *score the described behaviour, not its side

@@ -4,6 +4,12 @@
 or feature — it describes everything a human has to look at to believe the app works, and
 it accumulates. **Every feature branch extends it in its final stage.**
 
+**Last full pass: 2026-08-28**, by Owen, covering everything up to and including the results-page
+amendment (one-line type attribution, no relaxation banner). Everything in this file was green at
+that point. Anything landing after that date is unwalked until this line moves — so if you are
+picking this up and the line still says 2026-08-28, the newest work has not been looked at by a
+human on a real device.
+
 It exists because the dev scripts in `scripts/` deliberately stop at the maths. They
 import the real modules and check what can be checked without a browser: rankings,
 filters, the reroll reducer, the radar geometry. What they cannot check is whether the
