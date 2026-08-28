@@ -4,11 +4,15 @@
 or feature — it describes everything a human has to look at to believe the app works, and
 it accumulates. **Every feature branch extends it in its final stage.**
 
-**Last full pass: 2026-08-28**, by Owen, covering everything up to and including the results-page
+**Last full pass: 2026-08-28**, by Owen, covering the funnel up to and including the results-page
 amendment (one-line type attribution, no relaxation banner). Everything in this file was green at
-that point. Anything landing after that date is unwalked until this line moves — so if you are
-picking this up and the line still says 2026-08-28, the newest work has not been looked at by a
-human on a real device.
+that point.
+
+⚠️ **The results LAYOUT correction landed after that pass and is unwalked** — the return to a
+single centred vertical column, which is what section R now describes. Do not read the date alone
+as covering it. When anyone next walks the checklist, update this note to name the newest change it
+actually covered rather than just bumping the date; a date on its own cannot distinguish two
+changes shipped the same day.
 
 It exists because the dev scripts in `scripts/` deliberately stop at the maths. They
 import the real modules and check what can be checked without a browser: rankings,

@@ -1377,8 +1377,15 @@ stays publicly readable with no write policy.
 
 ## Recently completed
 
-**Results layout correction, 2026-08-28** (branch `results-layout`, **merge held for Owen's
-click-through**). Supersedes the "three cards in a row on desktop" half of the viewport work.
+**Results layout correction, 2026-08-28** (branch `results-layout`, **merged into `main` and
+deployed 2026-08-28 on Owen's instruction**). Supersedes the "three cards in a row on desktop" half
+of the viewport work.
+
+⚠️ **THIS LANDED AFTER OWEN'S CLICK-THROUGH, NOT BEFORE IT.** His sign-off earlier the same day
+covered the funnel up to and including the results-page amendment; this change came afterwards and
+has not been walked on a device. It is a layout reversal rather than new behaviour, and the four
+measured sizes are recorded below, but the checklist's section R was rewritten for it and has not
+been run.
 
 - **Results are a single centred vertical column on every viewport**, `max-w-2xl`, ranked cards in
   rank order with the wildcard last. The `lg:grid-cols-3` grid, the `lg:max-w-6xl` results-only
