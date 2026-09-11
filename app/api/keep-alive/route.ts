@@ -9,7 +9,7 @@ export async function GET() {
   );
 
   // 2. Query the database (Replace 'users' with your actual table name)
-  const { data, error } = await supabase.from('users').select('id').limit(1);
+  const { data, error } = await supabase.from('activities').select('*').limit(1);
 
   if (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
